@@ -16,11 +16,15 @@ interface CatalogTableProps<T extends { id: string; is_active: boolean }> {
   onEdit: (item: T) => void;
   onDelete: (id: string) => void;
   loading?: boolean;
+  extraAction?: {
+    label: string;
+    onClick: (item: T) => void;
+  };
 }
 
 export default function CatalogTable<
   T extends { id: string; is_active: boolean },
->({ title, data, columns, onAdd, onEdit, onDelete, loading }: CatalogTableProps<T>) {
+>({ title, data, columns, onAdd, onEdit, onDelete, loading, extraAction }: CatalogTableProps<T>) {
   const [search, setSearch] = useState('');
 
   const filtered = data.filter((item) =>
@@ -98,6 +102,14 @@ export default function CatalogTable<
                   </span>
                 </td>
                 <td className="px-6 py-4 text-sm text-right space-x-2">
+                  {extraAction && (
+                    <button
+                      onClick={() => extraAction.onClick(item)}
+                      className="text-purple-600 hover:text-purple-800"
+                    >
+                      {extraAction.label}
+                    </button>
+                  )}
                   <button
                     onClick={() => onEdit(item)}
                     className="text-blue-600 hover:text-blue-800"

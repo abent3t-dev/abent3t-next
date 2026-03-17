@@ -46,3 +46,36 @@ export interface Period {
   is_active: boolean;
   created_at: string;
 }
+
+export type PaymentStatus = 'pending' | 'paid' | 'cancelled' | 'na';
+
+export interface Course {
+  id: string;
+  name: string;
+  institution_id: string | null;
+  course_type_id: string | null;
+  modality_id: string | null;
+  total_hours: number;
+  cost: number;
+  payment_status: PaymentStatus;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  institutions: { id: string; name: string } | null;
+  course_types: { id: string; name: string } | null;
+  modalities: { id: string; name: string } | null;
+}
+
+export interface CourseEdition {
+  id: string;
+  course_id: string;
+  start_date: string;
+  end_date: string | null;
+  location: string | null;
+  instructor: string | null;
+  max_participants: number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
