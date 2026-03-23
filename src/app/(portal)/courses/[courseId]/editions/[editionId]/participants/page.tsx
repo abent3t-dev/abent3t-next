@@ -1,0 +1,433 @@
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
+import type {
+  CourseEnrollment,
+  EnrollmentStatus,
+  Course,
+  CourseEdition,
+  Department,
+  UserProfile,
+} from '@/types/catalogs';
+
+const statusLabels: Record<EnrollmentStatus, string> = {
+  inscrito: 'Inscrito',
+  en_curso: 'En Curso',
+  completo: 'Completo',
+  pendiente_evidencia: 'Pendiente Evidencia',
+  cancelado: 'Cancelado',
+};
+
+const statusColors: Record<EnrollmentStatus, string> = {
+  inscrito: 'bg-blue-100 text-blue-800',
+  en_curso: 'bg-yellow-100 text-yellow-800',
+  completo: 'bg-green-100 text-green-800',
+  pendiente_evidencia: 'bg-orange-100 text-orange-800',
+  cancelado: 'bg-red-100 text-red-800',
+};
+
+export default function ParticipantsPage() {
+  const params = useParams();
+  const router = useRouter();
+  const courseId = params.courseId as string;
+  const editionId = params.editionId as string;
+
+  const [course, setCourse] = useState<Course | null>(null);
+  const [edition, setEdition] = useState<CourseEdition | null>(null);
+  const [enrollments, setEnrollments] = useState<CourseEnrollment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Modal state
+  const [selectorOpen, setSelectorOpen] = useState(false);
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [selectedDept, setSelectedDept] = useState('');
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+
+  // Status edit
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingStatus, setEditingStatus] = useState<EnrollmentStatus>('inscrito');
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [courseData, editionsData, enrollmentsData] = await Promise.all([
+        api.get<Course>(`/courses/${courseId}`),
+        api.get<CourseEdition[]>(`/courses/${courseId}/editions`),
+        api.get<CourseEnrollment[]>(`/enrollments/edition/${editionId}`),
+      ]);
+      setCourse(courseData);
+      const ed = editionsData.find((e) => e.id === editionId);
+      setEdition(ed || null);
+      setEnrollments(enrollmentsData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [courseId, editionId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const openSelector = async () => {
+    setSelectorOpen(true);
+    setSelectedUsers([]);
+    setSearch('');
+    setSelectedDept('');
+
+    const [usersData, deptsData] = await Promise.all([
+      api.get<UserProfile[]>('/auth/users?is_active=true'),
+      api.get<Department[]>('/departments'),
+    ]);
+    setUsers(usersData);
+    setDepartments(deptsData.filter((d) => d.is_active));
+  };
+
+  const enrolledIds = enrollments.map((e) => e.profile_id);
+
+  const filteredUsers = users.filter((u) => {
+    if (enrolledIds.includes(u.id)) return false;
+    if (selectedDept && u.department_id !== selectedDept) return false;
+    if (search) {
+      const term = search.toLowerCase();
+      return (
+        u.full_name.toLowerCase().includes(term) ||
+        u.email.toLowerCase().includes(term)
+      );
+    }
+    return true;
+  });
+
+  const toggleUser = (userId: string) => {
+    setSelectedUsers((prev) =>
+      prev.includes(userId)
+        ? prev.filter((id) => id !== userId)
+        : [...prev, userId],
+    );
+  };
+
+  const selectAll = () => {
+    const allIds = filteredUsers.map((u) => u.id);
+    setSelectedUsers(allIds);
+  };
+
+  const handleEnroll = async () => {
+    if (selectedUsers.length === 0) return;
+    setSaving(true);
+    try {
+      if (selectedUsers.length === 1) {
+        await api.post('/enrollments', {
+          course_edition_id: editionId,
+          profile_id: selectedUsers[0],
+        });
+      } else {
+        await api.post('/enrollments/bulk', {
+          course_edition_id: editionId,
+          profile_ids: selectedUsers,
+        });
+      }
+      setSelectorOpen(false);
+      loadData();
+    } catch (error) {
+      console.error('Error enrolling participants:', error);
+      alert('Error al inscribir participantes');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openStatusEdit = (enrollment: CourseEnrollment) => {
+    setEditingId(enrollment.id);
+    setEditingStatus(enrollment.status);
+  };
+
+  const saveStatus = async () => {
+    if (!editingId) return;
+    try {
+      await api.put(`/enrollments/${editingId}`, { status: editingStatus });
+      setEditingId(null);
+      loadData();
+    } catch (error) {
+      console.error('Error updating status:', error);
+    }
+  };
+
+  const cancelEnrollment = async (id: string) => {
+    if (!confirm('¿Cancelar esta inscripción?')) return;
+    try {
+      await api.delete(`/enrollments/${id}`);
+      loadData();
+    } catch (error) {
+      console.error('Error cancelling enrollment:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="text-center text-gray-500">Cargando...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <button
+            onClick={() => router.push('/courses')}
+            className="text-sm text-blue-600 hover:text-blue-800 mb-2"
+          >
+            &larr; Volver a Cursos
+          </button>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Participantes: {course?.name}
+          </h1>
+          <p className="text-gray-500">
+            Edición: {edition?.start_date}
+            {edition?.end_date && ` - ${edition.end_date}`}
+            {edition?.max_participants && ` | Máx: ${edition.max_participants}`}
+          </p>
+        </div>
+        <button
+          onClick={openSelector}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+        >
+          + Agregar Participantes
+        </button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-lg shadow">
+          <p className="text-sm text-gray-500">Total Inscritos</p>
+          <p className="text-2xl font-bold text-gray-900">{enrollments.length}</p>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <p className="text-sm text-gray-500">En Curso</p>
+          <p className="text-2xl font-bold text-yellow-600">
+            {enrollments.filter((e) => e.status === 'en_curso').length}
+          </p>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <p className="text-sm text-gray-500">Completados</p>
+          <p className="text-2xl font-bold text-green-600">
+            {enrollments.filter((e) => e.status === 'completo').length}
+          </p>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <p className="text-sm text-gray-500">Pendiente Evidencia</p>
+          <p className="text-2xl font-bold text-orange-600">
+            {enrollments.filter((e) => e.status === 'pendiente_evidencia').length}
+          </p>
+        </div>
+      </div>
+
+      {/* Enrollments Table */}
+      <div className="bg-white rounded-lg shadow">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-gray-200 bg-gray-50">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Participante
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Email
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Área
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Estatus
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Fecha Inscripción
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {enrollments.map((enrollment) => (
+              <tr key={enrollment.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 text-sm text-gray-900">
+                  {enrollment.profiles?.full_name || '—'}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-500">
+                  {enrollment.profiles?.email || '—'}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-500">
+                  {enrollment.profiles?.departments?.name || '—'}
+                </td>
+                <td className="px-6 py-4 text-sm">
+                  {editingId === enrollment.id ? (
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={editingStatus}
+                        onChange={(e) =>
+                          setEditingStatus(e.target.value as EnrollmentStatus)
+                        }
+                        className="text-sm border border-gray-300 rounded px-2 py-1"
+                      >
+                        {Object.entries(statusLabels).map(([key, label]) => (
+                          <option key={key} value={key}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={saveStatus}
+                        className="text-green-600 hover:text-green-800 text-sm"
+                      >
+                        Guardar
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="text-gray-500 hover:text-gray-700 text-sm"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <span
+                      className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full cursor-pointer ${statusColors[enrollment.status]}`}
+                      onClick={() => openStatusEdit(enrollment)}
+                      title="Click para cambiar estatus"
+                    >
+                      {statusLabels[enrollment.status]}
+                    </span>
+                  )}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-500">
+                  {new Date(enrollment.enrolled_at).toLocaleDateString('es-MX')}
+                </td>
+                <td className="px-6 py-4 text-sm text-right">
+                  <button
+                    onClick={() => cancelEnrollment(enrollment.id)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    Cancelar
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {enrollments.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  No hay participantes inscritos
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Selector Modal */}
+      {selectorOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Agregar Participantes
+              </h3>
+            </div>
+
+            <div className="px-6 py-4 border-b border-gray-200 space-y-3">
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre o email..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+                <select
+                  value={selectedDept}
+                  onChange={(e) => setSelectedDept(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+                >
+                  <option value="">Todas las áreas</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">
+                  {filteredUsers.length} disponibles | {selectedUsers.length}{' '}
+                  seleccionados
+                </span>
+                <button
+                  onClick={selectAll}
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  Seleccionar todos
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto px-6 py-4">
+              <div className="space-y-2">
+                {filteredUsers.map((user) => (
+                  <label
+                    key={user.id}
+                    className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedUsers.includes(user.id)}
+                      onChange={() => toggleUser(user.id)}
+                      className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">
+                        {user.full_name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {user.email}
+                        {user.departments && ` | ${user.departments.name}`}
+                      </p>
+                    </div>
+                  </label>
+                ))}
+                {filteredUsers.length === 0 && (
+                  <p className="text-center text-gray-500 py-4">
+                    No hay usuarios disponibles
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setSelectorOpen(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEnroll}
+                disabled={selectedUsers.length === 0 || saving}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving
+                  ? 'Inscribiendo...'
+                  : `Inscribir ${selectedUsers.length} participante(s)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

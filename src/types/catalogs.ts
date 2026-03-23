@@ -93,3 +93,49 @@ export interface Budget {
   departments: { id: string; name: string } | null;
   periods: { id: string; label: string; year: number; semester: number } | null;
 }
+
+export type EnrollmentStatus =
+  | 'inscrito'
+  | 'en_curso'
+  | 'completo'
+  | 'pendiente_evidencia'
+  | 'cancelado';
+
+export interface CourseEnrollment {
+  id: string;
+  course_edition_id: string;
+  profile_id: string;
+  status: EnrollmentStatus;
+  enrolled_at: string;
+  completed_at: string | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  profiles: {
+    id: string;
+    full_name: string;
+    email: string;
+    position: string | null;
+    departments: { id: string; name: string } | null;
+  } | null;
+  course_editions: {
+    id: string;
+    course_id: string;
+    start_date: string;
+    end_date: string | null;
+    max_participants: number | null;
+    courses: { id: string; name: string } | null;
+  } | null;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  department_id: string | null;
+  position: string | null;
+  is_active: boolean;
+  departments?: { id: string; name: string } | null;
+}

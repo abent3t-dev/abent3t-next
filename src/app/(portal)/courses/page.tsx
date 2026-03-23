@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import type {
   Course,
@@ -47,6 +48,8 @@ const emptyEditionForm = {
 };
 
 export default function CoursesPage() {
+  const router = useRouter();
+
   // --- Courses state ---
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
@@ -371,6 +374,16 @@ export default function CoursesPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-right space-x-2">
+                      <button
+                        onClick={() =>
+                          router.push(
+                            `/courses/${selectedCourse.id}/editions/${ed.id}/participants`,
+                          )
+                        }
+                        className="text-purple-600 hover:text-purple-800"
+                      >
+                        Participantes
+                      </button>
                       <button
                         onClick={() => openEditEdition(ed)}
                         className="text-blue-600 hover:text-blue-800"
