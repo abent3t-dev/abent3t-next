@@ -79,3 +79,17 @@ export interface CourseEdition {
   created_at: string;
   updated_at: string;
 }
+
+export interface Budget {
+  id: string;
+  department_id: string;
+  period_id: string;
+  assigned_amount: number;
+  consumed_amount: number;
+  available_amount: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  departments: { id: string; name: string } | null;
+  periods: { id: string; label: string; year: number; semester: number } | null;
+}

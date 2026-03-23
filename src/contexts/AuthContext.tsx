@@ -18,6 +18,7 @@ interface AuthContextValue {
   user: UserProfile | null;
   loading: boolean;
   signInWithMicrosoft: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   hasRole: (...roles: UserRole[]) => boolean;
   isAdmin: boolean;
@@ -94,6 +95,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const signInWithEmail = async (email: string, password: string) => {
+    const supabase = getSupabase();
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    try {
+      const profile = await api.get<UserProfile>('/auth/me');
+      setUser(profile);
+    } catch {
+      // Profile might not exist yet, redirect anyway
+    }
+
+    window.location.href = '/catalogs';
+    return { error: null };
+  };
+
   const signOut = async () => {
     const supabase = getSupabase();
     await supabase.auth.signOut();
@@ -110,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, signInWithMicrosoft, signOut, hasRole, isAdmin }}
+      value={{ user, loading, signInWithMicrosoft, signInWithEmail, signOut, hasRole, isAdmin }}
     >
       {children}
     </AuthContext.Provider>

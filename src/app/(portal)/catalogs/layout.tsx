@@ -8,6 +8,7 @@ const catalogLinks = [
   { href: '/catalogs/course-types', label: 'Tipos de Curso' },
   { href: '/catalogs/modalities', label: 'Modalidades' },
   { href: '/catalogs/periods', label: 'Periodos' },
+  { href: '/catalogs/budgets', label: 'Presupuestos' },
   { href: '/courses', label: 'Cursos' },
 ];
 
