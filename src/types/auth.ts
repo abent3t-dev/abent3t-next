@@ -62,30 +62,29 @@ export const SIDEBAR_NAV: NavItem[] = [
   // Módulo RRHH - Capacitación
   {
     label: 'Capacitación',
-    href: '/capacitacion',
+    href: '/dashboard',
     icon: 'graduation',
     roles: ALL_ROLES,
     children: [
-      { label: 'Dashboard', href: '/capacitacion/dashboard', icon: 'chart', roles: [...HR_ADMIN_ROLES, ...EXEC_ROLES] },
-      { label: 'Cursos', href: '/capacitacion/cursos', icon: 'book', roles: HR_ADMIN_ROLES },
+      { label: 'Dashboard', href: '/dashboard', icon: 'chart', roles: [...HR_ADMIN_ROLES, ...EXEC_ROLES] },
+      { label: 'Cursos', href: '/courses', icon: 'book', roles: HR_ADMIN_ROLES },
       { label: 'Mis Cursos', href: '/capacitacion/mis-cursos', icon: 'user-check', roles: [...EMPLOYEE_ROLES, 'jefe_area', 'director'] },
       { label: 'Presupuestos', href: '/capacitacion/presupuestos', icon: 'wallet', roles: HR_ADMIN_ROLES },
-      { label: 'Participantes', href: '/capacitacion/participantes', icon: 'users', roles: HR_ADMIN_ROLES },
       { label: 'Solicitudes', href: '/capacitacion/solicitudes', icon: 'file-text', roles: [...HR_ADMIN_ROLES, ...EMPLOYEE_ROLES, 'jefe_area', 'director'] },
     ],
   },
   // Catálogos (solo admins de RRHH)
   {
     label: 'Catálogos',
-    href: '/catalogos',
+    href: '/catalogs',
     icon: 'database',
     roles: HR_ADMIN_ROLES,
     children: [
-      { label: 'Departamentos', href: '/catalogos/departamentos', icon: 'building', roles: HR_ADMIN_ROLES },
-      { label: 'Instituciones', href: '/catalogos/instituciones', icon: 'landmark', roles: HR_ADMIN_ROLES },
-      { label: 'Tipos de Curso', href: '/catalogos/tipos-curso', icon: 'tag', roles: HR_ADMIN_ROLES },
-      { label: 'Modalidades', href: '/catalogos/modalidades', icon: 'layers', roles: HR_ADMIN_ROLES },
-      { label: 'Periodos', href: '/catalogos/periodos', icon: 'calendar', roles: HR_ADMIN_ROLES },
+      { label: 'Departamentos', href: '/catalogs/departments', icon: 'building', roles: HR_ADMIN_ROLES },
+      { label: 'Instituciones', href: '/catalogs/institutions', icon: 'landmark', roles: HR_ADMIN_ROLES },
+      { label: 'Tipos de Curso', href: '/catalogs/course-types', icon: 'tag', roles: HR_ADMIN_ROLES },
+      { label: 'Modalidades', href: '/catalogs/modalities', icon: 'layers', roles: HR_ADMIN_ROLES },
+      { label: 'Periodos', href: '/catalogs/periods', icon: 'calendar', roles: HR_ADMIN_ROLES },
     ],
   },
   // Reportes (ejecutivos y admins)
@@ -114,12 +113,12 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 /** Página de inicio por rol */
 export const HOME_ROUTES: Record<UserRole, string> = {
   super_admin: '/admin',
-  admin_rh: '/capacitacion/dashboard',
+  admin_rh: '/dashboard',
   jefe_area: '/capacitacion/mis-cursos',
   director: '/capacitacion/mis-cursos',
   colaborador: '/capacitacion/mis-cursos',
   collaborator: '/capacitacion/mis-cursos',
-  executive: '/capacitacion/dashboard',
+  executive: '/dashboard',
 };
 
 /** Roles que pueden gestionar usuarios */
