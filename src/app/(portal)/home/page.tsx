@@ -10,9 +10,15 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && user) {
-      const homeRoute = HOME_ROUTES[user.role] || '/capacitacion/mis-cursos';
-      router.replace(homeRoute);
+    if (!loading) {
+      if (user) {
+        // Usuario autenticado - redirigir según rol
+        const homeRoute = HOME_ROUTES[user.role] || '/capacitacion/mis-cursos';
+        router.replace(homeRoute);
+      } else {
+        // No hay usuario - redirigir a login
+        router.replace('/login');
+      }
     }
   }, [user, loading, router]);
 

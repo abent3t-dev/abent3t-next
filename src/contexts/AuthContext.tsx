@@ -23,7 +23,8 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
   hasRole: (...roles: UserRole[]) => boolean;
   isSuperAdmin: boolean;
-  isJefeArea: boolean;
+  isAdminRH: boolean;
+  isManager: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -42,48 +43,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let subscription: { unsubscribe: () => void } | null = null;
+    let mounted = true;
 
-    try {
-      const supabase = getSupabase();
-
-      const loadUser = async () => {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (session) {
-          try {
-            const profile = await api.get<UserProfile>('/auth/me');
-            setUser(profile);
-          } catch {
-            setUser(null);
-          }
-        }
+    // Timeout para evitar loading infinito
+    const timeout = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn('Auth timeout - forcing loading to false');
         setLoading(false);
-      };
+      }
+    }, 5000);
 
-      loadUser();
+    const loadUser = async () => {
+      try {
+        const supabase = getSupabase();
+        const { data: { session } } = await supabase.auth.getSession();
 
-      const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
         if (session) {
           try {
             const profile = await api.get<UserProfile>('/auth/me');
-            setUser(profile);
-          } catch {
-            setUser(null);
+            if (mounted) setUser(profile);
+          } catch (err) {
+            console.error('Error loading profile:', err);
+            if (mounted) setUser(null);
           }
         } else {
-          setUser(null);
+          if (mounted) setUser(null);
         }
-        setLoading(false);
-      });
-      subscription = data.subscription;
-    } catch {
-      // Supabase not configured (build time)
-      setLoading(false);
-    }
+      } catch (err) {
+        console.error('Error getting session:', err);
+        if (mounted) setUser(null);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
 
-    return () => subscription?.unsubscribe();
+    const setupSubscription = () => {
+      try {
+        const supabase = getSupabase();
+        const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+          if (session) {
+            try {
+              const profile = await api.get<UserProfile>('/auth/me');
+              if (mounted) setUser(profile);
+            } catch {
+              if (mounted) setUser(null);
+            }
+          } else {
+            if (mounted) setUser(null);
+          }
+          if (mounted) setLoading(false);
+        });
+        subscription = data.subscription;
+      } catch {
+        // Supabase not configured
+      }
+    };
+
+    loadUser();
+    setupSubscription();
+
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+      subscription?.unsubscribe();
+    };
   }, [getSupabase]);
 
   const signInWithMicrosoft = async () => {
@@ -135,11 +158,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const isSuperAdmin = user?.role === 'super_admin';
-  const isJefeArea = user?.role === 'jefe_area';
+  const isAdminRH = user?.role === 'admin_rh' || user?.role === 'super_admin';
+  const isManager = ['super_admin', 'admin_rh', 'jefe_area', 'director'].includes(user?.role || '');
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, signInWithMicrosoft, signInWithEmail, signOut, hasRole, isSuperAdmin, isJefeArea }}
+      value={{ user, loading, signInWithMicrosoft, signInWithEmail, signOut, hasRole, isSuperAdmin, isAdminRH, isManager }}
     >
       {children}
     </AuthContext.Provider>

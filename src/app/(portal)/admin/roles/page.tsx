@@ -19,7 +19,7 @@ export default function RolesPage() {
     return <div className="p-6 text-center text-gray-500">Cargando...</div>;
   }
 
-  const roles: UserRole[] = ['super_admin', 'jefe_area', 'colaborador'];
+  const roles: UserRole[] = ['super_admin', 'admin_rh', 'jefe_area', 'director', 'executive', 'colaborador', 'collaborator'];
 
   return (
     <div className="p-6 space-y-6">
