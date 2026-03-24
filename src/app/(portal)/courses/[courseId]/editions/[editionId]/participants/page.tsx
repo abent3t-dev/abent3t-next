@@ -12,6 +12,29 @@ import type {
   UserProfile,
 } from '@/types/catalogs';
 
+const Icons = {
+  plus: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+    </svg>
+  ),
+  ban: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+    </svg>
+  ),
+  arrowLeft: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+    </svg>
+  ),
+  x: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  ),
+};
+
 const statusLabels: Record<EnrollmentStatus, string> = {
   inscrito: 'Inscrito',
   en_curso: 'En Curso',
@@ -183,9 +206,10 @@ export default function ParticipantsPage() {
         <div>
           <button
             onClick={() => router.push('/courses')}
-            className="text-sm text-blue-600 hover:text-blue-800 mb-2"
+            className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mb-2"
           >
-            &larr; Volver a Cursos
+            {Icons.arrowLeft}
+            <span>Volver a Cursos</span>
           </button>
           <h1 className="text-2xl font-bold text-gray-900">
             Participantes: {course?.name}
@@ -198,9 +222,10 @@ export default function ParticipantsPage() {
         </div>
         <button
           onClick={openSelector}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
         >
-          + Agregar Participantes
+          {Icons.plus}
+          <span>Agregar Participantes</span>
         </button>
       </div>
 
@@ -250,7 +275,7 @@ export default function ParticipantsPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 Fecha Inscripción
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
                 Acciones
               </th>
             </tr>
@@ -309,13 +334,16 @@ export default function ParticipantsPage() {
                 <td className="px-6 py-4 text-sm text-gray-500">
                   {new Date(enrollment.enrolled_at).toLocaleDateString('es-MX')}
                 </td>
-                <td className="px-6 py-4 text-sm text-right">
-                  <button
-                    onClick={() => cancelEnrollment(enrollment.id)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    Cancelar
-                  </button>
+                <td className="px-6 py-4">
+                  <div className="flex items-center justify-center">
+                    <button
+                      onClick={() => cancelEnrollment(enrollment.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Cancelar inscripción"
+                    >
+                      {Icons.ban}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -334,10 +362,16 @@ export default function ParticipantsPage() {
       {selectorOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-            <div className="px-6 py-4 border-b border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">
                 Agregar Participantes
               </h3>
+              <button
+                onClick={() => setSelectorOpen(false)}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded"
+              >
+                {Icons.x}
+              </button>
             </div>
 
             <div className="px-6 py-4 border-b border-gray-200 space-y-3">
@@ -347,12 +381,12 @@ export default function ParticipantsPage() {
                   placeholder="Buscar por nombre o email..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 placeholder:text-gray-400"
                 />
                 <select
                   value={selectedDept}
                   onChange={(e) => setSelectedDept(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 bg-white"
                 >
                   <option value="">Todas las áreas</option>
                   {departments.map((d) => (

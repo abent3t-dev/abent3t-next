@@ -14,6 +14,34 @@ import type {
 import CatalogTable from '@/components/catalogs/CatalogTable';
 import CatalogModal from '@/components/catalogs/CatalogModal';
 
+const Icons = {
+  plus: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+    </svg>
+  ),
+  edit: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+    </svg>
+  ),
+  trash: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+    </svg>
+  ),
+  users: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+  ),
+  x: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  ),
+};
+
 const paymentLabels: Record<PaymentStatus, string> = {
   pending: 'Pendiente',
   paid: 'Pagado',
@@ -302,15 +330,17 @@ export default function CoursesPage() {
                   setSelectedCourse(null);
                   setEditions([]);
                 }}
-                className="px-3 py-1.5 text-sm text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Cerrar"
               >
-                Cerrar
+                {Icons.x}
               </button>
               <button
                 onClick={openAddEdition}
-                className="px-4 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
               >
-                + Agregar Edición
+                {Icons.plus}
+                <span>Agregar Edición</span>
               </button>
             </div>
           </div>
@@ -339,7 +369,7 @@ export default function CoursesPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Estado
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
                     Acciones
                   </th>
                 </tr>
@@ -373,29 +403,34 @@ export default function CoursesPage() {
                         {ed.is_active ? 'Activa' : 'Inactiva'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-right space-x-2">
-                      <button
-                        onClick={() =>
-                          router.push(
-                            `/courses/${selectedCourse.id}/editions/${ed.id}/participants`,
-                          )
-                        }
-                        className="text-purple-600 hover:text-purple-800"
-                      >
-                        Participantes
-                      </button>
-                      <button
-                        onClick={() => openEditEdition(ed)}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleDeleteEdition(ed.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        Desactivar
-                      </button>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() =>
+                            router.push(
+                              `/courses/${selectedCourse.id}/editions/${ed.id}/participants`,
+                            )
+                          }
+                          className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                          title="Participantes"
+                        >
+                          {Icons.users}
+                        </button>
+                        <button
+                          onClick={() => openEditEdition(ed)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Editar"
+                        >
+                          {Icons.edit}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEdition(ed.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Desactivar"
+                        >
+                          {Icons.trash}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
