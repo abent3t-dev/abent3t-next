@@ -12,6 +12,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { UserProfile, UserRole } from '@/types/auth';
+import { HOME_ROUTES } from '@/types/auth';
 import { api } from '@/lib/api';
 
 interface AuthContextValue {
@@ -21,7 +22,8 @@ interface AuthContextValue {
   signInWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   hasRole: (...roles: UserRole[]) => boolean;
-  isAdmin: boolean;
+  isSuperAdmin: boolean;
+  isJefeArea: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -109,11 +111,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const profile = await api.get<UserProfile>('/auth/me');
       setUser(profile);
+      // Redirigir a la página de inicio según el rol
+      const homeRoute = HOME_ROUTES[profile.role] || '/capacitacion/mis-cursos';
+      window.location.href = homeRoute;
     } catch {
-      // Profile might not exist yet, redirect anyway
+      // Profile might not exist yet, redirect to default
+      window.location.href = '/capacitacion/mis-cursos';
     }
 
-    window.location.href = '/catalogs';
     return { error: null };
   };
 
@@ -129,11 +134,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return roles.includes(user.role);
   }, [user]);
 
-  const isAdmin = user?.role === 'admin_rh';
+  const isSuperAdmin = user?.role === 'super_admin';
+  const isJefeArea = user?.role === 'jefe_area';
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, signInWithMicrosoft, signInWithEmail, signOut, hasRole, isAdmin }}
+      value={{ user, loading, signInWithMicrosoft, signInWithEmail, signOut, hasRole, isSuperAdmin, isJefeArea }}
     >
       {children}
     </AuthContext.Provider>

@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import Link from 'next/link';
 
 const catalogLinks = [
+  { href: '/dashboard', label: 'Dashboard' },
   { href: '/catalogs/departments', label: 'Departamentos' },
   { href: '/catalogs/institutions', label: 'Instituciones' },
   { href: '/catalogs/course-types', label: 'Tipos de Curso' },
