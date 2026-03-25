@@ -41,7 +41,6 @@ async function getAuthToken(): Promise<string | null> {
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = await getAuthToken();
-  console.log(`[API] ${options?.method || 'GET'} ${path} - Token: ${token ? 'YES' : 'NO'}`);
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -63,8 +62,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
-
-    console.log(`[API] ${path} - Status: ${res.status}`);
 
     if (!res.ok) {
       const error = await res.json().catch(() => ({ message: res.statusText }));

@@ -1,10 +1,23 @@
+export interface KpiValue {
+  value: number;
+  formatted: string;
+  subtitle: string;
+}
+
 export interface DashboardSummary {
-  totalHours: number;
-  totalSpent: number;
-  activeCourses: number;
-  totalEnrolled: number;
-  completedCount: number;
-  avgCompletionDays: number;
+  period: {
+    id: string;
+    label: string;
+    year: number;
+    semester: number | null;
+  } | null;
+  kpis: {
+    budgetExecution: KpiValue;
+    investmentPerEmployee: KpiValue;
+    hoursPerEmployee: KpiValue;
+    coverageRate: KpiValue;
+    completionRate: KpiValue;
+  };
 }
 
 export interface DepartmentStats {

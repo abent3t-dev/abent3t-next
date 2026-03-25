@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
+import { notify } from '@/lib/notifications';
 
 interface Budget {
   id: string;
@@ -32,7 +33,7 @@ export default function PresupuestosPage() {
         const data = await api.get<Budget[]>('/budgets');
         setBudgets(data);
       } catch (error) {
-        console.error('Error loading budgets:', error);
+        notify.error('Error al cargar presupuestos');
       } finally {
         setLoading(false);
       }
