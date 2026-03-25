@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { notify } from '@/lib/notifications';
 import type {
   CourseEnrollment,
   EnrollmentStatus,
@@ -88,7 +89,7 @@ export default function ParticipantsPage() {
       setEdition(ed || null);
       setEnrollments(enrollmentsData);
     } catch (error) {
-      console.error('Error loading data:', error);
+      notify.error('Error al cargar los datos');
     } finally {
       setLoading(false);
     }
@@ -156,10 +157,10 @@ export default function ParticipantsPage() {
         });
       }
       setSelectorOpen(false);
+      notify.success('Participantes inscritos correctamente');
       loadData();
     } catch (error) {
-      console.error('Error enrolling participants:', error);
-      alert('Error al inscribir participantes');
+      notify.error('Error al inscribir participantes');
     } finally {
       setSaving(false);
     }
@@ -175,19 +176,22 @@ export default function ParticipantsPage() {
     try {
       await api.put(`/enrollments/${editingId}`, { status: editingStatus });
       setEditingId(null);
+      notify.success('Estado actualizado');
       loadData();
     } catch (error) {
-      console.error('Error updating status:', error);
+      notify.error('Error al actualizar estado');
     }
   };
 
   const cancelEnrollment = async (id: string) => {
-    if (!confirm('¿Cancelar esta inscripción?')) return;
+    const confirmed = await notify.confirm('¿Cancelar esta inscripción?');
+    if (!confirmed) return;
     try {
       await api.delete(`/enrollments/${id}`);
+      notify.success('Inscripción cancelada');
       loadData();
     } catch (error) {
-      console.error('Error cancelling enrollment:', error);
+      notify.error('Error al cancelar inscripción');
     }
   };
 

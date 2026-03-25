@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
+import { notify } from '@/lib/notifications';
+import { queryKeys } from '@/lib/queryKeys';
 import { ROLE_LABELS, type UserRole, type UserProfile } from '@/types/auth';
 
 interface Department {
@@ -48,10 +51,7 @@ const Icons = {
 export default function UsersPage() {
   const { user: currentUser, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const qc = useQueryClient();
   const [error, setError] = useState('');
 
   // Modal states
@@ -75,25 +75,24 @@ export default function UsersPage() {
     }
   }, [currentUser, authLoading, router]);
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [usersData, deptsData] = await Promise.all([
-          api.get<UserProfile[]>('/auth/users'),
-          api.get<Department[]>('/departments'),
-        ]);
-        setUsers(usersData);
-        setDepartments(deptsData);
-      } catch (error) {
-        console.error('Error loading users:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    if (currentUser?.role === 'super_admin') {
-      loadData();
-    }
-  }, [currentUser]);
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+
+  const usersQuery = useQuery({
+    queryKey: queryKeys.users.all,
+    queryFn: () => api.get<UserProfile[]>('/auth/users'),
+    enabled: isSuperAdmin,
+  });
+
+  const deptsQuery = useQuery({
+    queryKey: queryKeys.departments.all,
+    queryFn: () => api.get<Department[]>('/departments'),
+    enabled: isSuperAdmin,
+  });
+
+  const users = usersQuery.data ?? [];
+  const departments = deptsQuery.data ?? [];
+  const loading = usersQuery.isLoading || deptsQuery.isLoading;
+
 
   const openCreateModal = () => {
     setModalMode('create');
@@ -131,96 +130,100 @@ export default function UsersPage() {
     setError('');
   };
 
+  const invalidateUsers = () => qc.invalidateQueries({ queryKey: queryKeys.users.all });
+
+  const createMutation = useMutation({
+    mutationFn: (data: typeof formData) =>
+      api.post('/auth/users', {
+        email: data.email,
+        password: data.password,
+        full_name: data.full_name,
+        position: data.position || undefined,
+        role: data.role,
+        department_id: data.department_id || undefined,
+      }),
+    onSuccess: () => {
+      invalidateUsers();
+      closeModal();
+      notify.success('Usuario creado correctamente');
+    },
+    onError: (err: Error) => {
+      const message = err.message || 'Error al crear usuario';
+      setError(message);
+      notify.error(message);
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: { userId: string; role: UserRole; department_id: string; prevRole: UserRole; prevDeptId: string }) => {
+      if (data.role !== data.prevRole) {
+        await api.put(`/auth/users/${data.userId}/role`, { role: data.role });
+      }
+      if (data.department_id !== data.prevDeptId) {
+        await api.put(`/auth/users/${data.userId}/department`, { department_id: data.department_id || null });
+      }
+    },
+    onSuccess: () => {
+      invalidateUsers();
+      closeModal();
+      notify.success('Usuario actualizado correctamente');
+    },
+    onError: (err: Error) => {
+      const message = err.message || 'Error al actualizar usuario';
+      setError(message);
+      notify.error(message);
+    },
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: (params: { userId: string; action: 'deactivate' | 'reactivate' }) =>
+      api.put(`/auth/users/${params.userId}/${params.action}`, {}),
+    onSuccess: (_, vars) => {
+      invalidateUsers();
+      notify.success(vars.action === 'deactivate' ? 'Usuario desactivado' : 'Usuario reactivado');
+    },
+    onError: (_, vars) => {
+      notify.error(vars.action === 'deactivate' ? 'Error al desactivar usuario' : 'Error al reactivar usuario');
+    },
+  });
+
   const handleCreate = async () => {
     if (!formData.email || !formData.password || !formData.full_name) {
       setError('Email, contraseña y nombre son requeridos');
       return;
     }
-
     if (formData.password.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres');
       return;
     }
-
-    setSaving(true);
     setError('');
-
-    try {
-      // Crear usuario via backend API
-      await api.post('/auth/users', {
-        email: formData.email,
-        password: formData.password,
-        full_name: formData.full_name,
-        position: formData.position || undefined,
-        role: formData.role,
-        department_id: formData.department_id || undefined,
-      });
-
-      // Recargar usuarios
-      const updatedUsers = await api.get<UserProfile[]>('/auth/users');
-      setUsers(updatedUsers);
-      closeModal();
-    } catch (err) {
-      console.error('Error creating user:', err);
-      const message = err instanceof Error ? err.message : 'Error al crear usuario';
-      setError(message);
-    } finally {
-      setSaving(false);
-    }
+    createMutation.mutate(formData);
   };
 
   const handleUpdate = async () => {
     if (!editingUser) return;
-
-    setSaving(true);
     setError('');
-
-    try {
-      // Update role if changed
-      if (formData.role !== editingUser.role) {
-        await api.put(`/auth/users/${editingUser.id}/role`, { role: formData.role });
-      }
-      // Update department if changed
-      if (formData.department_id !== (editingUser.department_id || '')) {
-        await api.put(`/auth/users/${editingUser.id}/department`, {
-          department_id: formData.department_id || null,
-        });
-      }
-
-      // Reload users
-      const usersData = await api.get<UserProfile[]>('/auth/users');
-      setUsers(usersData);
-      closeModal();
-    } catch (err) {
-      console.error('Error updating user:', err);
-      setError(err instanceof Error ? err.message : 'Error al actualizar usuario');
-    } finally {
-      setSaving(false);
-    }
+    updateMutation.mutate({
+      userId: editingUser.id,
+      role: formData.role,
+      department_id: formData.department_id,
+      prevRole: editingUser.role,
+      prevDeptId: editingUser.department_id || '',
+    });
   };
 
-  const handleDeactivate = async (userId: string) => {
-    if (!confirm('¿Estás seguro de desactivar este usuario?')) return;
+  const saving = createMutation.isPending || updateMutation.isPending || statusMutation.isPending;
 
-    try {
-      await api.put(`/auth/users/${userId}/deactivate`, {});
-      const usersData = await api.get<UserProfile[]>('/auth/users');
-      setUsers(usersData);
-    } catch (error) {
-      console.error('Error deactivating user:', error);
-    }
+  const handleDeactivate = async (userId: string) => {
+    const confirmed = await notify.confirm('¿Estás seguro de desactivar este usuario?');
+    if (!confirmed) return;
+    statusMutation.mutate({ userId, action: 'deactivate' });
   };
 
   const handleReactivate = async (userId: string) => {
-    if (!confirm('¿Reactivar este usuario?')) return;
-
-    try {
-      await api.put(`/auth/users/${userId}/reactivate`, {});
-      const usersData = await api.get<UserProfile[]>('/auth/users');
-      setUsers(usersData);
-    } catch (error) {
-      console.error('Error reactivating user:', error);
-    }
+    const confirmed = await notify.confirm('¿Reactivar este usuario?');
+    if (!confirmed) return;
+    statusMutation.mutate({ userId, action: 'reactivate' });
   };
 
   if (authLoading || loading) {

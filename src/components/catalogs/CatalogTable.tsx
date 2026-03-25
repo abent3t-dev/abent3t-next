@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import Pagination from '@/components/ui/Pagination';
+import type { PaginationMeta } from '@/types/pagination';
 
 interface Column<T> {
   key: keyof T;
@@ -12,15 +13,21 @@ interface CatalogTableProps<T extends { id: string; is_active: boolean }> {
   title: string;
   data: T[];
   columns: Column<T>[];
-  onAdd: () => void;
-  onEdit: (item: T) => void;
-  onDelete: (id: string) => void;
+  onAdd?: () => void;
+  onEdit?: (item: T) => void;
+  onDelete?: (id: string) => void;
   loading?: boolean;
   extraAction?: {
     label: string;
     onClick: (item: T) => void;
     icon?: React.ReactNode;
   };
+  // Server-side pagination & search
+  meta?: PaginationMeta | null;
+  onPageChange?: (page: number) => void;
+  onLimitChange?: (limit: number) => void;
+  searchValue?: string;
+  onSearch?: (value: string) => void;
 }
 
 const Icons = {
@@ -49,25 +56,38 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
     </svg>
   ),
+  x: (
+    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  ),
 };
 
 export default function CatalogTable<
   T extends { id: string; is_active: boolean },
->({ title, data, columns, onAdd, onEdit, onDelete, loading, extraAction }: CatalogTableProps<T>) {
-  const [search, setSearch] = useState('');
-
-  const filtered = data.filter((item) =>
-    columns.some((col) => {
-      const val = item[col.key];
-      return String(val).toLowerCase().includes(search.toLowerCase());
-    }),
-  );
+>({
+  title,
+  data,
+  columns,
+  onAdd,
+  onEdit,
+  onDelete,
+  loading,
+  extraAction,
+  meta,
+  onPageChange,
+  onLimitChange,
+  searchValue,
+  onSearch,
+}: CatalogTableProps<T>) {
+  const hasActions = onEdit || onDelete || extraAction;
 
   return (
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
         <div className="flex gap-3">
+          {/* Search — server-side if onSearch provided */}
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               {Icons.search}
@@ -75,18 +95,28 @@ export default function CatalogTable<
             <input
               type="text"
               placeholder="Buscar..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 pr-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder:text-gray-400"
+              value={searchValue ?? ''}
+              onChange={(e) => onSearch?.(e.target.value)}
+              className="pl-10 pr-8 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder:text-gray-400"
             />
+            {searchValue && (
+              <button
+                onClick={() => onSearch?.('')}
+                className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-600"
+              >
+                {Icons.x}
+              </button>
+            )}
           </div>
-          <button
-            onClick={onAdd}
-            className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
-          >
-            {Icons.plus}
-            <span>Agregar</span>
-          </button>
+          {onAdd && (
+            <button
+              onClick={onAdd}
+              className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+            >
+              {Icons.plus}
+              <span>Agregar</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -107,13 +137,15 @@ export default function CatalogTable<
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Estado
               </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Acciones
-              </th>
+              {hasActions && (
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Acciones
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {filtered.map((item) => (
+            {data.map((item) => (
               <tr key={item.id} className="hover:bg-gray-50">
                 {columns.map((col) => (
                   <td
@@ -136,39 +168,45 @@ export default function CatalogTable<
                     {item.is_active ? 'Activo' : 'Inactivo'}
                   </span>
                 </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center justify-center gap-1">
-                    {extraAction && (
-                      <button
-                        onClick={() => extraAction.onClick(item)}
-                        className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                        title={extraAction.label}
-                      >
-                        {extraAction.icon || Icons.calendar}
-                      </button>
-                    )}
-                    <button
-                      onClick={() => onEdit(item)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      title="Editar"
-                    >
-                      {Icons.edit}
-                    </button>
-                    <button
-                      onClick={() => onDelete(item.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Desactivar"
-                    >
-                      {Icons.trash}
-                    </button>
-                  </div>
-                </td>
+                {hasActions && (
+                  <td className="px-6 py-4">
+                    <div className="flex items-center justify-center gap-1">
+                      {extraAction && (
+                        <button
+                          onClick={() => extraAction.onClick(item)}
+                          className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                          title={extraAction.label}
+                        >
+                          {extraAction.icon || Icons.calendar}
+                        </button>
+                      )}
+                      {onEdit && (
+                        <button
+                          onClick={() => onEdit(item)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Editar"
+                        >
+                          {Icons.edit}
+                        </button>
+                      )}
+                      {onDelete && (
+                        <button
+                          onClick={() => onDelete(item.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Desactivar"
+                        >
+                          {Icons.trash}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
-            {filtered.length === 0 && (
+            {data.length === 0 && (
               <tr>
                 <td
-                  colSpan={columns.length + 2}
+                  colSpan={columns.length + 1 + (hasActions ? 1 : 0)}
                   className="px-6 py-8 text-center text-gray-500"
                 >
                   No se encontraron registros
@@ -177,6 +215,14 @@ export default function CatalogTable<
             )}
           </tbody>
         </table>
+      )}
+
+      {meta && onPageChange && (
+        <Pagination
+          meta={meta}
+          onPageChange={onPageChange}
+          onLimitChange={onLimitChange}
+        />
       )}
     </div>
   );

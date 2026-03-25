@@ -1,115 +1,109 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCatalogCRUD } from '@/hooks/useCatalogCRUD';
+import { CAN_MANAGE_DATA } from '@/config/permissions';
 import { CourseType } from '@/types/catalogs';
 import CatalogTable from '@/components/catalogs/CatalogTable';
 import CatalogModal from '@/components/catalogs/CatalogModal';
 
+interface CourseTypeForm {
+  name: string;
+  key: string;
+  description: string;
+}
+
+const initialForm: CourseTypeForm = { name: '', key: '', description: '' };
+
+function toKey(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
 export default function CourseTypesPage() {
-  const [data, setData] = useState<CourseType[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<CourseType | null>(null);
-  const [form, setForm] = useState({ name: '', key: '', description: '' });
-  const [saving, setSaving] = useState(false);
+  const { hasRole } = useAuth();
+  const canEdit = hasRole(...CAN_MANAGE_DATA);
 
-  const load = async () => {
-    setLoading(true);
-    const items = await api.get<CourseType[]>('/course-types');
-    setData(items);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const openAdd = () => {
-    setEditing(null);
-    setForm({ name: '', key: '', description: '' });
-    setModalOpen(true);
-  };
-
-  const openEdit = (item: CourseType) => {
-    setEditing(item);
-    setForm({ name: item.name, key: item.key, description: item.description || '' });
-    setModalOpen(true);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    const payload = { ...form, description: form.description || null };
-    if (editing) {
-      await api.put(`/course-types/${editing.id}`, { name: form.name, description: payload.description });
-    } else {
-      await api.post('/course-types', payload);
-    }
-    setSaving(false);
-    setModalOpen(false);
-    load();
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('¿Desactivar este tipo de curso?')) return;
-    await api.delete(`/course-types/${id}`);
-    load();
-  };
+  const crud = useCatalogCRUD<CourseType, CourseTypeForm>({
+    endpoint: '/course-types',
+    initialForm,
+    transformForEdit: (item) => ({
+      name: item.name,
+      key: item.key,
+      description: item.description || '',
+    }),
+    transformForCreate: (form) => ({ ...form, description: form.description || null }),
+    transformForUpdate: (form) => ({ name: form.name, description: form.description || null }),
+  });
 
   return (
     <>
       <CatalogTable
         title="Tipos de Curso"
-        data={data}
+        data={crud.data}
         columns={[
           { key: 'name', label: 'Nombre' },
           { key: 'key', label: 'Clave' },
           { key: 'description', label: 'Descripción', render: (val) => (val as string) || '—' },
         ]}
-        onAdd={openAdd}
-        onEdit={openEdit}
-        onDelete={handleDelete}
-        loading={loading}
+        onAdd={canEdit ? crud.openCreate : undefined}
+        onEdit={canEdit ? crud.openEdit : undefined}
+        onDelete={canEdit ? crud.handleDelete : undefined}
+        loading={crud.loading}
+        meta={crud.meta}
+        onPageChange={crud.goToPage}
+        onLimitChange={crud.changeLimit}
+        searchValue={crud.search}
+        onSearch={crud.setSearch}
       />
-      <CatalogModal
-        title={editing ? 'Editar Tipo de Curso' : 'Nuevo Tipo de Curso'}
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSubmit={handleSubmit}
-        loading={saving}
+      {canEdit && <CatalogModal
+        title={crud.editing ? 'Editar Tipo de Curso' : 'Nuevo Tipo de Curso'}
+        open={crud.modalOpen}
+        onClose={crud.closeModal}
+        onSubmit={crud.handleSubmit}
+        loading={crud.saving}
       >
         <label className="block text-sm font-medium text-gray-700">
           Nombre
           <input
             type="text"
             required
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            value={crud.form.name}
+            onChange={(e) => {
+              const name = e.target.value;
+              crud.updateField('name', name);
+              if (!crud.editing) crud.updateField('key', toKey(name));
+            }}
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </label>
-        {!editing && (
+        {!crud.editing && (
           <label className="block text-sm font-medium text-gray-700">
             Clave (identificador único)
             <input
               type="text"
               required
-              value={form.key}
-              onChange={(e) => setForm({ ...form, key: e.target.value })}
+              value={crud.form.key}
+              onChange={(e) => crud.updateField('key', e.target.value)}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="ej: technical"
+              placeholder="ej: diplomado"
             />
           </label>
         )}
         <label className="block text-sm font-medium text-gray-700">
           Descripción
           <textarea
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            value={crud.form.description}
+            onChange={(e) => crud.updateField('description', e.target.value)}
             rows={3}
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </label>
-      </CatalogModal>
+      </CatalogModal>}
     </>
   );
 }

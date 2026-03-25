@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { notify } from '@/lib/notifications';
 import type {
   Course,
   CourseEdition,
@@ -175,7 +176,8 @@ export default function CoursesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Desactivar este curso?')) return;
+    const confirmed = await notify.confirm('¿Desactivar este curso?');
+    if (!confirmed) return;
     await api.delete(`/courses/${id}`);
     loadCourses();
     if (selectedCourse?.id === id) {
@@ -235,7 +237,9 @@ export default function CoursesPage() {
   };
 
   const handleDeleteEdition = async (editionId: string) => {
-    if (!selectedCourse || !confirm('¿Desactivar esta edición?')) return;
+    if (!selectedCourse) return;
+    const confirmed = await notify.confirm('¿Desactivar esta edición?');
+    if (!confirmed) return;
     await api.delete(
       `/courses/${selectedCourse.id}/editions/${editionId}`,
     );

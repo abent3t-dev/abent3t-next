@@ -1,29 +1,51 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import type { UserRole } from '@/types/auth';
+import { getAllowedRoles } from '@/config/permissions';
 
 interface RoleGateProps {
-  roles: UserRole[];
   children: React.ReactNode;
-  fallback?: React.ReactNode;
 }
 
 /**
- * RoleGate — Only renders children if user has one of the allowed roles.
- *
- * Usage:
- * <RoleGate roles={['admin_rh']}>
- *   <AdminOnlyContent />
- * </RoleGate>
+ * RoleGate — Protects routes based on the permission map in config/permissions.ts.
+ * If the user's role is not in the allowed list for the current path, they are
+ * redirected to /unauthorized.  While auth is loading, a spinner is shown.
  */
-export default function RoleGate({ roles, children, fallback }: RoleGateProps) {
+export default function RoleGate({ children }: RoleGateProps) {
   const { user, loading } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
 
-  if (loading) return null;
+  const allowedRoles = getAllowedRoles(pathname);
+  const isAllowed = !allowedRoles || (user && allowedRoles.includes(user.role));
 
-  if (!user || !roles.includes(user.role)) {
-    return fallback ? <>{fallback}</> : null;
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+    if (!isAllowed) {
+      router.replace('/unauthorized');
+    }
+  }, [loading, user, isAllowed, router]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[50vh]">
+        <div className="text-center text-gray-500">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3" />
+          Verificando permisos...
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || !isAllowed) {
+    return null;
   }
 
   return <>{children}</>;

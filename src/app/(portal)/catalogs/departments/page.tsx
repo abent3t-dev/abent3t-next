@@ -1,88 +1,64 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCatalogCRUD } from '@/hooks/useCatalogCRUD';
+import { CAN_MANAGE_DATA } from '@/config/permissions';
 import { Department } from '@/types/catalogs';
 import CatalogTable from '@/components/catalogs/CatalogTable';
 import CatalogModal from '@/components/catalogs/CatalogModal';
 
+interface DepartmentForm {
+  name: string;
+}
+
+const initialForm: DepartmentForm = { name: '' };
+
 export default function DepartmentsPage() {
-  const [data, setData] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Department | null>(null);
-  const [form, setForm] = useState({ name: '' });
-  const [saving, setSaving] = useState(false);
+  const { hasRole } = useAuth();
+  const canEdit = hasRole(...CAN_MANAGE_DATA);
 
-  const load = async () => {
-    setLoading(true);
-    const items = await api.get<Department[]>('/departments');
-    setData(items);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const openAdd = () => {
-    setEditing(null);
-    setForm({ name: '' });
-    setModalOpen(true);
-  };
-
-  const openEdit = (item: Department) => {
-    setEditing(item);
-    setForm({ name: item.name });
-    setModalOpen(true);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    if (editing) {
-      await api.put(`/departments/${editing.id}`, form);
-    } else {
-      await api.post('/departments', form);
-    }
-    setSaving(false);
-    setModalOpen(false);
-    load();
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('¿Desactivar este departamento?')) return;
-    await api.delete(`/departments/${id}`);
-    load();
-  };
+  const crud = useCatalogCRUD<Department, DepartmentForm>({
+    endpoint: '/departments',
+    initialForm,
+    transformForEdit: (item) => ({ name: item.name }),
+  });
 
   return (
     <>
       <CatalogTable
         title="Departamentos"
-        data={data}
+        data={crud.data}
         columns={[{ key: 'name', label: 'Nombre' }]}
-        onAdd={openAdd}
-        onEdit={openEdit}
-        onDelete={handleDelete}
-        loading={loading}
+        onAdd={canEdit ? crud.openCreate : undefined}
+        onEdit={canEdit ? crud.openEdit : undefined}
+        onDelete={canEdit ? crud.handleDelete : undefined}
+        loading={crud.loading}
+        meta={crud.meta}
+        onPageChange={crud.goToPage}
+        onLimitChange={crud.changeLimit}
+        searchValue={crud.search}
+        onSearch={crud.setSearch}
       />
-      <CatalogModal
-        title={editing ? 'Editar Departamento' : 'Nuevo Departamento'}
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSubmit={handleSubmit}
-        loading={saving}
-      >
-        <label className="block text-sm font-medium text-gray-700">
-          Nombre
-          <input
-            type="text"
-            required
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </label>
-      </CatalogModal>
+      {canEdit && (
+        <CatalogModal
+          title={crud.editing ? 'Editar Departamento' : 'Nuevo Departamento'}
+          open={crud.modalOpen}
+          onClose={crud.closeModal}
+          onSubmit={crud.handleSubmit}
+          loading={crud.saving}
+        >
+          <label className="block text-sm font-medium text-gray-700">
+            Nombre
+            <input
+              type="text"
+              required
+              value={crud.form.name}
+              onChange={(e) => crud.updateField('name', e.target.value)}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </label>
+        </CatalogModal>
+      )}
     </>
   );
 }

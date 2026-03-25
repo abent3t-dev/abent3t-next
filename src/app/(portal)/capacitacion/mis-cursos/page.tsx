@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
+import { notify } from '@/lib/notifications';
 
 interface MyCourse {
   id: string;
@@ -46,7 +47,7 @@ export default function MisCursosPage() {
         const data = await api.get<MyCourse[]>(`/enrollments?profile_id=${user.id}`);
         setCourses(data);
       } catch (error) {
-        console.error('Error loading courses:', error);
+        notify.error('Error al cargar tus cursos');
       } finally {
         setLoading(false);
       }
