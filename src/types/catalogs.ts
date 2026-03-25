@@ -75,6 +75,7 @@ export interface CourseEdition {
   location: string | null;
   instructor: string | null;
   max_participants: number | null;
+  prorate_cost: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;

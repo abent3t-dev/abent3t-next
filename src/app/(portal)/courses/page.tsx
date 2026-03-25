@@ -74,6 +74,7 @@ const emptyEditionForm = {
   location: '',
   instructor: '',
   max_participants: '',
+  prorate_cost: false,
 };
 
 export default function CoursesPage() {
@@ -206,6 +207,7 @@ export default function CoursesPage() {
       location: edition.location || '',
       instructor: edition.instructor || '',
       max_participants: edition.max_participants?.toString() || '',
+      prorate_cost: edition.prorate_cost || false,
     });
     setEditionModalOpen(true);
   };
@@ -222,6 +224,7 @@ export default function CoursesPage() {
       max_participants: editionForm.max_participants
         ? parseInt(editionForm.max_participants)
         : null,
+      prorate_cost: editionForm.prorate_cost,
     };
     if (editingEdition) {
       await api.put(
@@ -371,6 +374,9 @@ export default function CoursesPage() {
                     Máx. participantes
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Prorrateo
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Estado
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
@@ -395,6 +401,15 @@ export default function CoursesPage() {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {ed.max_participants || '—'}
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      {ed.prorate_cost ? (
+                        <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                          Sí
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">No</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <span
@@ -441,7 +456,7 @@ export default function CoursesPage() {
                 {editions.length === 0 && (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       className="px-6 py-8 text-center text-gray-500"
                     >
                       Sin ediciones registradas
@@ -655,6 +670,27 @@ export default function CoursesPage() {
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </label>
+        <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+          <input
+            type="checkbox"
+            id="prorate_cost"
+            checked={editionForm.prorate_cost}
+            onChange={(e) =>
+              setEditionForm({
+                ...editionForm,
+                prorate_cost: e.target.checked,
+              })
+            }
+            className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <label htmlFor="prorate_cost" className="text-sm text-gray-700">
+            <span className="font-medium">Prorratear costo</span>
+            <p className="text-gray-500 text-xs mt-0.5">
+              Divide el costo del curso entre todos los participantes inscritos.
+              Cada área paga según el número de colaboradores que tenga.
+            </p>
+          </label>
+        </div>
       </CatalogModal>
     </div>
   );
