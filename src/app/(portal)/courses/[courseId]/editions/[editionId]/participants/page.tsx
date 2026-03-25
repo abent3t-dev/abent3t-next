@@ -58,6 +58,15 @@ const statusColors: Record<EnrollmentStatus, string> = {
   cancelado: 'bg-red-100 text-red-800',
 };
 
+// Semáforo visual: colores de círculo indicador
+const trafficLightColors: Record<EnrollmentStatus, string> = {
+  inscrito: 'bg-blue-500',      // Azul: recién inscrito
+  en_curso: 'bg-yellow-500',    // Amarillo: en progreso
+  completo: 'bg-green-500',     // Verde: completado
+  pendiente_evidencia: 'bg-orange-500', // Naranja: falta evidencia
+  cancelado: 'bg-red-500',      // Rojo: cancelado
+};
+
 export default function ParticipantsPage() {
   const params = useParams();
   const router = useRouter();
@@ -341,13 +350,19 @@ export default function ParticipantsPage() {
                       </button>
                     </div>
                   ) : (
-                    <span
-                      className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full cursor-pointer ${statusColors[enrollment.status]}`}
-                      onClick={() => openStatusEdit(enrollment)}
-                      title="Click para cambiar estatus"
-                    >
-                      {statusLabels[enrollment.status]}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`w-3 h-3 rounded-full ${trafficLightColors[enrollment.status]}`}
+                        title={`Semáforo: ${statusLabels[enrollment.status]}`}
+                      />
+                      <span
+                        className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full cursor-pointer ${statusColors[enrollment.status]}`}
+                        onClick={() => openStatusEdit(enrollment)}
+                        title="Click para cambiar estatus"
+                      >
+                        {statusLabels[enrollment.status]}
+                      </span>
+                    </div>
                   )}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-500">

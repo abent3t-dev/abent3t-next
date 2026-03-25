@@ -65,6 +65,8 @@ const emptyCourseForm = {
   total_hours: 0,
   cost: 0,
   payment_status: 'pending' as PaymentStatus,
+  payment_reference: '',
+  payment_date: '',
   description: '',
 };
 
@@ -75,6 +77,7 @@ const emptyEditionForm = {
   instructor: '',
   max_participants: '',
   prorate_cost: false,
+  require_evidence_for_completion: true,
 };
 
 export default function CoursesPage() {
@@ -151,6 +154,8 @@ export default function CoursesPage() {
       total_hours: item.total_hours,
       cost: item.cost,
       payment_status: item.payment_status,
+      payment_reference: item.payment_reference || '',
+      payment_date: item.payment_date || '',
       description: item.description || '',
     });
     setModalOpen(true);
@@ -164,6 +169,8 @@ export default function CoursesPage() {
       institution_id: form.institution_id || null,
       course_type_id: form.course_type_id || null,
       modality_id: form.modality_id || null,
+      payment_reference: form.payment_reference || null,
+      payment_date: form.payment_date || null,
       description: form.description || null,
     };
     if (editing) {
@@ -208,6 +215,7 @@ export default function CoursesPage() {
       instructor: edition.instructor || '',
       max_participants: edition.max_participants?.toString() || '',
       prorate_cost: edition.prorate_cost || false,
+      require_evidence_for_completion: edition.require_evidence_for_completion ?? true,
     });
     setEditionModalOpen(true);
   };
@@ -225,6 +233,7 @@ export default function CoursesPage() {
         ? parseInt(editionForm.max_participants)
         : null,
       prorate_cost: editionForm.prorate_cost,
+      require_evidence_for_completion: editionForm.require_evidence_for_completion,
     };
     if (editingEdition) {
       await api.put(
@@ -588,6 +597,31 @@ export default function CoursesPage() {
             <option value="na">N/A</option>
           </select>
         </label>
+        <div className="grid grid-cols-2 gap-4">
+          <label className="block text-sm font-medium text-gray-700">
+            Referencia de pago
+            <input
+              type="text"
+              value={form.payment_reference}
+              onChange={(e) =>
+                setForm({ ...form, payment_reference: e.target.value })
+              }
+              placeholder="Factura, transferencia, etc."
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </label>
+          <label className="block text-sm font-medium text-gray-700">
+            Fecha de pago
+            <input
+              type="date"
+              value={form.payment_date}
+              onChange={(e) =>
+                setForm({ ...form, payment_date: e.target.value })
+              }
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </label>
+        </div>
         <label className="block text-sm font-medium text-gray-700">
           Descripción
           <textarea
@@ -688,6 +722,27 @@ export default function CoursesPage() {
             <p className="text-gray-500 text-xs mt-0.5">
               Divide el costo del curso entre todos los participantes inscritos.
               Cada área paga según el número de colaboradores que tenga.
+            </p>
+          </label>
+        </div>
+        <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+          <input
+            type="checkbox"
+            id="require_evidence"
+            checked={editionForm.require_evidence_for_completion}
+            onChange={(e) =>
+              setEditionForm({
+                ...editionForm,
+                require_evidence_for_completion: e.target.checked,
+              })
+            }
+            className="mt-1 h-4 w-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
+          />
+          <label htmlFor="require_evidence" className="text-sm text-gray-700">
+            <span className="font-medium">Requerir evidencia para completar</span>
+            <p className="text-gray-500 text-xs mt-0.5">
+              Sin diploma/evidencia aprobada, el curso NO se considera completado
+              y el colaborador NO puede inscribirse en otro curso.
             </p>
           </label>
         </div>

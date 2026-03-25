@@ -58,6 +58,8 @@ export interface Course {
   total_hours: number;
   cost: number;
   payment_status: PaymentStatus;
+  payment_reference: string | null;
+  payment_date: string | null;
   description: string | null;
   is_active: boolean;
   created_at: string;
@@ -76,6 +78,7 @@ export interface CourseEdition {
   instructor: string | null;
   max_participants: number | null;
   prorate_cost: boolean;
+  require_evidence_for_completion: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
