@@ -93,10 +93,14 @@ export const SIDEBAR_NAV: NavItem[] = [
     label: 'Reportes',
     href: '/reportes',
     icon: 'chart',
-    roles: EXEC_ROLES,
-    children: [
-      { label: 'Capacitación', href: '/reportes/capacitacion', icon: 'graduation', roles: EXEC_ROLES },
-    ],
+    roles: [...HR_ADMIN_ROLES, ...EXEC_ROLES],
+  },
+  // Auditoría (solo admins)
+  {
+    label: 'Auditoría',
+    href: '/auditoria',
+    icon: 'shield',
+    roles: HR_ADMIN_ROLES,
   },
 ];
 

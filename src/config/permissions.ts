@@ -27,6 +27,12 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
   { path: '/capacitacion/presupuestos', roles: ['super_admin', 'admin_rh', 'executive'] },
   { path: '/capacitacion/solicitudes', roles: ['super_admin', 'admin_rh', 'director', 'jefe_area', 'colaborador', 'collaborator'] },
   { path: '/capacitacion/mis-cursos', roles: ['super_admin', 'admin_rh', 'director', 'jefe_area', 'executive', 'colaborador', 'collaborator'] },
+
+  // Reportes
+  { path: '/reportes', roles: ['super_admin', 'admin_rh', 'executive'] },
+
+  // Auditoría
+  { path: '/auditoria', roles: ['super_admin', 'admin_rh'] },
 ];
 
 /**
