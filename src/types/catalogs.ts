@@ -143,3 +143,53 @@ export interface UserProfile {
   is_active: boolean;
   departments?: { id: string; name: string } | null;
 }
+
+export type RequestStatus = 'pendiente' | 'aprobada' | 'rechazada';
+
+export interface TrainingRequest {
+  id: string;
+  course_edition_id: string;
+  profile_id: string;
+  requested_by: string;
+  status: RequestStatus;
+  request_reason: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  rejection_reason: string | null;
+  enrollment_id: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  profiles: {
+    id: string;
+    full_name: string;
+    email: string;
+    position: string | null;
+    department_id: string | null;
+    departments: { id: string; name: string } | null;
+  } | null;
+  requester: {
+    id: string;
+    full_name: string;
+    email: string;
+  } | null;
+  reviewer: {
+    id: string;
+    full_name: string;
+  } | null;
+  course_editions: {
+    id: string;
+    start_date: string;
+    end_date: string | null;
+    location: string | null;
+    instructor: string | null;
+    courses: {
+      id: string;
+      name: string;
+      cost: number;
+      total_hours: number;
+      institutions: { name: string } | null;
+      modalities: { name: string } | null;
+    } | null;
+  } | null;
+}

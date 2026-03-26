@@ -44,7 +44,7 @@ export default function MisCursosPage() {
     async function loadCourses() {
       if (!user) return;
       try {
-        const data = await api.get<MyCourse[]>(`/enrollments?profile_id=${user.id}`);
+        const data = await api.get<MyCourse[]>(`/enrollments/profile/${user.id}`);
         setCourses(data);
       } catch (error) {
         notify.error('Error al cargar tus cursos');
