@@ -88,6 +88,13 @@ export const SIDEBAR_NAV: NavItem[] = [
       { label: 'Periodos', href: '/catalogs/periods', icon: 'calendar', roles: HR_ADMIN_ROLES },
     ],
   },
+  // Personal (colaboradores)
+  {
+    label: 'Personal',
+    href: '/personal',
+    icon: 'users',
+    roles: HR_ADMIN_ROLES,
+  },
   // Reportes (ejecutivos y admins)
   {
     label: 'Reportes',

@@ -33,6 +33,9 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
 
   // Auditoría
   { path: '/auditoria', roles: ['super_admin', 'admin_rh'] },
+
+  // Personal (colaboradores)
+  { path: '/personal', roles: ['super_admin', 'admin_rh'] },
 ];
 
 /**
