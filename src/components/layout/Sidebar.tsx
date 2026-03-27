@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSocket } from '@/contexts/SocketContext';
 import { SIDEBAR_NAV, ROLE_LABELS, type NavItem } from '@/types/auth';
 import { useState } from 'react';
 
@@ -177,6 +178,7 @@ function NavItemComponent({ item, level = 0 }: { item: NavItem; level?: number }
 
 export function Sidebar() {
   const { user, signOut } = useAuth();
+  const { isConnected } = useSocket();
 
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen">
@@ -203,6 +205,18 @@ export function Sidebar() {
           <NavItemComponent key={item.href} item={item} />
         ))}
       </nav>
+
+      {/* Connection Status */}
+      <div className="px-4 py-2 border-t border-gray-200">
+        <div className="flex items-center gap-2 text-xs">
+          <span
+            className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}
+          />
+          <span className="text-gray-500">
+            {isConnected ? 'Tiempo real activo' : 'Sin conexión en tiempo real'}
+          </span>
+        </div>
+      </div>
 
       {/* Logout */}
       <div className="p-4 border-t border-gray-200">
