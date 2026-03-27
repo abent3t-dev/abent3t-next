@@ -24,6 +24,7 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
   { path: '/dashboard', roles: ['super_admin', 'admin_rh', 'director', 'jefe_area', 'executive'] },
 
   // Capacitación sub-routes (most-specific first)
+  { path: '/capacitacion/propuestas', roles: ['super_admin', 'admin_rh'] },
   { path: '/capacitacion/evidencias', roles: ['super_admin', 'admin_rh'] },
   { path: '/capacitacion/presupuestos', roles: ['super_admin', 'admin_rh', 'executive'] },
   { path: '/capacitacion/solicitudes', roles: ['super_admin', 'admin_rh', 'director', 'jefe_area', 'colaborador', 'collaborator'] },

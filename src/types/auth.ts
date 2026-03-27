@@ -72,6 +72,7 @@ export const SIDEBAR_NAV: NavItem[] = [
       { label: 'Historial', href: '/capacitacion/historial', icon: 'clock', roles: [...EMPLOYEE_ROLES, 'jefe_area', 'director'] },
       { label: 'Presupuestos', href: '/capacitacion/presupuestos', icon: 'wallet', roles: HR_ADMIN_ROLES },
       { label: 'Evidencias', href: '/capacitacion/evidencias', icon: 'file-check', roles: HR_ADMIN_ROLES },
+      { label: 'Propuestas', href: '/capacitacion/propuestas', icon: 'lightbulb', roles: HR_ADMIN_ROLES },
       { label: 'Solicitudes', href: '/capacitacion/solicitudes', icon: 'file-text', roles: [...HR_ADMIN_ROLES, ...EMPLOYEE_ROLES, 'jefe_area', 'director'] },
     ],
   },

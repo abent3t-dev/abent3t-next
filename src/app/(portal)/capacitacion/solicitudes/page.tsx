@@ -12,6 +12,23 @@ import type {
   UserProfile,
 } from '@/types/catalogs';
 
+interface CourseProposal {
+  id: string;
+  course_name: string;
+  institution_name: string | null;
+  course_url: string | null;
+  estimated_cost: number;
+  estimated_hours: number;
+  modality: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  justification: string | null;
+  status: 'pendiente' | 'en_investigacion' | 'aprobada' | 'rechazada';
+  review_notes: string | null;
+  rejection_reason: string | null;
+  created_at: string;
+}
+
 const Icons = {
   plus: (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -33,6 +50,11 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
   ),
+  lightbulb: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+    </svg>
+  ),
 };
 
 const statusLabels: Record<RequestStatus, string> = {
@@ -43,6 +65,20 @@ const statusLabels: Record<RequestStatus, string> = {
 
 const statusColors: Record<RequestStatus, string> = {
   pendiente: 'bg-yellow-100 text-yellow-800',
+  aprobada: 'bg-green-100 text-green-800',
+  rechazada: 'bg-red-100 text-red-800',
+};
+
+const proposalStatusLabels: Record<string, string> = {
+  pendiente: 'Pendiente',
+  en_investigacion: 'En Investigación',
+  aprobada: 'Aprobada',
+  rechazada: 'Rechazada',
+};
+
+const proposalStatusColors: Record<string, string> = {
+  pendiente: 'bg-yellow-100 text-yellow-800',
+  en_investigacion: 'bg-blue-100 text-blue-800',
   aprobada: 'bg-green-100 text-green-800',
   rechazada: 'bg-red-100 text-red-800',
 };
@@ -73,6 +109,24 @@ export default function SolicitudesPage() {
   const [reviewAction, setReviewAction] = useState<'aprobada' | 'rechazada'>('aprobada');
   const [rejectionReason, setRejectionReason] = useState('');
   const [reviewing, setReviewing] = useState(false);
+
+  // Estado para propuestas de cursos externos
+  const [activeTab, setActiveTab] = useState<'solicitudes' | 'propuestas'>('solicitudes');
+  const [proposals, setProposals] = useState<CourseProposal[]>([]);
+  const [loadingProposals, setLoadingProposals] = useState(false);
+  const [proposalModalOpen, setProposalModalOpen] = useState(false);
+  const [creatingProposal, setCreatingProposal] = useState(false);
+  const [proposalForm, setProposalForm] = useState({
+    course_name: '',
+    institution_name: '',
+    course_url: '',
+    estimated_cost: 0,
+    estimated_hours: 0,
+    modality: '',
+    start_date: '',
+    end_date: '',
+    justification: '',
+  });
 
   // Cargar solicitudes
   const loadRequests = useCallback(async () => {
@@ -112,9 +166,23 @@ export default function SolicitudesPage() {
     setCollaborators(data);
   };
 
+  // Cargar mis propuestas
+  const loadProposals = useCallback(async () => {
+    setLoadingProposals(true);
+    try {
+      const data = await api.get<CourseProposal[]>('/proposals/my-proposals');
+      setProposals(data);
+    } catch {
+      notify.error('Error al cargar propuestas');
+    } finally {
+      setLoadingProposals(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadRequests();
-  }, [loadRequests]);
+    loadProposals();
+  }, [loadRequests, loadProposals]);
 
   // Abrir modal de crear
   const openCreateModal = async () => {
@@ -215,6 +283,57 @@ export default function SolicitudesPage() {
     }
   };
 
+  // Abrir modal de propuesta
+  const openProposalModal = () => {
+    setProposalForm({
+      course_name: '',
+      institution_name: '',
+      course_url: '',
+      estimated_cost: 0,
+      estimated_hours: 0,
+      modality: '',
+      start_date: '',
+      end_date: '',
+      justification: '',
+    });
+    setProposalModalOpen(true);
+  };
+
+  // Crear propuesta
+  const handleCreateProposal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!proposalForm.course_name.trim()) {
+      notify.error('Ingresa el nombre del curso');
+      return;
+    }
+
+    setCreatingProposal(true);
+    try {
+      await api.post('/proposals', proposalForm);
+      notify.success('Propuesta enviada exitosamente');
+      setProposalModalOpen(false);
+      loadProposals();
+    } catch (err: any) {
+      notify.error(err.message || 'Error al enviar propuesta');
+    } finally {
+      setCreatingProposal(false);
+    }
+  };
+
+  // Cancelar propuesta
+  const handleCancelProposal = async (id: string) => {
+    const confirmed = await notify.confirm('¿Cancelar esta propuesta?');
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/proposals/${id}`);
+      notify.success('Propuesta cancelada');
+      loadProposals();
+    } catch (err: any) {
+      notify.error(err.message || 'Error al cancelar');
+    }
+  };
+
   // Filtrar solicitudes
   const filteredRequests = requests.filter((r) =>
     filter === 'all' ? true : r.status === filter
@@ -229,20 +348,63 @@ export default function SolicitudesPage() {
           <p className="text-gray-500">
             {isAdmin
               ? 'Gestiona las solicitudes de capacitación de todas las áreas'
-              : 'Solicita cursos para los colaboradores de tu equipo'}
+              : 'Solicita cursos para tu equipo o propón cursos externos'}
           </p>
         </div>
-        {isManager && (
+        <div className="flex gap-2">
           <button
-            onClick={openCreateModal}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={openProposalModal}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
           >
-            {Icons.plus}
-            <span>Nueva Solicitud</span>
+            {Icons.lightbulb}
+            <span>Proponer Curso</span>
           </button>
-        )}
+          {isManager && (
+            <button
+              onClick={openCreateModal}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              {Icons.plus}
+              <span>Nueva Solicitud</span>
+            </button>
+          )}
+        </div>
       </div>
 
+      {/* Tabs */}
+      <div className="border-b border-gray-200">
+        <nav className="flex gap-4">
+          <button
+            onClick={() => setActiveTab('solicitudes')}
+            className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'solicitudes'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {isManager ? 'Solicitudes de Equipo' : 'Solicitudes'}
+          </button>
+          <button
+            onClick={() => setActiveTab('propuestas')}
+            className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'propuestas'
+                ? 'border-purple-600 text-purple-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Mis Propuestas de Cursos
+            {proposals.filter(p => ['pendiente', 'en_investigacion'].includes(p.status)).length > 0 && (
+              <span className="ml-2 px-2 py-0.5 text-xs bg-purple-100 text-purple-800 rounded-full">
+                {proposals.filter(p => ['pendiente', 'en_investigacion'].includes(p.status)).length}
+              </span>
+            )}
+          </button>
+        </nav>
+      </div>
+
+      {/* Contenido de Solicitudes */}
+      {activeTab === 'solicitudes' && (
+        <>
       {/* Filtros */}
       <div className="flex gap-2">
         <button
@@ -411,6 +573,85 @@ export default function SolicitudesPage() {
           </table>
         )}
       </div>
+        </>
+      )}
+
+      {/* Contenido de Propuestas */}
+      {activeTab === 'propuestas' && (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          {loadingProposals ? (
+            <div className="p-8 text-center text-gray-500">Cargando...</div>
+          ) : proposals.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              <p>No tienes propuestas de cursos</p>
+              <p className="text-sm mt-2">
+                ¿Encontraste un curso interesante? Haz clic en &quot;Proponer Curso&quot; para enviarlo a revisión.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200">
+              {proposals.map((proposal) => (
+                <div key={proposal.id} className="p-4 hover:bg-gray-50">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900">{proposal.course_name}</span>
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${proposalStatusColors[proposal.status]}`}>
+                          {proposalStatusLabels[proposal.status]}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-gray-500">
+                        {proposal.institution_name && (
+                          <span>{proposal.institution_name}</span>
+                        )}
+                        {proposal.modality && (
+                          <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">{proposal.modality}</span>
+                        )}
+                        <span>${proposal.estimated_cost.toLocaleString()}</span>
+                        <span>{proposal.estimated_hours}h</span>
+                        <span className="flex items-center gap-1">
+                          {Icons.clock}
+                          {new Date(proposal.created_at).toLocaleDateString('es-MX')}
+                        </span>
+                      </div>
+                      {proposal.course_url && (
+                        <a
+                          href={proposal.course_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline mt-1 inline-block"
+                        >
+                          Ver curso
+                        </a>
+                      )}
+                      {proposal.justification && (
+                        <p className="text-sm text-gray-600 mt-2 italic">&quot;{proposal.justification}&quot;</p>
+                      )}
+                      {proposal.review_notes && (
+                        <p className="text-sm text-blue-600 mt-2">Notas: {proposal.review_notes}</p>
+                      )}
+                      {proposal.rejection_reason && (
+                        <p className="text-sm text-red-600 mt-2">Motivo de rechazo: {proposal.rejection_reason}</p>
+                      )}
+                    </div>
+                    <div className="ml-4">
+                      {['pendiente', 'en_investigacion'].includes(proposal.status) && (
+                        <button
+                          onClick={() => handleCancelProposal(proposal.id)}
+                          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                          title="Cancelar propuesta"
+                        >
+                          {Icons.x}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Modal Crear Solicitud */}
       {createModalOpen && (
@@ -582,6 +823,143 @@ export default function SolicitudesPage() {
                     : reviewAction === 'aprobada'
                     ? 'Aprobar Solicitud'
                     : 'Rechazar Solicitud'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Proponer Curso */}
+      {proposalModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Proponer Curso Externo</h2>
+              <p className="text-sm text-gray-500">
+                ¿Encontraste un curso que te interesa? Comparte los detalles y lo revisaremos.
+              </p>
+            </div>
+            <form onSubmit={handleCreateProposal} className="p-6 space-y-4">
+              <label className="block text-sm font-medium text-gray-700">
+                Nombre del Curso *
+                <input
+                  type="text"
+                  value={proposalForm.course_name}
+                  onChange={(e) => setProposalForm({ ...proposalForm, course_name: e.target.value })}
+                  required
+                  placeholder="Ej: Certificación Scrum Master"
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </label>
+
+              <label className="block text-sm font-medium text-gray-700">
+                Institución / Plataforma
+                <input
+                  type="text"
+                  value={proposalForm.institution_name}
+                  onChange={(e) => setProposalForm({ ...proposalForm, institution_name: e.target.value })}
+                  placeholder="Ej: Coursera, Udemy, Universidad XYZ"
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </label>
+
+              <label className="block text-sm font-medium text-gray-700">
+                URL del Curso
+                <input
+                  type="url"
+                  value={proposalForm.course_url}
+                  onChange={(e) => setProposalForm({ ...proposalForm, course_url: e.target.value })}
+                  placeholder="https://..."
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </label>
+
+              <div className="grid grid-cols-2 gap-4">
+                <label className="block text-sm font-medium text-gray-700">
+                  Costo Estimado (MXN)
+                  <input
+                    type="number"
+                    value={proposalForm.estimated_cost}
+                    onChange={(e) => setProposalForm({ ...proposalForm, estimated_cost: Number(e.target.value) })}
+                    min="0"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  />
+                </label>
+
+                <label className="block text-sm font-medium text-gray-700">
+                  Horas Estimadas
+                  <input
+                    type="number"
+                    value={proposalForm.estimated_hours}
+                    onChange={(e) => setProposalForm({ ...proposalForm, estimated_hours: Number(e.target.value) })}
+                    min="0"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  />
+                </label>
+              </div>
+
+              <label className="block text-sm font-medium text-gray-700">
+                Modalidad
+                <select
+                  value={proposalForm.modality}
+                  onChange={(e) => setProposalForm({ ...proposalForm, modality: e.target.value })}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                >
+                  <option value="">— Seleccionar —</option>
+                  <option value="presencial">Presencial</option>
+                  <option value="virtual">Virtual</option>
+                  <option value="hibrido">Híbrido</option>
+                </select>
+              </label>
+
+              <div className="grid grid-cols-2 gap-4">
+                <label className="block text-sm font-medium text-gray-700">
+                  Fecha de Inicio
+                  <input
+                    type="date"
+                    value={proposalForm.start_date}
+                    onChange={(e) => setProposalForm({ ...proposalForm, start_date: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  />
+                </label>
+
+                <label className="block text-sm font-medium text-gray-700">
+                  Fecha de Fin
+                  <input
+                    type="date"
+                    value={proposalForm.end_date}
+                    onChange={(e) => setProposalForm({ ...proposalForm, end_date: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  />
+                </label>
+              </div>
+
+              <label className="block text-sm font-medium text-gray-700">
+                ¿Por qué te interesa este curso?
+                <textarea
+                  value={proposalForm.justification}
+                  onChange={(e) => setProposalForm({ ...proposalForm, justification: e.target.value })}
+                  rows={3}
+                  placeholder="Explica cómo te ayudará en tu trabajo..."
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+              </label>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setProposalModalOpen(false)}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingProposal}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                >
+                  {creatingProposal ? 'Enviando...' : 'Enviar Propuesta'}
                 </button>
               </div>
             </form>
