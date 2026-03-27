@@ -87,6 +87,7 @@ export default function PropuestasPage() {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [approvingProposal, setApprovingProposal] = useState<Proposal | null>(null);
+  const [confirmingApproval, setConfirmingApproval] = useState<Proposal | null>(null);
 
   // Form state for approval
   const [approvalForm, setApprovalForm] = useState({
@@ -177,21 +178,29 @@ export default function PropuestasPage() {
   };
 
   const handleOpenApproval = (proposal: Proposal) => {
-    setApprovingProposal(proposal);
+    // First show confirmation modal
+    setConfirmingApproval(proposal);
+  };
+
+  const handleConfirmApproval = () => {
+    if (!confirmingApproval) return;
+    // Proceed to approval form
+    setApprovingProposal(confirmingApproval);
     setApprovalForm({
-      course_name: proposal.course_name,
+      course_name: confirmingApproval.course_name,
       institution_id: '',
       course_type_id: '',
       modality_id: '',
-      cost: proposal.estimated_cost,
-      total_hours: proposal.estimated_hours,
+      cost: confirmingApproval.estimated_cost,
+      total_hours: confirmingApproval.estimated_hours,
       description: '',
-      start_date: proposal.start_date || '',
-      end_date: proposal.end_date || '',
+      start_date: confirmingApproval.start_date || '',
+      end_date: confirmingApproval.end_date || '',
       location: '',
       instructor: '',
       review_notes: '',
     });
+    setConfirmingApproval(null);
   };
 
   const handleApprove = () => {
@@ -427,10 +436,78 @@ export default function PropuestasPage() {
         )}
       </div>
 
+      {/* Confirmation Modal - Before Approval */}
+      {confirmingApproval && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setConfirmingApproval(null)}
+          />
+          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-amber-100 rounded-full">
+                  <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Antes de aprobar</h3>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <p className="text-sm text-gray-600">
+                  <strong>Importante:</strong> Antes de aprobar esta propuesta, asegúrate de:
+                </p>
+                <ul className="text-sm text-gray-600 space-y-2 ml-4">
+                  <li className="flex items-start gap-2">
+                    <span className="text-amber-500 mt-0.5">•</span>
+                    <span>Investigar el curso propuesto (revisar URL, contenido, calidad)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-amber-500 mt-0.5">•</span>
+                    <span>Verificar que la <strong>institución</strong> exista en el catálogo (si no, registrarla primero)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-amber-500 mt-0.5">•</span>
+                    <span>Verificar que el <strong>tipo de curso</strong> exista en el catálogo</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-amber-500 mt-0.5">•</span>
+                    <span>Verificar que la <strong>modalidad</strong> exista en el catálogo</span>
+                  </li>
+                </ul>
+                <p className="text-sm text-gray-500 italic">
+                  Los catálogos se pueden administrar desde el menú &quot;Catálogos&quot;.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setConfirmingApproval(null)}
+                  className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmApproval}
+                  className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  Entendido, continuar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Approval Modal */}
       {approvingProposal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setApprovingProposal(null)}
+          />
+          <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-4">
             <div className="p-6 border-b">
               <h2 className="text-xl font-bold text-gray-900">Aprobar Propuesta</h2>
               <p className="text-sm text-gray-500">Verifica y completa los datos del curso antes de crear</p>
