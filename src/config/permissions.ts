@@ -28,6 +28,8 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
   { path: '/capacitacion/evidencias', roles: ['super_admin', 'admin_rh'] },
   { path: '/capacitacion/presupuestos', roles: ['super_admin', 'admin_rh', 'executive'] },
   { path: '/capacitacion/solicitudes', roles: ['super_admin', 'admin_rh', 'director', 'jefe_area', 'colaborador', 'collaborator'] },
+  { path: '/capacitacion/mi-equipo', roles: ['super_admin', 'admin_rh', 'director', 'jefe_area'] },
+  { path: '/capacitacion/historial', roles: ['super_admin', 'admin_rh', 'colaborador', 'collaborator'] },
   { path: '/capacitacion/mis-cursos', roles: ['super_admin', 'admin_rh', 'director', 'jefe_area', 'executive', 'colaborador', 'collaborator'] },
 
   // Reportes
