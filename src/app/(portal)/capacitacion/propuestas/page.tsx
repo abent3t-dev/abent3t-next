@@ -41,26 +41,50 @@ interface Catalog {
   name: string;
 }
 
-const statusConfig: Record<string, { label: string; bgColor: string; color: string }> = {
-  pendiente: { label: 'Pendiente', bgColor: 'bg-yellow-100', color: 'text-yellow-800' },
-  en_investigacion: { label: 'En Investigación', bgColor: 'bg-blue-100', color: 'text-blue-800' },
-  aprobada: { label: 'Aprobada', bgColor: 'bg-green-100', color: 'text-green-800' },
-  rechazada: { label: 'Rechazada', bgColor: 'bg-red-100', color: 'text-red-800' },
+const statusConfig: Record<string, { label: string; bg: string; text: string; border: string; icon: string }> = {
+  pendiente: {
+    label: 'Pendiente de Revisión',
+    bg: 'bg-amber-50',
+    text: 'text-amber-700',
+    border: 'border-amber-200',
+    icon: 'clock'
+  },
+  en_investigacion: {
+    label: 'En Investigación',
+    bg: 'bg-blue-50',
+    text: 'text-blue-700',
+    border: 'border-blue-200',
+    icon: 'search'
+  },
+  aprobada: {
+    label: 'Aprobada',
+    bg: 'bg-emerald-50',
+    text: 'text-emerald-700',
+    border: 'border-emerald-200',
+    icon: 'check'
+  },
+  rechazada: {
+    label: 'Rechazada',
+    bg: 'bg-red-50',
+    text: 'text-red-700',
+    border: 'border-red-200',
+    icon: 'x'
+  },
 };
 
 const Icons = {
   search: (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
     </svg>
   ),
   check: (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
     </svg>
   ),
   x: (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
     </svg>
   ),
@@ -70,13 +94,48 @@ const Icons = {
     </svg>
   ),
   clock: (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
   ),
   user: (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+    </svg>
+  ),
+  userGroup: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+    </svg>
+  ),
+  lightbulb: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+    </svg>
+  ),
+  book: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+    </svg>
+  ),
+  calendar: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+  ),
+  currency: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  office: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+    </svg>
+  ),
+  chat: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
     </svg>
   ),
 };
@@ -105,8 +164,14 @@ export default function PropuestasPage() {
     review_notes: '',
   });
 
-  // Queries
-  const { data: proposals = [], isLoading } = useQuery({
+  // Query para TODAS las propuestas (para los stats)
+  const { data: allProposals = [] } = useQuery({
+    queryKey: ['proposals', 'all'],
+    queryFn: () => api.get<Proposal[]>('/proposals'),
+  });
+
+  // Query para las propuestas filtradas (para la lista)
+  const { data: filteredProposals = [], isLoading } = useQuery({
     queryKey: ['proposals', filter],
     queryFn: async () => {
       if (filter === 'all') {
@@ -178,13 +243,11 @@ export default function PropuestasPage() {
   };
 
   const handleOpenApproval = (proposal: Proposal) => {
-    // First show confirmation modal
     setConfirmingApproval(proposal);
   };
 
   const handleConfirmApproval = () => {
     if (!confirmingApproval) return;
-    // Proceed to approval form
     setApprovingProposal(confirmingApproval);
     setApprovalForm({
       course_name: confirmingApproval.course_name,
@@ -212,503 +275,664 @@ export default function PropuestasPage() {
     approveMutation.mutate({ id: approvingProposal.id, data: approvalForm });
   };
 
+  // Stats calculados de TODAS las propuestas
+  const stats = {
+    pendientes: allProposals.filter(p => p.status === 'pendiente').length,
+    enInvestigacion: allProposals.filter(p => p.status === 'en_investigacion').length,
+    aprobadas: allProposals.filter(p => p.status === 'aprobada').length,
+    rechazadas: allProposals.filter(p => p.status === 'rechazada').length,
+    total: allProposals.length,
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
   };
 
-  const pendingCount = proposals.filter(p => p.status === 'pendiente').length;
-  const investigatingCount = proposals.filter(p => p.status === 'en_investigacion').length;
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('es-MX', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Propuestas de Cursos</h1>
-        <p className="text-gray-500">Revisa las propuestas de cursos externos enviadas por los colaboradores</p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-indigo-50 p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Propuestas de Cursos Externos</h1>
+          <p className="text-gray-500 mt-1">Revisa y gestiona las propuestas de cursos enviadas por los colaboradores</p>
+        </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow">
-          <p className="text-sm text-gray-500">Pendientes</p>
-          <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <p className="text-sm text-gray-500">En Investigación</p>
-          <p className="text-2xl font-bold text-blue-600">{investigatingCount}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <p className="text-sm text-gray-500">Aprobadas</p>
-          <p className="text-2xl font-bold text-green-600">
-            {proposals.filter(p => p.status === 'aprobada').length}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <p className="text-sm text-gray-500">Rechazadas</p>
-          <p className="text-2xl font-bold text-red-600">
-            {proposals.filter(p => p.status === 'rechazada').length}
-          </p>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex gap-2">
-        {[
-          { value: 'pendiente', label: 'Pendientes' },
-          { value: 'en_investigacion', label: 'En Investigación' },
-          { value: 'aprobada', label: 'Aprobadas' },
-          { value: 'rechazada', label: 'Rechazadas' },
-          { value: 'all', label: 'Todas' },
-        ].map((f) => (
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <button
-            key={f.value}
-            onClick={() => setFilter(f.value as typeof filter)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${
-              filter === f.value
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            onClick={() => setFilter('pendiente')}
+            className={`p-4 rounded-xl transition-all ${
+              filter === 'pendiente'
+                ? 'bg-amber-50 shadow-lg ring-2 ring-amber-400'
+                : 'bg-white/60 hover:bg-amber-50 hover:shadow-md'
             }`}
           >
-            {f.label}
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-amber-500">{Icons.clock}</span>
+              <span className="text-xs font-medium text-amber-600 uppercase tracking-wide">Pendientes</span>
+            </div>
+            <p className="text-3xl font-bold text-amber-600">{stats.pendientes}</p>
           </button>
-        ))}
-      </div>
 
-      {/* Proposals List */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+          <button
+            onClick={() => setFilter('en_investigacion')}
+            className={`p-4 rounded-xl transition-all ${
+              filter === 'en_investigacion'
+                ? 'bg-blue-50 shadow-lg ring-2 ring-blue-400'
+                : 'bg-white/60 hover:bg-blue-50 hover:shadow-md'
+            }`}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-blue-500">{Icons.search}</span>
+              <span className="text-xs font-medium text-blue-600 uppercase tracking-wide">Investigando</span>
+            </div>
+            <p className="text-3xl font-bold text-blue-600">{stats.enInvestigacion}</p>
+          </button>
+
+          <button
+            onClick={() => setFilter('aprobada')}
+            className={`p-4 rounded-xl transition-all ${
+              filter === 'aprobada'
+                ? 'bg-emerald-50 shadow-lg ring-2 ring-emerald-400'
+                : 'bg-white/60 hover:bg-emerald-50 hover:shadow-md'
+            }`}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-emerald-500">{Icons.check}</span>
+              <span className="text-xs font-medium text-emerald-600 uppercase tracking-wide">Aprobadas</span>
+            </div>
+            <p className="text-3xl font-bold text-emerald-600">{stats.aprobadas}</p>
+          </button>
+
+          <button
+            onClick={() => setFilter('rechazada')}
+            className={`p-4 rounded-xl transition-all ${
+              filter === 'rechazada'
+                ? 'bg-red-50 shadow-lg ring-2 ring-red-400'
+                : 'bg-white/60 hover:bg-red-50 hover:shadow-md'
+            }`}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-red-500">{Icons.x}</span>
+              <span className="text-xs font-medium text-red-600 uppercase tracking-wide">Rechazadas</span>
+            </div>
+            <p className="text-3xl font-bold text-red-600">{stats.rechazadas}</p>
+          </button>
+
+          <button
+            onClick={() => setFilter('all')}
+            className={`p-4 rounded-xl transition-all ${
+              filter === 'all'
+                ? 'bg-white shadow-lg ring-2 ring-gray-400'
+                : 'bg-white/60 hover:bg-white hover:shadow-md'
+            }`}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-gray-500">{Icons.lightbulb}</span>
+              <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">Total</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-700">{stats.total}</p>
+          </button>
+        </div>
+
+        {/* Proposals List */}
         {isLoading ? (
-          <div className="p-8 text-center text-gray-500">Cargando...</div>
-        ) : proposals.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            No hay propuestas {filter === 'pendiente' ? 'pendientes' : ''}
+          <div className="bg-white rounded-2xl p-12 text-center">
+            <div className="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full mx-auto" />
+            <p className="text-gray-500 mt-4">Cargando propuestas...</p>
+          </div>
+        ) : filteredProposals.length === 0 ? (
+          <div className="bg-white rounded-2xl p-12 text-center">
+            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 text-purple-600">
+              {Icons.lightbulb}
+            </div>
+            <p className="text-gray-600 font-medium">No hay propuestas</p>
+            <p className="text-gray-400 text-sm mt-1">
+              {filter !== 'all'
+                ? `No hay propuestas ${statusConfig[filter]?.label.toLowerCase() || ''}`
+                : 'Aún no se han recibido propuestas de cursos externos'}
+            </p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200">
-            {proposals.map((proposal) => {
+          <div className="space-y-4">
+            {filteredProposals.map((proposal) => {
               const status = statusConfig[proposal.status];
 
               return (
-                <div key={proposal.id} className="p-4 hover:bg-gray-50">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className="p-2 bg-purple-100 rounded-lg">
-                        {Icons.user}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900">{proposal.course_name}</span>
-                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${status.bgColor} ${status.color}`}>
-                            {status.label}
-                          </span>
-                        </div>
+                <div
+                  key={proposal.id}
+                  className={`bg-white rounded-2xl shadow-sm border overflow-hidden transition-all hover:shadow-md ${status.border}`}
+                >
+                  {/* Header con estado */}
+                  <div className={`px-6 py-3 ${status.bg} border-b ${status.border} flex items-center justify-between`}>
+                    <div className="flex items-center gap-3">
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${status.bg} ${status.text}`}>
+                        {status.icon === 'clock' && Icons.clock}
+                        {status.icon === 'search' && Icons.search}
+                        {status.icon === 'check' && Icons.check}
+                        {status.icon === 'x' && Icons.x}
+                        {status.label}
+                      </span>
+                      <span className="text-sm text-gray-500 flex items-center gap-1">
+                        {Icons.calendar}
+                        Propuesto el {formatDate(proposal.created_at)}
+                      </span>
+                    </div>
 
-                        {/* Beneficiary info */}
-                        <p className="text-sm text-gray-600 mt-1">
-                          <span className="font-medium">Para:</span> {proposal.profile?.full_name}
-                          {proposal.profile?.departments?.name && (
-                            <span className="text-gray-400"> • {proposal.profile.departments.name}</span>
-                          )}
-                        </p>
-
-                        {/* Proposer info */}
-                        <p className="text-sm text-gray-500">
-                          <span className="font-medium">Propuesto por:</span> {proposal.proposer?.full_name}
-                        </p>
-
-                        {/* Course details */}
-                        <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
-                          {proposal.institution_name && (
-                            <span className="bg-gray-100 px-2 py-1 rounded">{proposal.institution_name}</span>
-                          )}
-                          {proposal.modality && (
-                            <span className="bg-gray-100 px-2 py-1 rounded">{proposal.modality}</span>
-                          )}
-                          <span>{formatCurrency(proposal.estimated_cost)}</span>
-                          <span>{proposal.estimated_hours}h</span>
-                          <span className="flex items-center gap-1">
-                            {Icons.clock}
-                            {new Date(proposal.created_at).toLocaleDateString('es-MX')}
-                          </span>
-                        </div>
-
-                        {/* URL */}
-                        {proposal.course_url && (
-                          <a
-                            href={proposal.course_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 mt-2 text-sm text-blue-600 hover:underline"
+                    {/* Acciones */}
+                    {['pendiente', 'en_investigacion'].includes(proposal.status) && (
+                      <div className="flex items-center gap-2">
+                        {proposal.status === 'pendiente' && (
+                          <button
+                            onClick={() => handleInvestigate(proposal.id)}
+                            disabled={investigateMutation.isPending}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50"
                           >
-                            {Icons.link}
-                            Ver curso
-                          </a>
+                            {Icons.search}
+                            Investigar
+                          </button>
                         )}
+                        <button
+                          onClick={() => handleOpenApproval(proposal)}
+                          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
+                        >
+                          {Icons.check}
+                          Aprobar
+                        </button>
+                        <button
+                          onClick={() => setRejectingId(proposal.id)}
+                          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                        >
+                          {Icons.x}
+                          Rechazar
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
-                        {/* Justification */}
-                        {proposal.justification && (
-                          <p className="text-sm text-gray-600 mt-2 italic bg-gray-50 p-2 rounded">
-                            &quot;{proposal.justification}&quot;
-                          </p>
-                        )}
+                  {/* Contenido principal */}
+                  <div className="p-6">
+                    <div className="grid md:grid-cols-3 gap-6">
+                      {/* Columna 1: Información de personas */}
+                      <div className="space-y-4">
+                        {/* Quién propone */}
+                        <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-4">
+                          <div className="flex items-center gap-2 text-purple-600 mb-2">
+                            {Icons.user}
+                            <span className="text-xs font-semibold uppercase tracking-wide">Propuesto por</span>
+                          </div>
+                          <p className="font-semibold text-gray-900">{proposal.proposer?.full_name || '—'}</p>
+                          <p className="text-sm text-gray-500">{proposal.proposer?.email}</p>
+                        </div>
 
-                        {/* Rejection reason */}
-                        {proposal.rejection_reason && (
-                          <p className="text-sm text-red-600 mt-2">
-                            Motivo de rechazo: {proposal.rejection_reason}
-                          </p>
-                        )}
+                        {/* Flecha */}
+                        <div className="flex justify-center text-gray-300">
+                          <svg className="w-6 h-6 transform rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                          </svg>
+                        </div>
 
-                        {/* Review notes */}
-                        {proposal.review_notes && (
-                          <p className="text-sm text-blue-600 mt-2">
-                            Notas: {proposal.review_notes}
-                          </p>
-                        )}
+                        {/* Para quién es */}
+                        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-4">
+                          <div className="flex items-center gap-2 text-emerald-600 mb-2">
+                            {Icons.userGroup}
+                            <span className="text-xs font-semibold uppercase tracking-wide">Beneficiario</span>
+                          </div>
+                          <p className="font-semibold text-gray-900">{proposal.profile?.full_name || '—'}</p>
+                          <p className="text-sm text-gray-500">{proposal.profile?.position || 'Sin puesto'}</p>
+                          {proposal.profile?.departments?.name && (
+                            <span className="inline-flex items-center gap-1 mt-2 text-xs text-gray-500 bg-white px-2 py-1 rounded">
+                              {Icons.office}
+                              {proposal.profile.departments.name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Columna 2: Información del curso */}
+                      <div className="md:col-span-2">
+                        <div className="bg-gray-50 rounded-xl p-5 h-full">
+                          <div className="flex items-center gap-2 text-gray-600 mb-3">
+                            {Icons.book}
+                            <span className="text-xs font-semibold uppercase tracking-wide">Curso Propuesto</span>
+                          </div>
+
+                          <h3 className="font-bold text-xl text-gray-900 mb-4">{proposal.course_name}</h3>
+
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                            {/* Institución */}
+                            {proposal.institution_name && (
+                              <div className="bg-white rounded-lg p-3">
+                                <p className="text-xs text-gray-500 mb-1">Institución</p>
+                                <p className="font-medium text-gray-900 text-sm">{proposal.institution_name}</p>
+                              </div>
+                            )}
+
+                            {/* Modalidad */}
+                            {proposal.modality && (
+                              <div className="bg-white rounded-lg p-3">
+                                <p className="text-xs text-gray-500 mb-1">Modalidad</p>
+                                <p className="font-medium text-gray-900 text-sm capitalize">{proposal.modality}</p>
+                              </div>
+                            )}
+
+                            {/* Costo */}
+                            <div className="bg-white rounded-lg p-3">
+                              <p className="text-xs text-gray-500 mb-1">Costo Estimado</p>
+                              <p className="font-bold text-gray-900">{formatCurrency(proposal.estimated_cost)}</p>
+                            </div>
+
+                            {/* Horas */}
+                            <div className="bg-white rounded-lg p-3">
+                              <p className="text-xs text-gray-500 mb-1">Duración</p>
+                              <p className="font-medium text-gray-900">{proposal.estimated_hours} horas</p>
+                            </div>
+                          </div>
+
+                          {/* Fechas si existen */}
+                          {(proposal.start_date || proposal.end_date) && (
+                            <div className="flex items-center gap-4 mb-4 text-sm text-gray-600">
+                              {proposal.start_date && (
+                                <span className="flex items-center gap-1">
+                                  {Icons.calendar}
+                                  Inicio: {formatDate(proposal.start_date)}
+                                </span>
+                              )}
+                              {proposal.end_date && (
+                                <span className="flex items-center gap-1">
+                                  {Icons.calendar}
+                                  Fin: {formatDate(proposal.end_date)}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* URL del curso */}
+                          {proposal.course_url && (
+                            <a
+                              href={proposal.course_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
+                            >
+                              {Icons.link}
+                              Ver página del curso
+                            </a>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 ml-4">
-                      {['pendiente', 'en_investigacion'].includes(proposal.status) && (
-                        <>
-                          {rejectingId === proposal.id ? (
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="text"
-                                value={rejectReason}
-                                onChange={(e) => setRejectReason(e.target.value)}
-                                placeholder="Motivo de rechazo..."
-                                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg w-48"
-                              />
-                              <button
-                                onClick={() => handleReject(proposal.id)}
-                                disabled={rejectMutation.isPending}
-                                className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-                              >
-                                Confirmar
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setRejectingId(null);
-                                  setRejectReason('');
-                                }}
-                                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
-                              >
-                                Cancelar
-                              </button>
-                            </div>
-                          ) : (
-                            <>
-                              {proposal.status === 'pendiente' && (
-                                <button
-                                  onClick={() => handleInvestigate(proposal.id)}
-                                  disabled={investigateMutation.isPending}
-                                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                                >
-                                  {Icons.search}
-                                  <span>Investigar</span>
-                                </button>
-                              )}
-                              <button
-                                onClick={() => handleOpenApproval(proposal)}
-                                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
-                              >
-                                {Icons.check}
-                                <span>Aprobar</span>
-                              </button>
-                              <button
-                                onClick={() => setRejectingId(proposal.id)}
-                                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
-                              >
-                                {Icons.x}
-                                <span>Rechazar</span>
-                              </button>
-                            </>
-                          )}
-                        </>
-                      )}
-                    </div>
+                    {/* Justificación */}
+                    {proposal.justification && (
+                      <div className="mt-6 pt-4 border-t border-gray-100">
+                        <div className="flex items-start gap-3">
+                          <div className="text-gray-400 mt-0.5">{Icons.chat}</div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Justificación del colaborador</p>
+                            <p className="text-gray-700 italic">&quot;{proposal.justification}&quot;</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Notas de revisión */}
+                    {proposal.review_notes && (
+                      <div className="mt-4 pt-4 border-t border-blue-100">
+                        <div className="bg-blue-50 rounded-lg p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-blue-600 mb-1">Notas de revisión</p>
+                          <p className="text-blue-700">{proposal.review_notes}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Motivo de rechazo */}
+                    {proposal.status === 'rechazada' && proposal.rejection_reason && (
+                      <div className="mt-4 pt-4 border-t border-red-100">
+                        <div className="bg-red-50 rounded-lg p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-red-600 mb-1">Motivo del rechazo</p>
+                          <p className="text-red-700">{proposal.rejection_reason}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Input de rechazo inline */}
+                    {rejectingId === proposal.id && (
+                      <div className="mt-4 pt-4 border-t border-gray-100">
+                        <div className="flex items-end gap-3">
+                          <div className="flex-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Motivo del rechazo *
+                            </label>
+                            <input
+                              type="text"
+                              value={rejectReason}
+                              onChange={(e) => setRejectReason(e.target.value)}
+                              placeholder="Indica por qué se rechaza esta propuesta..."
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                              autoFocus
+                            />
+                          </div>
+                          <button
+                            onClick={() => handleReject(proposal.id)}
+                            disabled={rejectMutation.isPending}
+                            className="px-4 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50 text-sm font-medium"
+                          >
+                            Confirmar Rechazo
+                          </button>
+                          <button
+                            onClick={() => {
+                              setRejectingId(null);
+                              setRejectReason('');
+                            }}
+                            className="px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 text-sm font-medium"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
             })}
           </div>
         )}
-      </div>
 
-      {/* Confirmation Modal - Before Approval */}
-      {confirmingApproval && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setConfirmingApproval(null)}
-          />
-          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-amber-100 rounded-full">
-                  <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
+        {/* Confirmation Modal - Before Approval */}
+        {confirmingApproval && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+              <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">Antes de aprobar</h3>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900">Antes de aprobar</h3>
               </div>
 
-              <div className="space-y-3 mb-6">
+              <div className="p-6 space-y-4">
                 <p className="text-sm text-gray-600">
                   <strong>Importante:</strong> Antes de aprobar esta propuesta, asegúrate de:
                 </p>
-                <ul className="text-sm text-gray-600 space-y-2 ml-4">
-                  <li className="flex items-start gap-2">
-                    <span className="text-amber-500 mt-0.5">•</span>
+                <ul className="text-sm text-gray-600 space-y-3">
+                  <li className="flex items-start gap-3 bg-gray-50 p-3 rounded-lg">
+                    <span className="text-amber-500 mt-0.5">{Icons.search}</span>
                     <span>Investigar el curso propuesto (revisar URL, contenido, calidad)</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-amber-500 mt-0.5">•</span>
-                    <span>Verificar que la <strong>institución</strong> exista en el catálogo (si no, registrarla primero)</span>
+                  <li className="flex items-start gap-3 bg-gray-50 p-3 rounded-lg">
+                    <span className="text-amber-500 mt-0.5">{Icons.office}</span>
+                    <span>Verificar que la <strong>institución</strong> exista en el catálogo</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-amber-500 mt-0.5">•</span>
-                    <span>Verificar que el <strong>tipo de curso</strong> exista en el catálogo</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-amber-500 mt-0.5">•</span>
-                    <span>Verificar que la <strong>modalidad</strong> exista en el catálogo</span>
+                  <li className="flex items-start gap-3 bg-gray-50 p-3 rounded-lg">
+                    <span className="text-amber-500 mt-0.5">{Icons.book}</span>
+                    <span>Verificar <strong>tipo de curso</strong> y <strong>modalidad</strong> en catálogos</span>
                   </li>
                 </ul>
-                <p className="text-sm text-gray-500 italic">
-                  Los catálogos se pueden administrar desde el menú &quot;Catálogos&quot;.
+                <p className="text-xs text-gray-500 italic bg-blue-50 p-3 rounded-lg">
+                  Los catálogos se pueden administrar desde el menú &quot;Catálogos&quot; en la barra lateral.
                 </p>
               </div>
 
-              <div className="flex justify-end gap-3">
+              <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
                 <button
                   onClick={() => setConfirmingApproval(null)}
-                  className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900"
+                  className="px-4 py-2.5 text-sm text-gray-700 hover:text-gray-900 font-medium"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleConfirmApproval}
-                  className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  className="px-5 py-2.5 text-sm bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-medium"
                 >
                   Entendido, continuar
                 </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Approval Modal */}
-      {approvingProposal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setApprovingProposal(null)}
-          />
-          <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-4">
-            <div className="p-6 border-b">
-              <h2 className="text-xl font-bold text-gray-900">Aprobar Propuesta</h2>
-              <p className="text-sm text-gray-500">Verifica y completa los datos del curso antes de crear</p>
-            </div>
-
-            <div className="p-6 space-y-4">
-              {/* Original proposal info */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm font-medium text-gray-700">Propuesta original:</p>
-                <p className="text-sm text-gray-600">Curso: {approvingProposal.course_name}</p>
-                <p className="text-sm text-gray-600">Institución sugerida: {approvingProposal.institution_name || 'No especificada'}</p>
-                <p className="text-sm text-gray-600">Para: {approvingProposal.profile?.full_name}</p>
-                {approvingProposal.course_url && (
-                  <a href={approvingProposal.course_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
-                    Ver URL del curso
-                  </a>
-                )}
+        {/* Approval Modal */}
+        {approvingProposal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-4">
+              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4 sticky top-0 z-10">
+                <h2 className="text-xl font-bold text-white">Aprobar Propuesta y Crear Curso</h2>
+                <p className="text-emerald-100 text-sm">Verifica y completa los datos del curso antes de crear</p>
               </div>
 
-              {/* Course data form */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nombre del Curso *
-                  </label>
-                  <input
-                    type="text"
-                    value={approvalForm.course_name}
-                    onChange={(e) => setApprovalForm({ ...approvalForm, course_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
+              <div className="p-6 space-y-6">
+                {/* Original proposal info */}
+                <div className="bg-gray-50 p-4 rounded-xl">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Datos de la propuesta original</p>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">Curso:</span>
+                      <p className="font-medium text-gray-900">{approvingProposal.course_name}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Institución sugerida:</span>
+                      <p className="font-medium text-gray-900">{approvingProposal.institution_name || 'No especificada'}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Beneficiario:</span>
+                      <p className="font-medium text-gray-900">{approvingProposal.profile?.full_name}</p>
+                    </div>
+                    <div>
+                      {approvingProposal.course_url && (
+                        <a href={approvingProposal.course_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm flex items-center gap-1">
+                          {Icons.link} Ver URL del curso
+                        </a>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Institución *
-                  </label>
-                  <select
-                    value={approvalForm.institution_id}
-                    onChange={(e) => setApprovalForm({ ...approvalForm, institution_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  >
-                    <option value="">Seleccionar...</option>
-                    {institutions.map((inst) => (
-                      <option key={inst.id} value={inst.id}>{inst.name}</option>
-                    ))}
-                  </select>
+                {/* Course data form */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nombre del Curso *
+                    </label>
+                    <input
+                      type="text"
+                      value={approvalForm.course_name}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, course_name: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Institución *
+                    </label>
+                    <select
+                      value={approvalForm.institution_id}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, institution_id: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    >
+                      <option value="">Seleccionar...</option>
+                      {institutions.map((inst) => (
+                        <option key={inst.id} value={inst.id}>{inst.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tipo de Curso *
+                    </label>
+                    <select
+                      value={approvalForm.course_type_id}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, course_type_id: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    >
+                      <option value="">Seleccionar...</option>
+                      {courseTypes.map((ct) => (
+                        <option key={ct.id} value={ct.id}>{ct.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Modalidad *
+                    </label>
+                    <select
+                      value={approvalForm.modality_id}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, modality_id: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    >
+                      <option value="">Seleccionar...</option>
+                      {modalities.map((mod) => (
+                        <option key={mod.id} value={mod.id}>{mod.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Costo (MXN) *
+                    </label>
+                    <input
+                      type="number"
+                      value={approvalForm.cost}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, cost: Number(e.target.value) })}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      min="0"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Horas Totales *
+                    </label>
+                    <input
+                      type="number"
+                      value={approvalForm.total_hours}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, total_hours: Number(e.target.value) })}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      min="0"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Fecha de Inicio *
+                    </label>
+                    <input
+                      type="date"
+                      value={approvalForm.start_date}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, start_date: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Fecha de Fin
+                    </label>
+                    <input
+                      type="date"
+                      value={approvalForm.end_date}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, end_date: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Ubicación/Plataforma
+                    </label>
+                    <input
+                      type="text"
+                      value={approvalForm.location}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, location: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      placeholder="Ej: Udemy, Presencial CDMX"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Instructor
+                    </label>
+                    <input
+                      type="text"
+                      value={approvalForm.instructor}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, instructor: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Descripción
+                    </label>
+                    <textarea
+                      value={approvalForm.description}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, description: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
+                      rows={2}
+                    />
+                  </div>
+
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Notas de Aprobación
+                    </label>
+                    <textarea
+                      value={approvalForm.review_notes}
+                      onChange={(e) => setApprovalForm({ ...approvalForm, review_notes: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
+                      rows={2}
+                      placeholder="Notas opcionales..."
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tipo de Curso *
-                  </label>
-                  <select
-                    value={approvalForm.course_type_id}
-                    onChange={(e) => setApprovalForm({ ...approvalForm, course_type_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  >
-                    <option value="">Seleccionar...</option>
-                    {courseTypes.map((ct) => (
-                      <option key={ct.id} value={ct.id}>{ct.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Modalidad *
-                  </label>
-                  <select
-                    value={approvalForm.modality_id}
-                    onChange={(e) => setApprovalForm({ ...approvalForm, modality_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  >
-                    <option value="">Seleccionar...</option>
-                    {modalities.map((mod) => (
-                      <option key={mod.id} value={mod.id}>{mod.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Costo (MXN) *
-                  </label>
-                  <input
-                    type="number"
-                    value={approvalForm.cost}
-                    onChange={(e) => setApprovalForm({ ...approvalForm, cost: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    min="0"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Horas Totales *
-                  </label>
-                  <input
-                    type="number"
-                    value={approvalForm.total_hours}
-                    onChange={(e) => setApprovalForm({ ...approvalForm, total_hours: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    min="0"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Fecha de Inicio *
-                  </label>
-                  <input
-                    type="date"
-                    value={approvalForm.start_date}
-                    onChange={(e) => setApprovalForm({ ...approvalForm, start_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Fecha de Fin
-                  </label>
-                  <input
-                    type="date"
-                    value={approvalForm.end_date}
-                    onChange={(e) => setApprovalForm({ ...approvalForm, end_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Ubicación/Plataforma
-                  </label>
-                  <input
-                    type="text"
-                    value={approvalForm.location}
-                    onChange={(e) => setApprovalForm({ ...approvalForm, location: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    placeholder="Ej: Udemy, Presencial CDMX"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Instructor
-                  </label>
-                  <input
-                    type="text"
-                    value={approvalForm.instructor}
-                    onChange={(e) => setApprovalForm({ ...approvalForm, instructor: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Descripción
-                  </label>
-                  <textarea
-                    value={approvalForm.description}
-                    onChange={(e) => setApprovalForm({ ...approvalForm, description: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    rows={2}
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Notas de Aprobación
-                  </label>
-                  <textarea
-                    value={approvalForm.review_notes}
-                    onChange={(e) => setApprovalForm({ ...approvalForm, review_notes: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    rows={2}
-                    placeholder="Notas opcionales..."
-                  />
+                {/* Info box */}
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800">
+                  <p className="font-medium mb-1">Al aprobar esta propuesta:</p>
+                  <ul className="list-disc list-inside space-y-1 text-emerald-700">
+                    <li>Se creará el curso con los datos verificados</li>
+                    <li>Se creará una edición con las fechas indicadas</li>
+                    <li>Se inscribirá automáticamente al beneficiario</li>
+                    <li>Se actualizará el presupuesto del departamento</li>
+                  </ul>
                 </div>
               </div>
-            </div>
 
-            <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
-              <button
-                onClick={() => setApprovingProposal(null)}
-                className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleApprove}
-                disabled={approveMutation.isPending}
-                className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-              >
-                {approveMutation.isPending ? 'Procesando...' : 'Aprobar y Crear Curso'}
-              </button>
+              <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3 sticky bottom-0">
+                <button
+                  onClick={() => setApprovingProposal(null)}
+                  className="px-5 py-2.5 text-sm text-gray-700 hover:text-gray-900 font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleApprove}
+                  disabled={approveMutation.isPending}
+                  className="px-5 py-2.5 text-sm bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-50 font-medium"
+                >
+                  {approveMutation.isPending ? 'Procesando...' : 'Aprobar y Crear Curso'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

@@ -12,7 +12,6 @@ import type {
   Modality,
   PaymentStatus,
 } from '@/types/catalogs';
-import CatalogTable from '@/components/catalogs/CatalogTable';
 import CatalogModal from '@/components/catalogs/CatalogModal';
 
 const Icons = {
@@ -36,9 +35,45 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
     </svg>
   ),
-  x: (
+  chevronDown: (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  ),
+  book: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+    </svg>
+  ),
+  clock: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  money: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  building: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+    </svg>
+  ),
+  calendar: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+  ),
+  location: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  ),
+  search: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
     </svg>
   ),
 };
@@ -51,10 +86,10 @@ const paymentLabels: Record<PaymentStatus, string> = {
 };
 
 const paymentColors: Record<PaymentStatus, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  paid: 'bg-green-100 text-green-800',
-  cancelled: 'bg-red-100 text-red-800',
-  na: 'bg-gray-100 text-gray-600',
+  pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  paid: 'bg-green-100 text-green-800 border-green-200',
+  cancelled: 'bg-red-100 text-red-800 border-red-200',
+  na: 'bg-gray-100 text-gray-600 border-gray-200',
 };
 
 const emptyCourseForm = {
@@ -80,12 +115,19 @@ const emptyEditionForm = {
   require_evidence_for_completion: true,
 };
 
+// Extended course with editions cache
+interface CourseWithEditions extends Course {
+  _editions?: CourseEdition[];
+  _editionsLoaded?: boolean;
+}
+
 export default function CoursesPage() {
   const router = useRouter();
 
   // --- Courses state ---
-  const [courses, setCourses] = useState<Course[]>([]);
+  const [courses, setCourses] = useState<CourseWithEditions[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Course | null>(null);
   const [form, setForm] = useState(emptyCourseForm);
@@ -96,20 +138,22 @@ export default function CoursesPage() {
   const [courseTypes, setCourseTypes] = useState<CourseType[]>([]);
   const [modalities, setModalities] = useState<Modality[]>([]);
 
-  // --- Editions state ---
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
-  const [editions, setEditions] = useState<CourseEdition[]>([]);
-  const [editionsLoading, setEditionsLoading] = useState(false);
+  // --- Expanded courses (accordion) ---
+  const [expandedCourseId, setExpandedCourseId] = useState<string | null>(null);
+  const [editionsLoading, setEditionsLoading] = useState<string | null>(null);
+
+  // --- Edition modal state ---
   const [editionModalOpen, setEditionModalOpen] = useState(false);
   const [editingEdition, setEditingEdition] = useState<CourseEdition | null>(null);
   const [editionForm, setEditionForm] = useState(emptyEditionForm);
   const [savingEdition, setSavingEdition] = useState(false);
+  const [editionCourseId, setEditionCourseId] = useState<string | null>(null);
 
   // --- Load courses ---
   const loadCourses = useCallback(async () => {
     setLoading(true);
     const items = await api.get<Course[]>('/courses');
-    setCourses(items);
+    setCourses(items.map(c => ({ ...c, _editions: [], _editionsLoaded: false })));
     setLoading(false);
   }, []);
 
@@ -127,15 +171,27 @@ export default function CoursesPage() {
     });
   }, [loadCourses]);
 
-  // --- Load editions when a course is selected ---
-  const loadEditions = useCallback(async (courseId: string) => {
-    setEditionsLoading(true);
-    const items = await api.get<CourseEdition[]>(
-      `/courses/${courseId}/editions`,
-    );
-    setEditions(items);
-    setEditionsLoading(false);
-  }, []);
+  // --- Toggle course expansion and load editions ---
+  const toggleCourse = async (courseId: string) => {
+    if (expandedCourseId === courseId) {
+      setExpandedCourseId(null);
+      return;
+    }
+
+    setExpandedCourseId(courseId);
+
+    const course = courses.find(c => c.id === courseId);
+    if (course && !course._editionsLoaded) {
+      setEditionsLoading(courseId);
+      const editions = await api.get<CourseEdition[]>(`/courses/${courseId}/editions`);
+      setCourses(prev => prev.map(c =>
+        c.id === courseId
+          ? { ...c, _editions: editions, _editionsLoaded: true }
+          : c
+      ));
+      setEditionsLoading(null);
+    }
+  };
 
   // --- Course CRUD ---
   const openAdd = () => {
@@ -175,38 +231,39 @@ export default function CoursesPage() {
     };
     if (editing) {
       await api.put(`/courses/${editing.id}`, payload);
+      notify.success('Curso actualizado');
     } else {
       await api.post('/courses', payload);
+      notify.success('Curso creado');
     }
     setSaving(false);
     setModalOpen(false);
     loadCourses();
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     const confirmed = await notify.confirm('¿Desactivar este curso?');
     if (!confirmed) return;
     await api.delete(`/courses/${id}`);
+    notify.success('Curso desactivado');
     loadCourses();
-    if (selectedCourse?.id === id) {
-      setSelectedCourse(null);
-      setEditions([]);
+    if (expandedCourseId === id) {
+      setExpandedCourseId(null);
     }
   };
 
   // --- Edition CRUD ---
-  const openCourseEditions = (course: Course) => {
-    setSelectedCourse(course);
-    loadEditions(course.id);
-  };
-
-  const openAddEdition = () => {
+  const openAddEdition = (courseId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditionCourseId(courseId);
     setEditingEdition(null);
     setEditionForm(emptyEditionForm);
     setEditionModalOpen(true);
   };
 
-  const openEditEdition = (edition: CourseEdition) => {
+  const openEditEdition = (courseId: string, edition: CourseEdition) => {
+    setEditionCourseId(courseId);
     setEditingEdition(edition);
     setEditionForm({
       start_date: edition.start_date,
@@ -222,7 +279,7 @@ export default function CoursesPage() {
 
   const handleEditionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCourse) return;
+    if (!editionCourseId) return;
     setSavingEdition(true);
     const payload = {
       start_date: editionForm.start_date,
@@ -236,245 +293,414 @@ export default function CoursesPage() {
       require_evidence_for_completion: editionForm.require_evidence_for_completion,
     };
     if (editingEdition) {
-      await api.put(
-        `/courses/${selectedCourse.id}/editions/${editingEdition.id}`,
-        payload,
-      );
+      await api.put(`/courses/${editionCourseId}/editions/${editingEdition.id}`, payload);
+      notify.success('Edición actualizada');
     } else {
-      await api.post(`/courses/${selectedCourse.id}/editions`, payload);
+      await api.post(`/courses/${editionCourseId}/editions`, payload);
+      notify.success('Edición creada');
     }
     setSavingEdition(false);
     setEditionModalOpen(false);
-    loadEditions(selectedCourse.id);
+
+    // Reload editions for this course
+    const editions = await api.get<CourseEdition[]>(`/courses/${editionCourseId}/editions`);
+    setCourses(prev => prev.map(c =>
+      c.id === editionCourseId
+        ? { ...c, _editions: editions, _editionsLoaded: true }
+        : c
+    ));
   };
 
-  const handleDeleteEdition = async (editionId: string) => {
-    if (!selectedCourse) return;
+  const handleDeleteEdition = async (courseId: string, editionId: string) => {
     const confirmed = await notify.confirm('¿Desactivar esta edición?');
     if (!confirmed) return;
-    await api.delete(
-      `/courses/${selectedCourse.id}/editions/${editionId}`,
-    );
-    loadEditions(selectedCourse.id);
+    await api.delete(`/courses/${courseId}/editions/${editionId}`);
+    notify.success('Edición desactivada');
+
+    // Reload editions
+    const editions = await api.get<CourseEdition[]>(`/courses/${courseId}/editions`);
+    setCourses(prev => prev.map(c =>
+      c.id === courseId
+        ? { ...c, _editions: editions, _editionsLoaded: true }
+        : c
+    ));
+  };
+
+  // --- Filtered courses ---
+  const filteredCourses = courses.filter(c =>
+    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.institutions?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.course_types?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const formatCurrency = (amount: number) =>
+    `$${amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`;
+
+  const formatDate = (date: string) => {
+    const d = new Date(date + 'T00:00:00');
+    return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Gestión de Cursos</h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Gestión de Cursos</h1>
+        <p className="text-gray-500 mt-1">Administra cursos y sus ediciones</p>
+      </div>
 
-      {/* --- Courses Table --- */}
-      <CatalogTable
-        title="Cursos"
-        data={courses}
-        columns={[
-          { key: 'name', label: 'Nombre' },
-          {
-            key: 'institutions',
-            label: 'Institución',
-            render: (val) => {
-              const inst = val as Course['institutions'];
-              return inst?.name || '—';
-            },
-          },
-          {
-            key: 'course_types',
-            label: 'Tipo',
-            render: (val) => {
-              const ct = val as Course['course_types'];
-              return ct?.name || '—';
-            },
-          },
-          {
-            key: 'modalities',
-            label: 'Modalidad',
-            render: (val) => {
-              const m = val as Course['modalities'];
-              return m?.name || '—';
-            },
-          },
-          {
-            key: 'total_hours',
-            label: 'Horas',
-            render: (val) => `${val}h`,
-          },
-          {
-            key: 'cost',
-            label: 'Costo',
-            render: (val) =>
-              `$${Number(val).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
-          },
-          {
-            key: 'payment_status',
-            label: 'Pago',
-            render: (val) => {
-              const status = val as PaymentStatus;
-              return (
-                <span
-                  className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${paymentColors[status]}`}
-                >
-                  {paymentLabels[status]}
-                </span>
-              );
-            },
-          },
-        ]}
-        onAdd={openAdd}
-        onEdit={openEdit}
-        onDelete={handleDelete}
-        loading={loading}
-        extraAction={{
-          label: 'Ediciones',
-          onClick: openCourseEditions,
-        }}
-      />
+      {/* Toolbar */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
+        <div className="flex items-center justify-between gap-4">
+          {/* Search */}
+          <div className="relative flex-1 max-w-md">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              {Icons.search}
+            </span>
+            <input
+              type="text"
+              placeholder="Buscar cursos..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
 
-      {/* --- Editions Panel --- */}
-      {selectedCourse && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Ediciones: {selectedCourse.name}
-              </h2>
-              <p className="text-sm text-gray-500">
-                Cohortes, fechas e instructores
-              </p>
+          {/* Stats */}
+          <div className="hidden md:flex items-center gap-6 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
+                {Icons.book}
+              </div>
+              <div>
+                <p className="text-gray-500">Total cursos</p>
+                <p className="font-semibold text-gray-900">{courses.length}</p>
+              </div>
             </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setSelectedCourse(null);
-                  setEditions([]);
-                }}
-                className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Cerrar"
-              >
-                {Icons.x}
-              </button>
-              <button
-                onClick={openAddEdition}
-                className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
-              >
-                {Icons.plus}
-                <span>Agregar Edición</span>
-              </button>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center text-green-600">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-gray-500">Activos</p>
+                <p className="font-semibold text-gray-900">{courses.filter(c => c.is_active).length}</p>
+              </div>
             </div>
           </div>
 
-          {editionsLoading ? (
-            <div className="p-8 text-center text-gray-500">Cargando...</div>
-          ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Fecha inicio
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Fecha fin
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Ubicación
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Instructor
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Máx. participantes
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Prorrateo
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Estado
-                  </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {editions.map((ed) => (
-                  <tr key={ed.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {ed.start_date}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {ed.end_date || '—'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {ed.location || '—'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {ed.instructor || '—'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {ed.max_participants || '—'}
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      {ed.prorate_cost ? (
-                        <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                          Sí
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">No</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <span
-                        className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
-                          ed.is_active
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {ed.is_active ? 'Activa' : 'Inactiva'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-center gap-1">
+          {/* Add Button */}
+          <button
+            onClick={openAdd}
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm"
+          >
+            {Icons.plus}
+            <span>Nuevo Curso</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Courses List */}
+      {loading ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+          <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-500">Cargando cursos...</p>
+        </div>
+      ) : filteredCourses.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            {Icons.book}
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-1">No hay cursos</h3>
+          <p className="text-gray-500 mb-4">
+            {searchTerm ? 'No se encontraron cursos con ese criterio' : 'Comienza agregando tu primer curso'}
+          </p>
+          {!searchTerm && (
+            <button
+              onClick={openAdd}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              {Icons.plus}
+              <span>Agregar Curso</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredCourses.map((course) => {
+            const isExpanded = expandedCourseId === course.id;
+            const isLoadingEditions = editionsLoading === course.id;
+            const editions = course._editions || [];
+
+            return (
+              <div
+                key={course.id}
+                className={`bg-white rounded-xl shadow-sm border transition-all duration-200 ${
+                  isExpanded ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                {/* Course Card Header */}
+                <div
+                  onClick={() => toggleCourse(course.id)}
+                  className="p-5 cursor-pointer"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    {/* Left: Course Info */}
+                    <div className="flex items-start gap-4 flex-1 min-w-0">
+                      {/* Icon */}
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                        course.is_active ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'
+                      }`}>
+                        {Icons.book}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold text-gray-900 truncate">{course.name}</h3>
+                          {!course.is_active && (
+                            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700">
+                              Inactivo
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Meta info */}
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                          {course.institutions?.name && (
+                            <span className="flex items-center gap-1">
+                              {Icons.building}
+                              {course.institutions.name}
+                            </span>
+                          )}
+                          {course.course_types?.name && (
+                            <span className="px-2 py-0.5 bg-gray-100 rounded text-xs">
+                              {course.course_types.name}
+                            </span>
+                          )}
+                          {course.modalities?.name && (
+                            <span className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded text-xs">
+                              {course.modalities.name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Stats & Actions */}
+                    <div className="flex items-center gap-6">
+                      {/* Stats */}
+                      <div className="hidden lg:flex items-center gap-4 text-sm">
+                        <div className="text-center px-3">
+                          <p className="text-gray-400 text-xs uppercase tracking-wide">Horas</p>
+                          <p className="font-semibold text-gray-900 flex items-center justify-center gap-1">
+                            {Icons.clock}
+                            {course.total_hours}h
+                          </p>
+                        </div>
+                        <div className="text-center px-3 border-l border-gray-100">
+                          <p className="text-gray-400 text-xs uppercase tracking-wide">Costo</p>
+                          <p className="font-semibold text-gray-900">
+                            {formatCurrency(course.cost)}
+                          </p>
+                        </div>
+                        <div className="text-center px-3 border-l border-gray-100">
+                          <p className="text-gray-400 text-xs uppercase tracking-wide">Pago</p>
+                          <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${paymentColors[course.payment_status]}`}>
+                            {paymentLabels[course.payment_status]}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                         <button
-                          onClick={() =>
-                            router.push(
-                              `/courses/${selectedCourse.id}/editions/${ed.id}/participants`,
-                            )
-                          }
-                          className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                          title="Participantes"
+                          onClick={(e) => openAddEdition(course.id, e)}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          title="Agregar edición"
                         >
-                          {Icons.users}
+                          {Icons.plus}
                         </button>
                         <button
-                          onClick={() => openEditEdition(ed)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEdit(course);
+                          }}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Editar"
+                          title="Editar curso"
                         >
                           {Icons.edit}
                         </button>
                         <button
-                          onClick={() => handleDeleteEdition(ed.id)}
+                          onClick={(e) => handleDelete(course.id, e)}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Desactivar"
+                          title="Desactivar curso"
                         >
                           {Icons.trash}
                         </button>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-                {editions.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-6 py-8 text-center text-gray-500"
-                    >
-                      Sin ediciones registradas
-                    </td>
-                  </tr>
+
+                      {/* Expand Indicator */}
+                      <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
+                        {Icons.chevronDown}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mobile stats */}
+                  <div className="lg:hidden flex items-center gap-4 mt-3 pt-3 border-t border-gray-100 text-sm">
+                    <span className="flex items-center gap-1 text-gray-600">
+                      {Icons.clock} {course.total_hours}h
+                    </span>
+                    <span className="flex items-center gap-1 text-gray-600">
+                      {Icons.money} {formatCurrency(course.cost)}
+                    </span>
+                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${paymentColors[course.payment_status]}`}>
+                      {paymentLabels[course.payment_status]}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Editions Panel (Expanded) */}
+                {isExpanded && (
+                  <div className="border-t border-gray-100 bg-gray-50/50">
+                    {/* Editions Header */}
+                    <div className="px-5 py-3 flex items-center justify-between border-b border-gray-100">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-700">Ediciones</span>
+                        <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
+                          {editions.length}
+                        </span>
+                      </div>
+                      <button
+                        onClick={(e) => openAddEdition(course.id, e)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        {Icons.plus}
+                        <span>Nueva Edición</span>
+                      </button>
+                    </div>
+
+                    {/* Editions Content */}
+                    <div className="p-4">
+                      {isLoadingEditions ? (
+                        <div className="py-8 text-center">
+                          <div className="animate-spin w-6 h-6 border-3 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                          <p className="text-sm text-gray-500">Cargando ediciones...</p>
+                        </div>
+                      ) : editions.length === 0 ? (
+                        <div className="py-8 text-center">
+                          <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                            {Icons.calendar}
+                          </div>
+                          <p className="text-gray-500 text-sm mb-3">No hay ediciones registradas</p>
+                          <button
+                            onClick={(e) => openAddEdition(course.id, e)}
+                            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                          >
+                            + Agregar primera edición
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="grid gap-3">
+                          {editions.map((edition) => (
+                            <div
+                              key={edition.id}
+                              className={`bg-white rounded-lg border p-4 transition-all ${
+                                edition.is_active
+                                  ? 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                                  : 'border-red-100 bg-red-50/30'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                {/* Edition Info */}
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    {/* Date range */}
+                                    <span className="flex items-center gap-1.5 text-sm font-medium text-gray-900">
+                                      {Icons.calendar}
+                                      {formatDate(edition.start_date)}
+                                      {edition.end_date && (
+                                        <>
+                                          <span className="text-gray-400">→</span>
+                                          {formatDate(edition.end_date)}
+                                        </>
+                                      )}
+                                    </span>
+
+                                    {!edition.is_active && (
+                                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700">
+                                        Inactiva
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Edition details */}
+                                  <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
+                                    {edition.location && (
+                                      <span className="flex items-center gap-1">
+                                        {Icons.location}
+                                        {edition.location}
+                                      </span>
+                                    )}
+                                    {edition.instructor && (
+                                      <span className="flex items-center gap-1">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                        {edition.instructor}
+                                      </span>
+                                    )}
+                                    {edition.max_participants && (
+                                      <span className="flex items-center gap-1">
+                                        {Icons.users}
+                                        Máx. {edition.max_participants}
+                                      </span>
+                                    )}
+                                    {edition.prorate_cost && (
+                                      <span className="px-2 py-0.5 text-xs font-medium rounded bg-blue-50 text-blue-700 border border-blue-100">
+                                        Prorrateo
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Edition Actions */}
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => router.push(`/courses/${course.id}/editions/${edition.id}/participants`)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+                                  >
+                                    {Icons.users}
+                                    <span className="hidden sm:inline">Participantes</span>
+                                  </button>
+                                  <button
+                                    onClick={() => openEditEdition(course.id, edition)}
+                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                    title="Editar edición"
+                                  >
+                                    {Icons.edit}
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteEdition(course.id, edition.id)}
+                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    title="Desactivar edición"
+                                  >
+                                    {Icons.trash}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
-              </tbody>
-            </table>
-          )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -500,16 +726,12 @@ export default function CoursesPage() {
           Institución
           <select
             value={form.institution_id}
-            onChange={(e) =>
-              setForm({ ...form, institution_id: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, institution_id: e.target.value })}
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">— Seleccionar —</option>
             {institutions.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.name}
-              </option>
+              <option key={i.id} value={i.id}>{i.name}</option>
             ))}
           </select>
         </label>
@@ -518,16 +740,12 @@ export default function CoursesPage() {
             Tipo de curso
             <select
               value={form.course_type_id}
-              onChange={(e) =>
-                setForm({ ...form, course_type_id: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, course_type_id: e.target.value })}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">— Seleccionar —</option>
               {courseTypes.map((ct) => (
-                <option key={ct.id} value={ct.id}>
-                  {ct.name}
-                </option>
+                <option key={ct.id} value={ct.id}>{ct.name}</option>
               ))}
             </select>
           </label>
@@ -535,16 +753,12 @@ export default function CoursesPage() {
             Modalidad
             <select
               value={form.modality_id}
-              onChange={(e) =>
-                setForm({ ...form, modality_id: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, modality_id: e.target.value })}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">— Seleccionar —</option>
               {modalities.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
+                <option key={m.id} value={m.id}>{m.name}</option>
               ))}
             </select>
           </label>
@@ -556,9 +770,7 @@ export default function CoursesPage() {
               type="number"
               min="0"
               value={form.total_hours}
-              onChange={(e) =>
-                setForm({ ...form, total_hours: parseInt(e.target.value) || 0 })
-              }
+              onChange={(e) => setForm({ ...form, total_hours: parseInt(e.target.value) || 0 })}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </label>
@@ -569,12 +781,7 @@ export default function CoursesPage() {
               step="0.01"
               min="0"
               value={form.cost}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  cost: parseFloat(e.target.value) || 0,
-                })
-              }
+              onChange={(e) => setForm({ ...form, cost: parseFloat(e.target.value) || 0 })}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </label>
@@ -583,12 +790,7 @@ export default function CoursesPage() {
           Estatus de pago
           <select
             value={form.payment_status}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                payment_status: e.target.value as PaymentStatus,
-              })
-            }
+            onChange={(e) => setForm({ ...form, payment_status: e.target.value as PaymentStatus })}
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="pending">Pendiente</option>
@@ -603,9 +805,7 @@ export default function CoursesPage() {
             <input
               type="text"
               value={form.payment_reference}
-              onChange={(e) =>
-                setForm({ ...form, payment_reference: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, payment_reference: e.target.value })}
               placeholder="Factura, transferencia, etc."
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -615,9 +815,7 @@ export default function CoursesPage() {
             <input
               type="date"
               value={form.payment_date}
-              onChange={(e) =>
-                setForm({ ...form, payment_date: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, payment_date: e.target.value })}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </label>
@@ -626,9 +824,7 @@ export default function CoursesPage() {
           Descripción
           <textarea
             value={form.description}
-            onChange={(e) =>
-              setForm({ ...form, description: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
             rows={3}
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
@@ -649,9 +845,7 @@ export default function CoursesPage() {
             type="date"
             required
             value={editionForm.start_date}
-            onChange={(e) =>
-              setEditionForm({ ...editionForm, start_date: e.target.value })
-            }
+            onChange={(e) => setEditionForm({ ...editionForm, start_date: e.target.value })}
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </label>
@@ -660,9 +854,7 @@ export default function CoursesPage() {
           <input
             type="date"
             value={editionForm.end_date}
-            onChange={(e) =>
-              setEditionForm({ ...editionForm, end_date: e.target.value })
-            }
+            onChange={(e) => setEditionForm({ ...editionForm, end_date: e.target.value })}
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </label>
@@ -671,9 +863,7 @@ export default function CoursesPage() {
           <input
             type="text"
             value={editionForm.location}
-            onChange={(e) =>
-              setEditionForm({ ...editionForm, location: e.target.value })
-            }
+            onChange={(e) => setEditionForm({ ...editionForm, location: e.target.value })}
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="ej: Campus Monterrey, Sala Virtual"
           />
@@ -683,9 +873,7 @@ export default function CoursesPage() {
           <input
             type="text"
             value={editionForm.instructor}
-            onChange={(e) =>
-              setEditionForm({ ...editionForm, instructor: e.target.value })
-            }
+            onChange={(e) => setEditionForm({ ...editionForm, instructor: e.target.value })}
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </label>
@@ -695,12 +883,7 @@ export default function CoursesPage() {
             type="number"
             min="1"
             value={editionForm.max_participants}
-            onChange={(e) =>
-              setEditionForm({
-                ...editionForm,
-                max_participants: e.target.value,
-              })
-            }
+            onChange={(e) => setEditionForm({ ...editionForm, max_participants: e.target.value })}
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </label>
@@ -709,19 +892,13 @@ export default function CoursesPage() {
             type="checkbox"
             id="prorate_cost"
             checked={editionForm.prorate_cost}
-            onChange={(e) =>
-              setEditionForm({
-                ...editionForm,
-                prorate_cost: e.target.checked,
-              })
-            }
+            onChange={(e) => setEditionForm({ ...editionForm, prorate_cost: e.target.checked })}
             className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
           />
           <label htmlFor="prorate_cost" className="text-sm text-gray-700">
             <span className="font-medium">Prorratear costo</span>
             <p className="text-gray-500 text-xs mt-0.5">
               Divide el costo del curso entre todos los participantes inscritos.
-              Cada área paga según el número de colaboradores que tenga.
             </p>
           </label>
         </div>
@@ -730,19 +907,13 @@ export default function CoursesPage() {
             type="checkbox"
             id="require_evidence"
             checked={editionForm.require_evidence_for_completion}
-            onChange={(e) =>
-              setEditionForm({
-                ...editionForm,
-                require_evidence_for_completion: e.target.checked,
-              })
-            }
+            onChange={(e) => setEditionForm({ ...editionForm, require_evidence_for_completion: e.target.checked })}
             className="mt-1 h-4 w-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
           />
           <label htmlFor="require_evidence" className="text-sm text-gray-700">
             <span className="font-medium">Requerir evidencia para completar</span>
             <p className="text-gray-500 text-xs mt-0.5">
-              Sin diploma/evidencia aprobada, el curso NO se considera completado
-              y el colaborador NO puede inscribirse en otro curso.
+              Sin diploma/evidencia aprobada, el colaborador NO puede inscribirse en otro curso.
             </p>
           </label>
         </div>
