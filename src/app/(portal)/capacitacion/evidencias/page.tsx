@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
+import Pagination from '@/components/ui/Pagination';
+import type { PaginatedResponse } from '@/types/pagination';
 
 interface Evidence {
   id: string;
@@ -58,7 +60,7 @@ const evidenceTypeLabels: Record<string, string> = {
   other: 'Otro',
 };
 
-const evidenceTypeIcons: Record<string, JSX.Element> = {
+const evidenceTypeIcons: Record<string, React.ReactNode> = {
   certificate: (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
@@ -131,27 +133,34 @@ export default function EvidenciasPage() {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [previewEvidence, setPreviewEvidence] = useState<Evidence | null>(null);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
 
-  // Query para TODAS las evidencias (para los stats)
+  // Query para TODAS las evidencias sin paginación (para los stats)
   const { data: allEvidences = [] } = useQuery({
-    queryKey: ['evidences', 'all'],
+    queryKey: ['evidences', 'all', 'stats'],
     queryFn: () => api.get<Evidence[]>('/evidences'),
   });
 
-  // Query para las evidencias filtradas (para la lista)
-  const { data: filteredEvidences = [], isLoading } = useQuery({
-    queryKey: ['evidences', filter],
+  // Query para las evidencias filtradas con paginación (para la lista)
+  const { data: paginatedData, isLoading } = useQuery({
+    queryKey: ['evidences', filter, page, limit],
     queryFn: async () => {
-      if (filter === 'pending') {
-        return api.get<Evidence[]>('/evidences/pending');
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+
+      if (filter !== 'all') {
+        params.append('status', filter);
       }
-      if (filter === 'all') {
-        return api.get<Evidence[]>('/evidences');
-      }
-      const all = await api.get<Evidence[]>('/evidences');
-      return all.filter(e => e.verification_status === filter);
+
+      return api.get<PaginatedResponse<Evidence>>(`/evidences?${params}`);
     },
   });
+
+  const filteredEvidences = paginatedData?.data ?? [];
+  const meta = paginatedData?.meta;
 
   const approveMutation = useMutation({
     mutationFn: (id: string) => api.put(`/evidences/${id}/verify`, { verification_status: 'approved' }),
@@ -173,6 +182,21 @@ export default function EvidenciasPage() {
     },
     onError: () => notify.error('Error al rechazar evidencia'),
   });
+
+  // Resetear página cuando cambia el filtro
+  const handleFilterChange = (newFilter: typeof filter) => {
+    setFilter(newFilter);
+    setPage(1);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit);
+    setPage(1);
+  };
 
   const handleDownload = async (evidence: Evidence) => {
     try {
@@ -293,7 +317,7 @@ export default function EvidenciasPage() {
         {/* Stats Cards - Clickeables como filtros */}
         <div className="grid grid-cols-4 gap-4">
           <button
-            onClick={() => setFilter('pending')}
+            onClick={() => handleFilterChange('pending')}
             className={`text-left p-5 rounded-xl border-2 transition-all ${
               filter === 'pending'
                 ? 'bg-yellow-50 border-yellow-300 shadow-md'
@@ -313,7 +337,7 @@ export default function EvidenciasPage() {
           </button>
 
           <button
-            onClick={() => setFilter('approved')}
+            onClick={() => handleFilterChange('approved')}
             className={`text-left p-5 rounded-xl border-2 transition-all ${
               filter === 'approved'
                 ? 'bg-green-50 border-green-300 shadow-md'
@@ -333,7 +357,7 @@ export default function EvidenciasPage() {
           </button>
 
           <button
-            onClick={() => setFilter('rejected')}
+            onClick={() => handleFilterChange('rejected')}
             className={`text-left p-5 rounded-xl border-2 transition-all ${
               filter === 'rejected'
                 ? 'bg-red-50 border-red-300 shadow-md'
@@ -353,7 +377,7 @@ export default function EvidenciasPage() {
           </button>
 
           <button
-            onClick={() => setFilter('all')}
+            onClick={() => handleFilterChange('all')}
             className={`text-left p-5 rounded-xl border-2 transition-all ${
               filter === 'all'
                 ? 'bg-blue-50 border-blue-300 shadow-md'
@@ -385,7 +409,7 @@ export default function EvidenciasPage() {
             ].map((f) => (
               <button
                 key={f.value}
-                onClick={() => setFilter(f.value as typeof filter)}
+                onClick={() => handleFilterChange(f.value as typeof filter)}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
                   filter === f.value
                     ? f.color === 'yellow' ? 'bg-yellow-500 text-white shadow-sm' :
@@ -650,6 +674,17 @@ export default function EvidenciasPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {meta && meta.total > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200">
+            <Pagination
+              meta={meta}
+              onPageChange={handlePageChange}
+              onLimitChange={handleLimitChange}
+            />
           </div>
         )}
       </div>

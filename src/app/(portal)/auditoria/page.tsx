@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
+import Pagination from '@/components/ui/Pagination';
+import type { PaginationMeta } from '@/types/pagination';
 
 interface AuditLog {
   id: string;
@@ -25,6 +27,14 @@ interface AuditStats {
   by_entity: Record<string, number>;
 }
 
+interface AuditResponse {
+  data: AuditLog[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 const actionLabels: Record<string, { label: string; color: string }> = {
   create: { label: 'Crear', color: 'bg-green-100 text-green-800' },
   update: { label: 'Actualizar', color: 'bg-blue-100 text-blue-800' },
@@ -43,6 +53,7 @@ const entityLabels: Record<string, string> = {
   budget: 'Presupuesto',
   request: 'Solicitud',
   user: 'Usuario',
+  proposal: 'Propuesta',
 };
 
 const Icons = {
@@ -62,9 +73,14 @@ export default function AuditoriaPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [stats, setStats] = useState<AuditStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(0);
-  const limit = 20;
+  const [paginationMeta, setPaginationMeta] = useState<PaginationMeta>({
+    total: 0,
+    page: 1,
+    limit: 15,
+    totalPages: 0,
+    hasNext: false,
+    hasPrev: false,
+  });
 
   // Filters
   const [actionFilter, setActionFilter] = useState('');
@@ -76,24 +92,31 @@ export default function AuditoriaPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      params.set('limit', limit.toString());
-      params.set('offset', (page * limit).toString());
+      params.set('page', paginationMeta.page.toString());
+      params.set('limit', paginationMeta.limit.toString());
       if (actionFilter) params.set('action', actionFilter);
       if (entityFilter) params.set('entity_type', entityFilter);
       if (dateFrom) params.set('start_date', dateFrom);
       if (dateTo) params.set('end_date', dateTo);
 
-      const response = await api.get<{ data: AuditLog[]; total: number }>(
+      const response = await api.get<AuditResponse>(
         `/audit?${params.toString()}`
       );
       setLogs(response.data);
-      setTotal(response.total);
+      setPaginationMeta({
+        total: response.total,
+        page: response.page,
+        limit: response.limit,
+        totalPages: response.totalPages,
+        hasNext: response.page < response.totalPages,
+        hasPrev: response.page > 1,
+      });
     } catch {
       notify.error('Error al cargar bitácora');
     } finally {
       setLoading(false);
     }
-  }, [page, actionFilter, entityFilter, dateFrom, dateTo]);
+  }, [paginationMeta.page, paginationMeta.limit, actionFilter, entityFilter, dateFrom, dateTo]);
 
   const loadStats = async () => {
     try {
@@ -113,8 +136,7 @@ export default function AuditoriaPage() {
   }, []);
 
   const handleFilter = () => {
-    setPage(0);
-    loadLogs();
+    setPaginationMeta((prev) => ({ ...prev, page: 1 }));
   };
 
   const clearFilters = () => {
@@ -122,10 +144,16 @@ export default function AuditoriaPage() {
     setEntityFilter('');
     setDateFrom('');
     setDateTo('');
-    setPage(0);
+    setPaginationMeta((prev) => ({ ...prev, page: 1 }));
   };
 
-  const totalPages = Math.ceil(total / limit);
+  const handlePageChange = (newPage: number) => {
+    setPaginationMeta((prev) => ({ ...prev, page: newPage }));
+  };
+
+  const handleLimitChange = (newLimit: number) => {
+    setPaginationMeta((prev) => ({ ...prev, limit: newLimit, page: 1 }));
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -279,29 +307,11 @@ export default function AuditoriaPage() {
             </table>
 
             {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-                <div className="text-sm text-gray-500">
-                  Mostrando {page * limit + 1} - {Math.min((page + 1) * limit, total)} de {total}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPage(Math.max(0, page - 1))}
-                    disabled={page === 0}
-                    className="px-3 py-1 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50"
-                  >
-                    Anterior
-                  </button>
-                  <button
-                    onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-                    disabled={page >= totalPages - 1}
-                    className="px-3 py-1 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50"
-                  >
-                    Siguiente
-                  </button>
-                </div>
-              </div>
-            )}
+            <Pagination
+              meta={paginationMeta}
+              onPageChange={handlePageChange}
+              onLimitChange={handleLimitChange}
+            />
           </>
         )}
       </div>

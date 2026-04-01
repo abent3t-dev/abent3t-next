@@ -35,7 +35,7 @@ export default function Pagination({ meta, onPageChange, onLimitChange }: Pagina
             onChange={(e) => onLimitChange(Number(e.target.value))}
             className="px-2 py-1 border border-gray-300 rounded text-sm text-gray-700 bg-white"
           >
-            {[10, 20, 50].map((v) => (
+            {[10, 15, 20, 50].map((v) => (
               <option key={v} value={v}>{v} / pág</option>
             ))}
           </select>

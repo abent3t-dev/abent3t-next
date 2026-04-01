@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
+import Pagination from '@/components/ui/Pagination';
+import type { PaginatedResponse } from '@/types/pagination';
 
 interface Proposal {
   id: string;
@@ -143,6 +145,8 @@ const Icons = {
 export default function PropuestasPage() {
   const qc = useQueryClient();
   const [filter, setFilter] = useState<'pendiente' | 'en_investigacion' | 'aprobada' | 'rechazada' | 'all'>('pendiente');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [approvingProposal, setApprovingProposal] = useState<Proposal | null>(null);
@@ -165,21 +169,24 @@ export default function PropuestasPage() {
   });
 
   // Query para TODAS las propuestas (para los stats)
-  const { data: allProposals = [] } = useQuery({
-    queryKey: ['proposals', 'all'],
-    queryFn: () => api.get<Proposal[]>('/proposals'),
+  const { data: allProposalsData } = useQuery({
+    queryKey: ['proposals', 'all', 1, 9999],
+    queryFn: () => api.get<PaginatedResponse<Proposal>>('/proposals?page=1&limit=9999'),
   });
 
-  // Query para las propuestas filtradas (para la lista)
-  const { data: filteredProposals = [], isLoading } = useQuery({
-    queryKey: ['proposals', filter],
+  const allProposals = allProposalsData?.data || [];
+
+  // Query para las propuestas filtradas (para la lista con paginación)
+  const { data: proposalsResponse, isLoading } = useQuery({
+    queryKey: ['proposals', filter, page, limit],
     queryFn: async () => {
-      if (filter === 'all') {
-        return api.get<Proposal[]>('/proposals');
-      }
-      return api.get<Proposal[]>(`/proposals?status=${filter}`);
+      const statusParam = filter !== 'all' ? `status=${filter}&` : '';
+      return api.get<PaginatedResponse<Proposal>>(`/proposals?${statusParam}page=${page}&limit=${limit}`);
     },
   });
+
+  const filteredProposals = proposalsResponse?.data || [];
+  const paginationMeta = proposalsResponse?.meta || null;
 
   const { data: institutions = [] } = useQuery({
     queryKey: ['institutions'],
@@ -275,6 +282,20 @@ export default function PropuestasPage() {
     approveMutation.mutate({ id: approvingProposal.id, data: approvalForm });
   };
 
+  const handleFilterChange = (newFilter: typeof filter) => {
+    setFilter(newFilter);
+    setPage(1); // Reset to page 1 when changing filter
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit);
+    setPage(1); // Reset to page 1 when changing limit
+  };
+
   // Stats calculados de TODAS las propuestas
   const stats = {
     pendientes: allProposals.filter(p => p.status === 'pendiente').length,
@@ -308,7 +329,7 @@ export default function PropuestasPage() {
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <button
-            onClick={() => setFilter('pendiente')}
+            onClick={() => handleFilterChange('pendiente')}
             className={`p-4 rounded-xl transition-all ${
               filter === 'pendiente'
                 ? 'bg-amber-50 shadow-lg ring-2 ring-amber-400'
@@ -323,7 +344,7 @@ export default function PropuestasPage() {
           </button>
 
           <button
-            onClick={() => setFilter('en_investigacion')}
+            onClick={() => handleFilterChange('en_investigacion')}
             className={`p-4 rounded-xl transition-all ${
               filter === 'en_investigacion'
                 ? 'bg-blue-50 shadow-lg ring-2 ring-blue-400'
@@ -338,7 +359,7 @@ export default function PropuestasPage() {
           </button>
 
           <button
-            onClick={() => setFilter('aprobada')}
+            onClick={() => handleFilterChange('aprobada')}
             className={`p-4 rounded-xl transition-all ${
               filter === 'aprobada'
                 ? 'bg-emerald-50 shadow-lg ring-2 ring-emerald-400'
@@ -353,7 +374,7 @@ export default function PropuestasPage() {
           </button>
 
           <button
-            onClick={() => setFilter('rechazada')}
+            onClick={() => handleFilterChange('rechazada')}
             className={`p-4 rounded-xl transition-all ${
               filter === 'rechazada'
                 ? 'bg-red-50 shadow-lg ring-2 ring-red-400'
@@ -368,7 +389,7 @@ export default function PropuestasPage() {
           </button>
 
           <button
-            onClick={() => setFilter('all')}
+            onClick={() => handleFilterChange('all')}
             className={`p-4 rounded-xl transition-all ${
               filter === 'all'
                 ? 'bg-white shadow-lg ring-2 ring-gray-400'
@@ -402,15 +423,16 @@ export default function PropuestasPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {filteredProposals.map((proposal) => {
-              const status = statusConfig[proposal.status];
+          <>
+            <div className="space-y-4">
+              {filteredProposals.map((proposal) => {
+                const status = statusConfig[proposal.status];
 
-              return (
-                <div
-                  key={proposal.id}
-                  className={`bg-white rounded-2xl shadow-sm border overflow-hidden transition-all hover:shadow-md ${status.border}`}
-                >
+                return (
+                  <div
+                    key={proposal.id}
+                    className={`bg-white rounded-2xl shadow-sm border overflow-hidden transition-all hover:shadow-md ${status.border}`}
+                  >
                   {/* Header con estado */}
                   <div className={`px-6 py-3 ${status.bg} border-b ${status.border} flex items-center justify-between`}>
                     <div className="flex items-center gap-3">
@@ -644,7 +666,19 @@ export default function PropuestasPage() {
                 </div>
               );
             })}
-          </div>
+            </div>
+
+            {/* Pagination */}
+            {paginationMeta && paginationMeta.total > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+                <Pagination
+                  meta={paginationMeta}
+                  onPageChange={handlePageChange}
+                  onLimitChange={handleLimitChange}
+                />
+              </div>
+            )}
+          </>
         )}
 
         {/* Confirmation Modal - Before Approval */}

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
+import Pagination from '@/components/ui/Pagination';
 import type {
   TrainingRequest,
   RequestStatus,
@@ -11,6 +12,7 @@ import type {
   CourseEdition,
   UserProfile,
 } from '@/types/catalogs';
+import type { PaginatedResponse, PaginationMeta } from '@/types/pagination';
 
 interface CourseProposal {
   id: string;
@@ -125,6 +127,16 @@ export default function SolicitudesPage() {
   const [requests, setRequests] = useState<TrainingRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<RequestStatus | 'all'>('all');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [meta, setMeta] = useState<PaginationMeta>({
+    total: 0,
+    page: 1,
+    limit: 10,
+    totalPages: 0,
+    hasNext: false,
+    hasPrev: false,
+  });
 
   // Modal para crear solicitud
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -162,23 +174,39 @@ export default function SolicitudesPage() {
     justification: '',
   });
 
+  // Estado para estadísticas
+  const [stats, setStats] = useState({
+    total: 0,
+    pendientes: 0,
+    aprobadas: 0,
+    rechazadas: 0,
+  });
+
   // Cargar solicitudes
   const loadRequests = useCallback(async () => {
     setLoading(true);
     try {
-      let data: TrainingRequest[];
-      if (isAdmin) {
-        data = await api.get<TrainingRequest[]>('/requests');
-      } else {
-        data = await api.get<TrainingRequest[]>('/requests/my-requests');
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
+      if (filter !== 'all') {
+        params.append('status', filter);
       }
-      setRequests(data);
+
+      let response: PaginatedResponse<TrainingRequest>;
+      if (isAdmin) {
+        response = await api.get<PaginatedResponse<TrainingRequest>>(`/requests?${params.toString()}`);
+      } else {
+        response = await api.get<PaginatedResponse<TrainingRequest>>(`/requests/my-requests?${params.toString()}`);
+      }
+      setRequests(response.data);
+      setMeta(response.meta);
     } catch {
       notify.error('Error al cargar solicitudes');
     } finally {
       setLoading(false);
     }
-  }, [isAdmin]);
+  }, [isAdmin, page, limit, filter]);
 
   // Cargar cursos para el modal de crear
   const loadCourses = async () => {
@@ -212,10 +240,29 @@ export default function SolicitudesPage() {
     }
   }, []);
 
+  // Cargar estadísticas
+  const loadStats = useCallback(async () => {
+    try {
+      const data = await api.get<{ total: number; pendientes: number; aprobadas: number; rechazadas: number }>('/requests/stats');
+      setStats(data);
+    } catch {
+      notify.error('Error al cargar estadísticas');
+    }
+  }, []);
+
   useEffect(() => {
-    loadRequests();
-    loadProposals();
-  }, [loadRequests, loadProposals]);
+    if (activeTab === 'solicitudes') {
+      loadRequests();
+      loadStats();
+    } else {
+      loadProposals();
+    }
+  }, [loadRequests, loadProposals, loadStats, activeTab]);
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [filter]);
 
   // Abrir modal de crear
   const openCreateModal = async () => {
@@ -257,6 +304,7 @@ export default function SolicitudesPage() {
       notify.success('Solicitud creada exitosamente');
       setCreateModalOpen(false);
       loadRequests();
+      loadStats();
     } catch (err: unknown) {
       const error = err as { message?: string };
       notify.error(error.message || 'Error al crear solicitud');
@@ -296,6 +344,7 @@ export default function SolicitudesPage() {
       );
       setReviewModalOpen(false);
       loadRequests();
+      loadStats();
     } catch (err: unknown) {
       const error = err as { message?: string };
       notify.error(error.message || 'Error al procesar solicitud');
@@ -313,6 +362,7 @@ export default function SolicitudesPage() {
       await api.delete(`/requests/${id}`);
       notify.success('Solicitud cancelada');
       loadRequests();
+      loadStats();
     } catch (err: unknown) {
       const error = err as { message?: string };
       notify.error(error.message || 'Error al cancelar');
@@ -372,17 +422,14 @@ export default function SolicitudesPage() {
     }
   };
 
-  // Filtrar solicitudes
-  const filteredRequests = requests.filter((r) =>
-    filter === 'all' ? true : r.status === filter
-  );
+  // Handlers de paginación
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+  };
 
-  // Calcular estadísticas
-  const stats = {
-    total: requests.length,
-    pendientes: requests.filter(r => r.status === 'pendiente').length,
-    aprobadas: requests.filter(r => r.status === 'aprobada').length,
-    rechazadas: requests.filter(r => r.status === 'rechazada').length,
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit);
+    setPage(1); // Reset to first page when changing limit
   };
 
   // Formatear fecha
@@ -519,19 +566,20 @@ export default function SolicitudesPage() {
                 <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto" />
                 <p className="text-gray-500 mt-4">Cargando solicitudes...</p>
               </div>
-            ) : filteredRequests.length === 0 ? (
+            ) : requests.length === 0 ? (
               <div className="bg-white rounded-2xl p-12 text-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   {Icons.book}
                 </div>
                 <p className="text-gray-600 font-medium">No hay solicitudes</p>
                 <p className="text-gray-400 text-sm mt-1">
-                  {filter !== 'all' ? `No hay solicitudes ${statusConfig[filter].label.toLowerCase()}` : 'Aún no se han creado solicitudes de capacitación'}
+                  {filter !== 'all' ? `No hay solicitudes con este estado` : 'Aún no se han creado solicitudes de capacitación'}
                 </p>
               </div>
             ) : (
+              <>
               <div className="space-y-4">
-                {filteredRequests.map((req) => {
+                {requests.map((req) => {
                   const status = statusConfig[req.status];
                   const course = req.course_editions?.courses;
                   const edition = req.course_editions;
@@ -708,6 +756,16 @@ export default function SolicitudesPage() {
                   );
                 })}
               </div>
+
+              {/* Pagination */}
+              <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                <Pagination
+                  meta={meta}
+                  onPageChange={handlePageChange}
+                  onLimitChange={handleLimitChange}
+                />
+              </div>
+              </>
             )}
           </>
         )}
