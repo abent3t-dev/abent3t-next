@@ -58,6 +58,31 @@ const statusColors: Record<EnrollmentStatus, string> = {
   cancelado: 'bg-red-100 text-red-800',
 };
 
+// Etiquetas de roles en español
+const roleLabels: Record<string, string> = {
+  super_admin: 'Super Admin',
+  admin_rh: 'Admin RRHH',
+  jefe_area: 'Jefe de Área',
+  director: 'Director',
+  colaborador: 'Colaborador',
+  collaborator: 'Colaborador',
+  executive: 'Ejecutivo',
+};
+
+// Roles activos en el sistema (solo estos se muestran en filtros)
+const activeRoles = ['admin_rh', 'jefe_area', 'colaborador'];
+
+// Colores para badges de roles
+const roleColors: Record<string, string> = {
+  super_admin: 'bg-purple-100 text-purple-800 border border-purple-200',
+  admin_rh: 'bg-indigo-100 text-indigo-800 border border-indigo-200',
+  jefe_area: 'bg-blue-100 text-blue-800 border border-blue-200',
+  director: 'bg-cyan-100 text-cyan-800 border border-cyan-200',
+  colaborador: 'bg-green-100 text-green-800 border border-green-200',
+  collaborator: 'bg-green-100 text-green-800 border border-green-200',
+  executive: 'bg-orange-100 text-orange-800 border border-orange-200',
+};
+
 // Semáforo visual: colores de círculo indicador
 const trafficLightColors: Record<EnrollmentStatus, string> = {
   inscrito: 'bg-blue-500',      // Azul: recién inscrito
@@ -83,6 +108,7 @@ export default function ParticipantsPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDept, setSelectedDept] = useState('');
+  const [selectedRole, setSelectedRole] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
@@ -128,6 +154,7 @@ export default function ParticipantsPage() {
     setSelectedUsers([]);
     setSearch('');
     setSelectedDept('');
+    setSelectedRole('');
 
     const [usersData, deptsData] = await Promise.all([
       api.get<UserProfile[]>('/auth/users?is_active=true'),
@@ -142,6 +169,7 @@ export default function ParticipantsPage() {
   const filteredUsers = users.filter((u) => {
     if (enrolledIds.includes(u.id)) return false;
     if (selectedDept && u.department_id !== selectedDept) return false;
+    if (selectedRole && u.role !== selectedRole) return false;
     if (search) {
       const term = search.toLowerCase();
       return (
@@ -401,38 +429,50 @@ export default function ParticipantsPage() {
 
       {/* Selector Modal */}
       {selectorOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col">
+            <div className="px-6 py-5 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-xl font-semibold text-gray-900">
                 Agregar Participantes
               </h3>
               <button
                 onClick={() => setSelectorOpen(false)}
-                className="p-1 text-gray-400 hover:text-gray-600 rounded"
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 {Icons.x}
               </button>
             </div>
 
-            <div className="px-6 py-4 border-b border-gray-200 space-y-3">
-              <div className="flex gap-3">
+            <div className="px-6 py-4 border-b border-gray-200 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <input
                   type="text"
                   placeholder="Buscar por nombre o email..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 placeholder:text-gray-400"
+                  className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 <select
                   value={selectedDept}
                   onChange={(e) => setSelectedDept(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 bg-white"
+                  className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">Todas las áreas</option>
                   {departments.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                  className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Todos los roles</option>
+                  {activeRoles.map((role) => (
+                    <option key={role} value={role}>
+                      {roleLabels[role]}
                     </option>
                   ))}
                 </select>
@@ -456,7 +496,7 @@ export default function ParticipantsPage() {
                 {filteredUsers.map((user) => (
                   <label
                     key={user.id}
-                    className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer border border-transparent hover:border-gray-200 transition-all"
                   >
                     <input
                       type="checkbox"
@@ -464,13 +504,24 @@ export default function ParticipantsPage() {
                       onChange={() => toggleUser(user.id)}
                       className="h-4 w-4 text-blue-600 rounded border-gray-300"
                     />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">
-                        {user.full_name}
-                      </p>
-                      <p className="text-xs text-gray-500">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {user.full_name}
+                        </p>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${roleColors[user.role] || 'bg-gray-100 text-gray-800 border border-gray-200'}`}
+                        >
+                          {roleLabels[user.role] || user.role}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 truncate">
                         {user.email}
-                        {user.departments && ` | ${user.departments.name}`}
+                        {user.departments && (
+                          <span className="ml-1">
+                            • {user.departments.name}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </label>
@@ -483,17 +534,17 @@ export default function ParticipantsPage() {
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+            <div className="px-6 py-5 border-t border-gray-200 flex justify-end gap-3 bg-gray-50">
               <button
                 onClick={() => setSelectorOpen(false)}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                className="px-5 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleEnroll}
                 disabled={selectedUsers.length === 0 || saving}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium shadow-sm"
               >
                 {saving
                   ? 'Inscribiendo...'
