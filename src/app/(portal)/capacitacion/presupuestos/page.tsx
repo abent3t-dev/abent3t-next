@@ -56,6 +56,16 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
     </svg>
   ),
+  download: ({ className }: { className?: string }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+    </svg>
+  ),
+  upload: ({ className }: { className?: string }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L9 8m4-4v12" />
+    </svg>
+  ),
 };
 
 export default function PresupuestosPage() {
@@ -79,6 +89,16 @@ export default function PresupuestosPage() {
   const [deletingBudget, setDeletingBudget] = useState<Budget | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Estado para modal de importación
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    success: number;
+    errors: Array<{ row: number; department: string; period: string; error: string }>;
+    total: number;
+  } | null>(null);
+
   const canManage = user?.role === 'super_admin' || user?.role === 'admin_rh';
 
   useEffect(() => {
@@ -89,6 +109,16 @@ export default function PresupuestosPage() {
 
     loadData();
   }, [user, router]);
+
+  // Auto-close import modal on successful import (without errors)
+  useEffect(() => {
+    if (importResult && importResult.success > 0 && importResult.errors.length === 0) {
+      // Auto-close after successful import
+      setTimeout(() => {
+        closeImportModal();
+      }, 1500); // Wait 1.5s to let user see the success message
+    }
+  }, [importResult]);
 
   const loadData = async () => {
     try {
@@ -161,8 +191,10 @@ export default function PresupuestosPage() {
       const data = await api.get<Budget[]>('/budgets');
       setBudgets(data);
       closeModal();
-    } catch (error) {
-      notify.error(editingBudget ? 'Error al actualizar' : 'Error al crear');
+    } catch (error: any) {
+      // Mostrar mensaje específico del backend
+      const errorMessage = error?.message || (editingBudget ? 'Error al actualizar presupuesto' : 'Error al crear presupuesto');
+      notify.error(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -194,6 +226,131 @@ export default function PresupuestosPage() {
     }
   };
 
+  const handleDownloadTemplate = async () => {
+    try {
+      // Obtener token PRIMERO
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        notify.error('No estás autenticado');
+        return;
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/budgets/export-template?include_data=false`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error('Error al descargar plantilla');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'plantilla_presupuestos.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      notify.success('Plantilla descargada');
+    } catch (error) {
+      console.error('Download error:', error);
+      notify.error('Error al descargar plantilla');
+    }
+  };
+
+  const openImportModal = () => {
+    setShowImportModal(true);
+    setSelectedFile(null);
+    setImportResult(null);
+  };
+
+  const closeImportModal = () => {
+    setShowImportModal(false);
+    setSelectedFile(null);
+    setImportResult(null);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar extensión
+    const allowedExtensions = ['.xlsx', '.xls'];
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+
+    if (!allowedExtensions.includes(fileExtension)) {
+      notify.error('Formato de archivo inválido. Solo se permiten archivos .xlsx o .xls');
+      return;
+    }
+
+    // Validar tamaño (5MB max)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      notify.error('El archivo es demasiado grande. Tamaño máximo: 5MB');
+      return;
+    }
+
+    setSelectedFile(file);
+    setImportResult(null);
+  };
+
+  const handleImport = async () => {
+    if (!selectedFile) {
+      notify.error('Selecciona un archivo');
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/budgets/import`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Error al importar');
+      }
+
+      const result = await response.json();
+      setImportResult(result);
+
+      if (result.success > 0) {
+        notify.success(`${result.success} presupuestos importados exitosamente`);
+        // Recargar lista de presupuestos
+        const data = await api.get<Budget[]>('/budgets');
+        setBudgets(data);
+      }
+
+      if (result.errors.length > 0) {
+        notify.error(`${result.errors.length} filas con errores`);
+      }
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : 'Error al importar archivo');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 p-6">
@@ -217,13 +374,23 @@ export default function PresupuestosPage() {
             <p className="text-gray-500">Control de presupuesto por área y periodo</p>
           </div>
           {canManage && (
-            <button
-              onClick={openCreateModal}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Icons.plus className="w-5 h-5" />
-              Nuevo Presupuesto
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={openImportModal}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                title="Importar desde Excel"
+              >
+                <Icons.upload className="w-5 h-5" />
+                Importar Presupuestos
+              </button>
+              <button
+                onClick={openCreateModal}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Icons.plus className="w-5 h-5" />
+                Nuevo Presupuesto
+              </button>
+            </div>
           )}
         </div>
 
@@ -536,6 +703,164 @@ export default function PresupuestosPage() {
                     className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
                   >
                     {deleting ? 'Eliminando...' : 'Eliminar'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Importar Excel */}
+        {showImportModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white">
+                <h2 className="text-lg font-semibold text-gray-900">Importar Presupuestos desde Excel</h2>
+                <button onClick={closeImportModal} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+                  <Icons.x className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* Descargar Plantilla - Sección destacada */}
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-5">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0 w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center shadow-lg">
+                      <Icons.download className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-green-900 mb-1">
+                        Paso 1: Descarga la Plantilla
+                      </h3>
+                      <p className="text-sm text-green-700 mb-3">
+                        La plantilla incluye dropdowns preconfigurados para departamentos y períodos.
+                        Esto evita errores de escritura y facilita la importación.
+                      </p>
+                      <button
+                        onClick={handleDownloadTemplate}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-md hover:shadow-lg font-medium"
+                      >
+                        <Icons.download className="w-5 h-5" />
+                        Descargar Plantilla Excel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Instrucciones */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Paso 2: Completa la Plantilla
+                  </h3>
+                  <ol className="text-sm text-blue-800 space-y-1.5 ml-7">
+                    <li>1. Abre el archivo descargado en Excel</li>
+                    <li>2. Completa los siguientes datos:</li>
+                  </ol>
+
+                  <div className="mt-3 ml-7 space-y-2">
+                    <div className="text-sm">
+                      <p className="font-medium text-blue-900 mb-1">Columnas requeridas:</p>
+                      <ul className="text-blue-800 space-y-0.5 ml-4">
+                        <li>• <strong>Departamento:</strong> Nombre exacto del departamento (ej: &quot;Compras&quot;, &quot;Comercial y Medición&quot;)</li>
+                        <li>• <strong>Período:</strong> Label del período (ej: &quot;2026-S1&quot;, &quot;2026-S2&quot;)</li>
+                        <li>• <strong>Monto Asignado:</strong> Cantidad numérica sin símbolos (ej: 45000, 150000.50)</li>
+                      </ul>
+                    </div>
+
+                    <div className="text-sm bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
+                      <p className="font-medium text-yellow-900 mb-1">Validaciones importantes:</p>
+                      <ul className="text-yellow-800 space-y-0.5 ml-4">
+                        <li>✓ El departamento debe existir en el sistema</li>
+                        <li>✓ El período debe existir en el sistema</li>
+                        <li>✓ El monto debe ser un número positivo</li>
+                        <li>✓ No puede haber presupuestos duplicados (mismo departamento + período)</li>
+                        <li>✓ Los nombres deben coincidir exactamente con los del sistema</li>
+                      </ul>
+                    </div>
+
+                    <div className="text-sm text-blue-700 bg-blue-100 rounded p-2 mt-2">
+                      💡 <strong>Tip:</strong> Descarga la plantilla con datos existentes para ver ejemplos
+                    </div>
+                  </div>
+                </div>
+
+                {/* Zona de upload */}
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center">
+                      <Icons.upload className="w-8 h-8 text-purple-600" />
+                    </div>
+                    <div>
+                      <label className="cursor-pointer">
+                        <span className="text-blue-600 hover:text-blue-700 font-medium">Seleccionar archivo</span>
+                        <input
+                          type="file"
+                          accept=".xlsx,.xls"
+                          onChange={handleFileChange}
+                          className="hidden"
+                        />
+                      </label>
+                      <p className="text-sm text-gray-500 mt-1">o arrastra y suelta aquí</p>
+                    </div>
+                    <p className="text-xs text-gray-400">Solo archivos .xlsx o .xls (máx. 5MB)</p>
+                    {selectedFile && (
+                      <div className="mt-2 flex items-center gap-2 bg-green-50 px-4 py-2 rounded-lg">
+                        <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-sm text-green-800 font-medium">{selectedFile.name}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Resultado de importación */}
+                {importResult && (
+                  <div className="space-y-3">
+                    {importResult.success > 0 && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <p className="text-green-800 font-medium">
+                          ✅ {importResult.success} presupuestos creados exitosamente
+                        </p>
+                      </div>
+                    )}
+
+                    {importResult.errors.length > 0 && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <p className="text-red-800 font-medium mb-2">
+                          ❌ {importResult.errors.length} filas con errores:
+                        </p>
+                        <div className="max-h-40 overflow-y-auto space-y-1.5">
+                          {importResult.errors.map((error, idx) => (
+                            <div key={idx} className="text-sm text-red-700 bg-red-100/50 px-3 py-2 rounded">
+                              <strong>Fila {error.row}</strong> - {error.department} / {error.period}: {error.error}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Botones */}
+                <div className="flex justify-end gap-3 pt-4 border-t">
+                  <button
+                    onClick={closeImportModal}
+                    disabled={importing}
+                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleImport}
+                    disabled={!selectedFile || importing}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {importing ? 'Importando...' : 'Importar'}
                   </button>
                 </div>
               </div>
