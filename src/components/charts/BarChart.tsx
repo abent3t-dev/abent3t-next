@@ -44,7 +44,7 @@ export function BarChart({
   data,
   dataKey,
   xAxisKey,
-  color = '#3b82f6',
+  color = '#52AF32', // A3T Green Primary
   colors,
   horizontal = false,
   formatValue,
@@ -84,7 +84,7 @@ export function BarChart({
             tick={{ fill: '#374151', fontSize: 12, fontWeight: 500 }}
             axisLine={{ stroke: '#e5e7eb' }}
           />
-          <Tooltip content={<CustomTooltip formatValue={formatValue} />} cursor={{ fill: 'rgba(59, 130, 246, 0.05)' }} />
+          <Tooltip content={<CustomTooltip formatValue={formatValue} />} cursor={{ fill: 'rgba(82, 175, 50, 0.05)' }} />
           <Bar
             dataKey={dataKey}
             radius={[0, 8, 8, 0]}
@@ -130,7 +130,7 @@ export function BarChart({
           tick={{ fill: '#6b7280', fontSize: 12 }}
           axisLine={{ stroke: '#e5e7eb' }}
         />
-        <Tooltip content={<CustomTooltip formatValue={formatValue} />} cursor={{ fill: 'rgba(59, 130, 246, 0.05)' }} />
+        <Tooltip content={<CustomTooltip formatValue={formatValue} />} cursor={{ fill: 'rgba(82, 175, 50, 0.05)' }} />
         <Bar
           dataKey={dataKey}
           radius={[8, 8, 0, 0]}

@@ -3,13 +3,46 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* A3T Corporate Colors */
+  --a3t-gray-dark: #424846;
+  --a3t-green-primary: #52AF32;
+  --a3t-green-secondary-1: #67B52E;
+  --a3t-green-secondary-2: #74B82B;
+  --a3t-blue-navy: #222D59;
+  --a3t-gold: #DFA922;
+
+  /* Status Colors */
+  --status-success: #10b981;
+  --status-warning: #f59e0b;
+  --status-error: #ef4444;
+  --status-info: #3b82f6;
+  --status-pending: #f97316;
 }
 
 @theme inline {
+  /* Base Colors */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  /* Fonts */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* A3T Corporate Colors */
+  --color-a3t-gray-dark: #424846;
+  --color-a3t-green: #52AF32;
+  --color-a3t-green-light: #67B52E;
+  --color-a3t-green-lighter: #74B82B;
+  --color-a3t-navy: #222D59;
+  --color-a3t-gold: #DFA922;
+
+  /* Status Colors */
+  --color-status-success: #10b981;
+  --color-status-warning: #f59e0b;
+  --color-status-error: #ef4444;
+  --color-status-info: #3b82f6;
+  --color-status-pending: #f97316;
 }
 
 @media (prefers-color-scheme: dark) {

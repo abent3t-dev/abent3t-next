@@ -19,17 +19,18 @@ interface PieChartProps {
   height?: number;
 }
 
+// A3T Color Palette
 const DEFAULT_COLORS = [
-  '#3b82f6', // Blue
-  '#10b981', // Green
-  '#f59e0b', // Orange
-  '#8b5cf6', // Purple
-  '#ef4444', // Red
-  '#06b6d4', // Cyan
-  '#84cc16', // Lime
-  '#f97316', // Orange-red
-  '#ec4899', // Pink
-  '#6366f1', // Indigo
+  '#52AF32', // A3T Green Primary
+  '#222D59', // A3T Blue Navy
+  '#DFA922', // A3T Gold
+  '#67B52E', // A3T Green Secondary 1
+  '#3b82f6', // Info Blue
+  '#f59e0b', // Warning
+  '#74B82B', // A3T Green Secondary 2
+  '#f97316', // Pending Orange
+  '#424846', // A3T Gray Dark
+  '#10b981', // Success Green
 ];
 
 // Label personalizado con mejor estilo

@@ -139,26 +139,26 @@ function NavItemComponent({ item, level = 0 }: { item: NavItem; level?: number }
       {hasChildren ? (
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 relative ${
             isActive
-              ? 'bg-blue-50 text-blue-700'
-              : 'text-gray-700 hover:bg-gray-100'
+              ? 'bg-[#52AF32] text-white shadow-lg shadow-[#52AF32]/30 border-l-4 border-[#67B52E]'
+              : 'text-gray-200 hover:bg-[#52AF32]/20 hover:text-white'
           }`}
         >
           <Icon className="w-5 h-5 flex-shrink-0" />
           <span className="flex-1 text-left">{item.label}</span>
           <Icons.chevron
-            className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+            className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
           />
         </button>
       ) : (
         <Link
           href={item.href}
-          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 relative ${
             isActive
-              ? 'bg-blue-50 text-blue-700'
-              : 'text-gray-700 hover:bg-gray-100'
-          } ${level > 0 ? 'pl-10' : ''}`}
+              ? 'bg-[#52AF32] text-white shadow-lg shadow-[#52AF32]/30 border-l-4 border-[#67B52E]'
+              : 'text-gray-200 hover:bg-[#52AF32]/20 hover:text-white'
+          } ${level > 0 ? 'pl-12 ml-2' : ''}`}
         >
           <Icon className="w-5 h-5 flex-shrink-0" />
           <span>{item.label}</span>
@@ -166,7 +166,7 @@ function NavItemComponent({ item, level = 0 }: { item: NavItem; level?: number }
       )}
 
       {hasChildren && isOpen && (
-        <div className="mt-1 space-y-1">
+        <div className="mt-1 ml-2 space-y-1 border-l-2 border-gray-600 pl-2">
           {visibleChildren.map((child) => (
             <NavItemComponent key={child.href} item={child} level={level + 1} />
           ))}
@@ -181,50 +181,66 @@ export function Sidebar() {
   const { isConnected } = useSocket();
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen">
+    <aside className="w-64 bg-[#424846] flex flex-col h-screen shadow-2xl">
       {/* Logo / Header */}
-      <div className="p-4 border-b border-gray-200">
-        <h1 className="text-xl font-bold text-gray-900">Abent 3T</h1>
-        <p className="text-xs text-gray-500">Sistema de Gestión</p>
+      <div className="h-20 px-6 py-4 bg-[#222D59]/60 border-b border-gray-600/50 flex items-center justify-center">
+        <div className="text-center w-full">
+          <h1 className="text-2xl font-bold text-white tracking-tight">
+            Abent <span className="text-[#52AF32]">3T</span>
+          </h1>
+          <p className="text-xs text-gray-300 font-medium mt-1">Sistema de Capacitación</p>
+        </div>
       </div>
 
       {/* User Info */}
       {user && (
-        <div className="p-4 border-b border-gray-200 bg-gray-50">
-          <p className="font-medium text-gray-900 truncate">{user.full_name}</p>
-          <p className="text-xs text-gray-500">{ROLE_LABELS[user.role]}</p>
-          {user.departments && (
-            <p className="text-xs text-blue-600 mt-1">{user.departments.name}</p>
-          )}
+        <div className="px-4 py-4 bg-[#222D59]/40 border-b border-gray-600/50">
+          <div className="flex items-center gap-3">
+            {/* Avatar placeholder */}
+            <div className="w-10 h-10 rounded-full bg-[#52AF32]/25 border-2 border-[#52AF32] flex items-center justify-center flex-shrink-0">
+              <span className="text-[#52AF32] font-bold text-sm">
+                {user.full_name?.charAt(0).toUpperCase() || 'U'}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-white truncate text-sm">{user.full_name}</p>
+              <p className="text-xs text-[#52AF32] font-medium">{ROLE_LABELS[user.role]}</p>
+              {user.departments && (
+                <p className="text-xs text-gray-300 truncate mt-0.5">{user.departments.name}</p>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {SIDEBAR_NAV.map((item) => (
           <NavItemComponent key={item.href} item={item} />
         ))}
       </nav>
 
       {/* Connection Status */}
-      <div className="px-4 py-2 border-t border-gray-200">
+      <div className="px-4 py-3 bg-[#222D59]/40 border-t border-gray-600/50">
         <div className="flex items-center gap-2 text-xs">
           <span
-            className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}
+            className={`w-2 h-2 rounded-full animate-pulse ${
+              isConnected ? 'bg-[#52AF32] shadow-lg shadow-[#52AF32]/50' : 'bg-red-500'
+            }`}
           />
-          <span className="text-gray-500">
+          <span className={`font-medium ${isConnected ? 'text-gray-200' : 'text-red-400'}`}>
             {isConnected ? 'Tiempo real activo' : 'Sin conexión en tiempo real'}
           </span>
         </div>
       </div>
 
       {/* Logout */}
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 bg-[#222D59]/60 border-t border-gray-600/50">
         <button
           onClick={signOut}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/15 hover:text-red-300 transition-all duration-200 border border-red-500/30 hover:border-red-500/50"
         >
-          <Icons.logout className="w-5 h-5" />
+          <Icons.logout className="w-5 h-5 flex-shrink-0" />
           <span>Cerrar Sesión</span>
         </button>
       </div>
