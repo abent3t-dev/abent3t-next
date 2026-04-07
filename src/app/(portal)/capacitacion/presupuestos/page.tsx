@@ -355,7 +355,7 @@ export default function PresupuestosPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 p-6">
         <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#52AF32]"></div>
         </div>
       </div>
     );
@@ -385,7 +385,7 @@ export default function PresupuestosPage() {
               </button>
               <button
                 onClick={openCreateModal}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] transition-colors"
               >
                 <Icons.plus className="w-5 h-5" />
                 Nuevo Presupuesto
@@ -400,12 +400,12 @@ export default function PresupuestosPage() {
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-gray-500">Presupuesto Total</p>
               <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-[#52AF32]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
             </div>
-            <p className="text-2xl font-bold text-blue-600 mt-2">{formatCurrency(totalAssigned)}</p>
+            <p className="text-2xl font-bold text-[#52AF32] mt-2">{formatCurrency(totalAssigned)}</p>
           </div>
           <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
             <div className="flex items-center justify-between">
@@ -514,7 +514,7 @@ export default function PresupuestosPage() {
                         <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => openEditModal(budget)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="p-2 text-[#52AF32] hover:bg-blue-50 rounded-lg transition-colors"
                             title="Editar"
                           >
                             <Icons.edit className="w-4 h-4" />
@@ -545,7 +545,7 @@ export default function PresupuestosPage() {
                       {canManage && (
                         <button
                           onClick={openCreateModal}
-                          className="mt-3 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                          className="mt-3 text-[#52AF32] hover:text-blue-700 text-sm font-medium"
                         >
                           Crear primer presupuesto
                         </button>
@@ -579,7 +579,7 @@ export default function PresupuestosPage() {
                   <select
                     value={formData.department_id}
                     onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900"
                     required
                   >
                     <option value="">Seleccionar departamento</option>
@@ -598,7 +598,7 @@ export default function PresupuestosPage() {
                   <select
                     value={formData.period_id}
                     onChange={(e) => setFormData({ ...formData, period_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900"
                     required
                   >
                     <option value="">Seleccionar periodo</option>
@@ -622,7 +622,7 @@ export default function PresupuestosPage() {
                     step="0.01"
                     value={formData.assigned_amount}
                     onChange={(e) => setFormData({ ...formData, assigned_amount: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900"
                     placeholder="0.00"
                     required
                   />
@@ -639,7 +639,7 @@ export default function PresupuestosPage() {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    className="px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] disabled:opacity-50 transition-colors"
                   >
                     {saving ? 'Guardando...' : editingBudget ? 'Actualizar' : 'Crear'}
                   </button>
@@ -796,7 +796,7 @@ export default function PresupuestosPage() {
                     </div>
                     <div>
                       <label className="cursor-pointer">
-                        <span className="text-blue-600 hover:text-blue-700 font-medium">Seleccionar archivo</span>
+                        <span className="text-[#52AF32] hover:text-blue-700 font-medium">Seleccionar archivo</span>
                         <input
                           type="file"
                           accept=".xlsx,.xls"

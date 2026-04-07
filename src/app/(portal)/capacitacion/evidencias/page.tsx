@@ -626,7 +626,7 @@ export default function EvidenciasPage() {
                         ) : (
                           <button
                             onClick={() => handleDownload(evidence)}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-[#52AF32] bg-[#52AF32]/10 border border-[#52AF32]/30 rounded-lg hover:bg-[#52AF32]/20 transition-colors"
                           >
                             {Icons.download}
                             Descargar

@@ -469,7 +469,7 @@ export default function SolicitudesPage() {
             {isManager && (
               <button
                 onClick={openCreateModal}
-                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200"
+                className="flex items-center gap-2 px-4 py-2.5 bg-[#52AF32] text-white rounded-xl hover:bg-[#67B52E] transition-all shadow-lg shadow-blue-200"
               >
                 {Icons.plus}
                 <span>Nueva Solicitud</span>
@@ -485,7 +485,7 @@ export default function SolicitudesPage() {
               onClick={() => setActiveTab('solicitudes')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 activeTab === 'solicitudes'
-                  ? 'bg-white text-blue-600 shadow-sm'
+                  ? 'bg-white text-[#52AF32] shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -643,7 +643,7 @@ export default function SolicitudesPage() {
                           <div className="md:col-span-1 space-y-4">
                             {/* Solicitante (quien pide) */}
                             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4">
-                              <div className="flex items-center gap-2 text-blue-600 mb-2">
+                              <div className="flex items-center gap-2 text-[#52AF32] mb-2">
                                 {Icons.userGroup}
                                 <span className="text-xs font-semibold uppercase tracking-wide">Solicitado por</span>
                               </div>
@@ -816,7 +816,7 @@ export default function SolicitudesPage() {
                             href={proposal.course_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm text-blue-600 hover:underline mt-2 inline-block"
+                            className="text-sm text-[#52AF32] hover:underline mt-2 inline-block"
                           >
                             Ver curso externo →
                           </a>
@@ -825,7 +825,7 @@ export default function SolicitudesPage() {
                           <p className="text-sm text-gray-600 mt-3 italic bg-gray-50 p-3 rounded-lg">&quot;{proposal.justification}&quot;</p>
                         )}
                         {proposal.review_notes && (
-                          <p className="text-sm text-blue-600 mt-2">📝 Notas de revisión: {proposal.review_notes}</p>
+                          <p className="text-sm text-[#52AF32] mt-2">📝 Notas de revisión: {proposal.review_notes}</p>
                         )}
                         {proposal.rejection_reason && (
                           <div className="mt-3 bg-red-50 rounded-lg p-3">
@@ -867,7 +867,7 @@ export default function SolicitudesPage() {
                     value={selectedCourse}
                     onChange={(e) => handleCourseChange(e.target.value)}
                     required
-                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                   >
                     <option value="">— Seleccionar curso —</option>
                     {courses.map((c) => (
@@ -885,7 +885,7 @@ export default function SolicitudesPage() {
                     onChange={(e) => setSelectedEdition(e.target.value)}
                     required
                     disabled={!selectedCourse}
-                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm disabled:bg-gray-50 disabled:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm disabled:bg-gray-50 disabled:text-gray-400 focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                   >
                     <option value="">— Seleccionar edición —</option>
                     {editions.map((ed) => (
@@ -902,7 +902,7 @@ export default function SolicitudesPage() {
                     value={selectedCollaborator}
                     onChange={(e) => setSelectedCollaborator(e.target.value)}
                     required
-                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                   >
                     <option value="">— Seleccionar colaborador —</option>
                     {collaborators.map((c) => (
@@ -920,7 +920,7 @@ export default function SolicitudesPage() {
                     onChange={(e) => setRequestReason(e.target.value)}
                     rows={3}
                     placeholder="¿Por qué se solicita esta capacitación?"
-                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#52AF32] focus:border-transparent resize-none"
                   />
                 </label>
 
@@ -935,7 +935,7 @@ export default function SolicitudesPage() {
                   <button
                     type="submit"
                     disabled={creating}
-                    className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium"
+                    className="px-5 py-2.5 bg-[#52AF32] text-white rounded-xl hover:bg-[#67B52E] disabled:opacity-50 transition-colors font-medium"
                   >
                     {creating ? 'Enviando...' : 'Enviar Solicitud'}
                   </button>

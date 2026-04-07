@@ -362,7 +362,7 @@ export default function CoursesPage() {
               placeholder="Buscar cursos..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
             />
           </div>
 
@@ -393,7 +393,7 @@ export default function CoursesPage() {
           {/* Add Button */}
           <button
             onClick={openAdd}
-            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm"
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] transition-colors duration-200 font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32]/50 focus:ring-offset-2"
           >
             {Icons.plus}
             <span>Nuevo Curso</span>
@@ -404,7 +404,7 @@ export default function CoursesPage() {
       {/* Courses List */}
       {loading ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-          <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <div className="animate-spin w-8 h-8 border-4 border-[#52AF32] border-t-transparent rounded-full mx-auto mb-4"></div>
           <p className="text-gray-500">Cargando cursos...</p>
         </div>
       ) : filteredCourses.length === 0 ? (
@@ -419,7 +419,7 @@ export default function CoursesPage() {
           {!searchTerm && (
             <button
               onClick={openAdd}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#52AF32]/50 focus:ring-offset-2"
             >
               {Icons.plus}
               <span>Agregar Curso</span>
@@ -437,7 +437,7 @@ export default function CoursesPage() {
               <div
                 key={course.id}
                 className={`bg-white rounded-xl shadow-sm border transition-all duration-200 ${
-                  isExpanded ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200 hover:border-gray-300'
+                  isExpanded ? 'border-[#52AF32]/50 ring-2 ring-[#52AF32]/20' : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
                 {/* Course Card Header */}
@@ -450,7 +450,7 @@ export default function CoursesPage() {
                     <div className="flex items-start gap-4 flex-1 min-w-0">
                       {/* Icon */}
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                        course.is_active ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'
+                        course.is_active ? 'bg-[#52AF32]/10 text-[#52AF32]' : 'bg-gray-100 text-gray-400'
                       }`}>
                         {Icons.book}
                       </div>
@@ -569,13 +569,13 @@ export default function CoursesPage() {
                     <div className="px-5 py-3 flex items-center justify-between border-b border-gray-100">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-gray-700">Ediciones</span>
-                        <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
+                        <span className="px-2 py-0.5 text-xs font-medium bg-[#52AF32]/15 text-[#52AF32] rounded-full">
                           {editions.length}
                         </span>
                       </div>
                       <button
                         onClick={(e) => openAddEdition(course.id, e)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] transition-colors duration-200"
                       >
                         {Icons.plus}
                         <span>Nueva Edición</span>
@@ -586,7 +586,7 @@ export default function CoursesPage() {
                     <div className="p-4">
                       {isLoadingEditions ? (
                         <div className="py-8 text-center">
-                          <div className="animate-spin w-6 h-6 border-3 border-blue-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                          <div className="animate-spin w-6 h-6 border-3 border-[#52AF32] border-t-transparent rounded-full mx-auto mb-2"></div>
                           <p className="text-sm text-gray-500">Cargando ediciones...</p>
                         </div>
                       ) : editions.length === 0 ? (
@@ -597,7 +597,7 @@ export default function CoursesPage() {
                           <p className="text-gray-500 text-sm mb-3">No hay ediciones registradas</p>
                           <button
                             onClick={(e) => openAddEdition(course.id, e)}
-                            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                            className="text-sm text-[#52AF32] hover:text-[#67B52E] font-medium"
                           >
                             + Agregar primera edición
                           </button>
@@ -659,7 +659,7 @@ export default function CoursesPage() {
                                       </span>
                                     )}
                                     {edition.prorate_cost && (
-                                      <span className="px-2 py-0.5 text-xs font-medium rounded bg-blue-50 text-blue-700 border border-blue-100">
+                                      <span className="px-2 py-0.5 text-xs font-medium rounded bg-[#52AF32]/10 text-[#52AF32] border border-[#52AF32]/20">
                                         Prorrateo
                                       </span>
                                     )}
@@ -719,7 +719,7 @@ export default function CoursesPage() {
             required
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
           />
         </label>
         <label className="block text-sm font-medium text-gray-700">
@@ -727,7 +727,7 @@ export default function CoursesPage() {
           <select
             value={form.institution_id}
             onChange={(e) => setForm({ ...form, institution_id: e.target.value })}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
           >
             <option value="">— Seleccionar —</option>
             {institutions.map((i) => (
@@ -741,7 +741,7 @@ export default function CoursesPage() {
             <select
               value={form.course_type_id}
               onChange={(e) => setForm({ ...form, course_type_id: e.target.value })}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
             >
               <option value="">— Seleccionar —</option>
               {courseTypes.map((ct) => (
@@ -754,7 +754,7 @@ export default function CoursesPage() {
             <select
               value={form.modality_id}
               onChange={(e) => setForm({ ...form, modality_id: e.target.value })}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
             >
               <option value="">— Seleccionar —</option>
               {modalities.map((m) => (
@@ -771,7 +771,7 @@ export default function CoursesPage() {
               min="0"
               value={form.total_hours}
               onChange={(e) => setForm({ ...form, total_hours: parseInt(e.target.value) || 0 })}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
             />
           </label>
           <label className="block text-sm font-medium text-gray-700">
@@ -782,7 +782,7 @@ export default function CoursesPage() {
               min="0"
               value={form.cost}
               onChange={(e) => setForm({ ...form, cost: parseFloat(e.target.value) || 0 })}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
             />
           </label>
         </div>
@@ -791,7 +791,7 @@ export default function CoursesPage() {
           <select
             value={form.payment_status}
             onChange={(e) => setForm({ ...form, payment_status: e.target.value as PaymentStatus })}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
           >
             <option value="pending">Pendiente</option>
             <option value="paid">Pagado</option>
@@ -807,7 +807,7 @@ export default function CoursesPage() {
               value={form.payment_reference}
               onChange={(e) => setForm({ ...form, payment_reference: e.target.value })}
               placeholder="Factura, transferencia, etc."
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
             />
           </label>
           <label className="block text-sm font-medium text-gray-700">
@@ -816,7 +816,7 @@ export default function CoursesPage() {
               type="date"
               value={form.payment_date}
               onChange={(e) => setForm({ ...form, payment_date: e.target.value })}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
             />
           </label>
         </div>
@@ -826,7 +826,7 @@ export default function CoursesPage() {
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             rows={3}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
           />
         </label>
       </CatalogModal>
@@ -846,7 +846,7 @@ export default function CoursesPage() {
             required
             value={editionForm.start_date}
             onChange={(e) => setEditionForm({ ...editionForm, start_date: e.target.value })}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
           />
         </label>
         <label className="block text-sm font-medium text-gray-700">
@@ -855,7 +855,7 @@ export default function CoursesPage() {
             type="date"
             value={editionForm.end_date}
             onChange={(e) => setEditionForm({ ...editionForm, end_date: e.target.value })}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
           />
         </label>
         <label className="block text-sm font-medium text-gray-700">
@@ -864,7 +864,7 @@ export default function CoursesPage() {
             type="text"
             value={editionForm.location}
             onChange={(e) => setEditionForm({ ...editionForm, location: e.target.value })}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
             placeholder="ej: Campus Monterrey, Sala Virtual"
           />
         </label>
@@ -874,7 +874,7 @@ export default function CoursesPage() {
             type="text"
             value={editionForm.instructor}
             onChange={(e) => setEditionForm({ ...editionForm, instructor: e.target.value })}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
           />
         </label>
         <label className="block text-sm font-medium text-gray-700">
@@ -884,7 +884,7 @@ export default function CoursesPage() {
             min="1"
             value={editionForm.max_participants}
             onChange={(e) => setEditionForm({ ...editionForm, max_participants: e.target.value })}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
           />
         </label>
         <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
@@ -893,7 +893,7 @@ export default function CoursesPage() {
             id="prorate_cost"
             checked={editionForm.prorate_cost}
             onChange={(e) => setEditionForm({ ...editionForm, prorate_cost: e.target.checked })}
-            className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            className="mt-1 h-4 w-4 text-[#52AF32] border-gray-300 rounded focus:ring-[#52AF32]"
           />
           <label htmlFor="prorate_cost" className="text-sm text-gray-700">
             <span className="font-medium">Prorratear costo</span>
@@ -908,7 +908,7 @@ export default function CoursesPage() {
             id="require_evidence"
             checked={editionForm.require_evidence_for_completion}
             onChange={(e) => setEditionForm({ ...editionForm, require_evidence_for_completion: e.target.checked })}
-            className="mt-1 h-4 w-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
+            className="mt-1 h-4 w-4 text-[#DFA922] border-gray-300 rounded focus:ring-[#DFA922]"
           />
           <label htmlFor="require_evidence" className="text-sm text-gray-700">
             <span className="font-medium">Requerir evidencia para completar</span>

@@ -302,7 +302,7 @@ export default function MisCursosPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto" />
+          <div className="animate-spin w-8 h-8 border-4 border-[#52AF32] border-t-transparent rounded-full mx-auto" />
           <p className="text-gray-500 mt-4">Cargando tus cursos...</p>
         </div>
       </div>
@@ -436,7 +436,7 @@ export default function MisCursosPage() {
                       {effective.canUploadEvidence && (
                         <button
                           onClick={() => openUploadModal(course)}
-                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                          className="flex items-center gap-2 px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] transition-colors text-sm font-medium"
                         >
                           {Icons.upload}
                           Subir Evidencia
@@ -602,7 +602,7 @@ export default function MisCursosPage() {
                   <select
                     value={evidenceType}
                     onChange={(e) => setEvidenceType(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent text-gray-900 bg-white"
                   >
                     <option value="certificate">Certificado</option>
                     <option value="attendance">Constancia de asistencia</option>
@@ -619,7 +619,7 @@ export default function MisCursosPage() {
                     type="file"
                     onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
                     accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent text-gray-900"
                   />
                   <p className="text-xs text-gray-500 mt-2">
                     Formatos: PDF, JPG, PNG, Word, Excel. Máximo 10MB.
@@ -627,9 +627,9 @@ export default function MisCursosPage() {
                 </div>
 
                 {uploadFile && (
-                  <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl">
+                  <div className="flex items-center gap-3 p-3 bg-[#52AF32]/10 rounded-xl">
                     {Icons.file}
-                    <span className="text-sm text-blue-700 font-medium">{uploadFile.name}</span>
+                    <span className="text-sm text-[#52AF32] font-medium">{uploadFile.name}</span>
                   </div>
                 )}
               </div>
@@ -645,7 +645,7 @@ export default function MisCursosPage() {
                 <button
                   onClick={handleUpload}
                   disabled={uploading || !uploadFile}
-                  className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 font-medium"
+                  className="px-5 py-2.5 bg-[#52AF32] text-white rounded-xl hover:bg-[#67B52E] disabled:opacity-50 flex items-center gap-2 font-medium"
                 >
                   {uploading && (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

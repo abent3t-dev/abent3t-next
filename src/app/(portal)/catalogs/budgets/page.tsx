@@ -166,7 +166,7 @@ export default function BudgetsPage() {
                   required
                   value={crud.form.department_id}
                   onChange={(e) => crud.updateField('department_id', e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
                 >
                   <option value="">— Seleccionar área —</option>
                   {departments.map((d) => (
@@ -180,7 +180,7 @@ export default function BudgetsPage() {
                   required
                   value={crud.form.period_id}
                   onChange={(e) => crud.updateField('period_id', e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
                 >
                   <option value="">— Seleccionar periodo —</option>
                   {periods.map((p) => (
@@ -207,7 +207,7 @@ export default function BudgetsPage() {
               step="0.01"
               value={crud.form.assigned_amount}
               onChange={(e) => crud.updateField('assigned_amount', parseFloat(e.target.value) || 0)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
             />
           </label>
 
@@ -220,7 +220,7 @@ export default function BudgetsPage() {
                 step="0.01"
                 value={crud.form.consumed_amount}
                 onChange={(e) => crud.updateField('consumed_amount', parseFloat(e.target.value) || 0)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
               />
             </label>
           )}

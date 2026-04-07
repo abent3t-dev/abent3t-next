@@ -82,7 +82,7 @@ export default function PeriodsPage() {
                 required
                 value={crud.form.year}
                 onChange={(e) => crud.updateField('year', parseInt(e.target.value))}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
               />
             </label>
             <label className="block text-sm font-medium text-gray-700">
@@ -90,7 +90,7 @@ export default function PeriodsPage() {
               <select
                 value={crud.form.semester}
                 onChange={(e) => crud.updateField('semester', parseInt(e.target.value))}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
               >
                 <option value={1}>Semestre 1</option>
                 <option value={2}>Semestre 2</option>
@@ -105,7 +105,7 @@ export default function PeriodsPage() {
             required
             value={crud.form.label}
             onChange={(e) => crud.updateField('label', e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
             placeholder="ej: 2026-S1"
           />
         </label>
@@ -116,7 +116,7 @@ export default function PeriodsPage() {
             required
             value={crud.form.start_date}
             onChange={(e) => crud.updateField('start_date', e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
           />
         </label>
         <label className="block text-sm font-medium text-gray-700">
@@ -126,7 +126,7 @@ export default function PeriodsPage() {
             required
             value={crud.form.end_date}
             onChange={(e) => crud.updateField('end_date', e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
           />
         </label>
       </CatalogModal>}

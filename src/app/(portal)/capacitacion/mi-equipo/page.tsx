@@ -216,7 +216,7 @@ export default function MiEquipoPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 p-6">
         <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#52AF32]"></div>
         </div>
       </div>
     );
@@ -314,7 +314,7 @@ export default function MiEquipoPage() {
                 onClick={() => setFilter(f.value as typeof filter)}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
                   filter === f.value
-                    ? 'bg-blue-600 text-white shadow-sm'
+                    ? 'bg-[#52AF32] text-white shadow-sm'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >

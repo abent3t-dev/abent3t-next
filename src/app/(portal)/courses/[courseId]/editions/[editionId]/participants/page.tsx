@@ -262,7 +262,7 @@ export default function ParticipantsPage() {
         <div>
           <button
             onClick={() => router.push('/courses')}
-            className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mb-2"
+            className="flex items-center gap-1 text-sm text-[#52AF32] hover:text-[#67B52E] mb-2"
           >
             {Icons.arrowLeft}
             <span>Volver a Cursos</span>
@@ -278,7 +278,7 @@ export default function ParticipantsPage() {
         </div>
         <button
           onClick={openSelector}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          className="flex items-center gap-2 px-4 py-2 bg-[#52AF32] text-white rounded-md hover:bg-[#67B52E]"
         >
           {Icons.plus}
           <span>Agregar Participantes</span>
@@ -400,7 +400,7 @@ export default function ParticipantsPage() {
                   <div className="flex items-center justify-center gap-1">
                     <button
                       onClick={() => openEvidenceModal(enrollment)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      className="p-2 text-[#52AF32] hover:bg-[#52AF32]/10 rounded-lg transition-colors"
                       title="Ver/Subir evidencias"
                     >
                       {Icons.file}
@@ -450,12 +450,12 @@ export default function ParticipantsPage() {
                   placeholder="Buscar por nombre o email..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                 />
                 <select
                   value={selectedDept}
                   onChange={(e) => setSelectedDept(e.target.value)}
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                 >
                   <option value="">Todas las áreas</option>
                   {departments.map((d) => (
@@ -467,7 +467,7 @@ export default function ParticipantsPage() {
                 <select
                   value={selectedRole}
                   onChange={(e) => setSelectedRole(e.target.value)}
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                 >
                   <option value="">Todos los roles</option>
                   {activeRoles.map((role) => (
@@ -484,7 +484,7 @@ export default function ParticipantsPage() {
                 </span>
                 <button
                   onClick={selectAll}
-                  className="text-blue-600 hover:text-blue-800"
+                  className="text-[#52AF32] hover:text-[#67B52E]"
                 >
                   Seleccionar todos
                 </button>
@@ -502,7 +502,7 @@ export default function ParticipantsPage() {
                       type="checkbox"
                       checked={selectedUsers.includes(user.id)}
                       onChange={() => toggleUser(user.id)}
-                      className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                      className="h-4 w-4 text-[#52AF32] rounded border-gray-300"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
@@ -544,7 +544,7 @@ export default function ParticipantsPage() {
               <button
                 onClick={handleEnroll}
                 disabled={selectedUsers.length === 0 || saving}
-                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium shadow-sm"
+                className="px-5 py-2.5 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium shadow-sm"
               >
                 {saving
                   ? 'Inscribiendo...'

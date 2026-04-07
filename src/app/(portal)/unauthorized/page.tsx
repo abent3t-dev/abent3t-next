@@ -30,7 +30,7 @@ export default function UnauthorizedPage() {
         </p>
         <Link
           href={homeRoute}
-          className="inline-flex px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="inline-flex px-6 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] transition-colors"
         >
           Ir al inicio
         </Link>

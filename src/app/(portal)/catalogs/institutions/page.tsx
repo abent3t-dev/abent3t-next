@@ -86,7 +86,7 @@ export default function InstitutionsPage() {
             required
             value={crud.form.name}
             onChange={(e) => crud.updateField('name', e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
           />
         </label>
         <label className="block text-sm font-medium text-gray-700">
@@ -94,7 +94,7 @@ export default function InstitutionsPage() {
           <select
             value={crud.form.type}
             onChange={(e) => crud.updateField('type', e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
           >
             <option value="external">Externa</option>
             <option value="platform">Plataforma</option>
@@ -118,7 +118,7 @@ export default function InstitutionsPage() {
             min="0"
             value={crud.form.annual_cost}
             onChange={(e) => crud.updateField('annual_cost', parseFloat(e.target.value) || 0)}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
           />
         </label>
         <label className="block text-sm font-medium text-gray-700">
@@ -127,7 +127,7 @@ export default function InstitutionsPage() {
             type="url"
             value={crud.form.platform_url}
             onChange={(e) => crud.updateField('platform_url', e.target.value)}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
             placeholder="https://..."
           />
         </label>

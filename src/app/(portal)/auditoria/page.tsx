@@ -240,7 +240,7 @@ export default function AuditoriaPage() {
           <div className="flex gap-2">
             <button
               onClick={handleFilter}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+              className="flex-1 px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] text-sm"
             >
               Aplicar
             </button>

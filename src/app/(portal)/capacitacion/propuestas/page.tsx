@@ -456,7 +456,7 @@ export default function PropuestasPage() {
                           <button
                             onClick={() => handleInvestigate(proposal.id)}
                             disabled={investigateMutation.isPending}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium disabled:opacity-50"
+                            className="flex items-center gap-2 px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] transition-colors text-sm font-medium disabled:opacity-50"
                           >
                             {Icons.search}
                             Investigar
@@ -583,7 +583,7 @@ export default function PropuestasPage() {
                               href={proposal.course_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-[#52AF32]/10 text-[#52AF32] rounded-lg hover:bg-[#52AF32]/20 transition-colors text-sm font-medium"
                             >
                               {Icons.link}
                               Ver página del curso

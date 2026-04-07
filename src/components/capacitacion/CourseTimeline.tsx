@@ -309,7 +309,7 @@ const CourseTimeline: React.FC<CourseTimelineProps> = ({ enrollments }) => {
               onClick={() => setViewMode('monthly')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 viewMode === 'monthly'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-[#52AF32] text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
@@ -319,7 +319,7 @@ const CourseTimeline: React.FC<CourseTimelineProps> = ({ enrollments }) => {
               onClick={() => setViewMode('quarterly')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 viewMode === 'quarterly'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-[#52AF32] text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
@@ -329,7 +329,7 @@ const CourseTimeline: React.FC<CourseTimelineProps> = ({ enrollments }) => {
               onClick={() => setViewMode('yearly')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 viewMode === 'yearly'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-[#52AF32] text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
@@ -499,10 +499,10 @@ const CourseTimeline: React.FC<CourseTimelineProps> = ({ enrollments }) => {
                       {/* Today Indicator */}
                       {todayPosition !== null && (
                         <div
-                          className="absolute top-0 bottom-0 w-0.5 bg-blue-600 z-10"
+                          className="absolute top-0 bottom-0 w-0.5 bg-[#52AF32] z-10"
                           style={{ left: `${todayPosition}%` }}
                         >
-                          <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white text-xs px-2 py-0.5 rounded whitespace-nowrap">
+                          <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-[#52AF32] text-white text-xs px-2 py-0.5 rounded whitespace-nowrap">
                             Hoy
                           </div>
                         </div>

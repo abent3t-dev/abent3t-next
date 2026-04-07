@@ -54,7 +54,7 @@ export default function DepartmentsPage() {
               required
               value={crud.form.name}
               onChange={(e) => crud.updateField('name', e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
             />
           </label>
         </CatalogModal>

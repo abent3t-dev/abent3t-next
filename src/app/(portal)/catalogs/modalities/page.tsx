@@ -78,7 +78,7 @@ export default function ModalitiesPage() {
               crud.updateField('name', name);
               if (!crud.editing) crud.updateField('key', toKey(name));
             }}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
           />
         </label>
         {!crud.editing && (
@@ -89,7 +89,7 @@ export default function ModalitiesPage() {
               required
               value={crud.form.key}
               onChange={(e) => crud.updateField('key', e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
               placeholder="ej: presencial"
             />
           </label>
@@ -100,7 +100,7 @@ export default function ModalitiesPage() {
             value={crud.form.description}
             onChange={(e) => crud.updateField('description', e.target.value)}
             rows={3}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
           />
         </label>
       </CatalogModal>}
