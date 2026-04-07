@@ -23,75 +23,115 @@ export default function Pagination({ meta, onPageChange, onLimitChange }: Pagina
   if (total === 0) return null;
 
   return (
-    <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between text-sm">
-      <div className="text-gray-500">
-        Mostrando {from}–{to} de {total} registros
+    <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm bg-white">
+      {/* Texto informativo */}
+      <div className="text-[#424846]/70 text-sm">
+        Mostrando <span className="font-medium text-[#424846]">{from}</span> a{' '}
+        <span className="font-medium text-[#424846]">{to}</span> de{' '}
+        <span className="font-medium text-[#424846]">{total}</span> registros
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-4">
+        {/* Selector de items por pagina */}
         {onLimitChange && (
-          <select
-            value={limit}
-            onChange={(e) => onLimitChange(Number(e.target.value))}
-            className="px-2 py-1 border border-gray-300 rounded text-sm text-gray-700 bg-white"
-          >
-            {[10, 15, 20, 50].map((v) => (
-              <option key={v} value={v}>{v} / pág</option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <label htmlFor="limit-select" className="text-[#424846]/70 text-sm hidden sm:inline">
+              Mostrar:
+            </label>
+            <select
+              id="limit-select"
+              value={limit}
+              onChange={(e) => onLimitChange(Number(e.target.value))}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-[#424846] bg-white cursor-pointer transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#52AF32]/30 focus:border-[#52AF32] hover:border-[#67B52E]"
+            >
+              {[10, 25, 50, 100].map((v) => (
+                <option key={v} value={v}>
+                  {v} / pag
+                </option>
+              ))}
+            </select>
+          </div>
         )}
 
-        <nav className="flex items-center gap-1">
+        {/* Navegacion de paginas */}
+        <nav className="flex items-center gap-1" aria-label="Paginacion">
+          {/* Boton Primera pagina */}
           <button
             onClick={() => onPageChange(1)}
             disabled={!hasPrev}
-            className="px-2 py-1 rounded text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Primera"
+            className="p-2 rounded-lg text-[#424846] bg-transparent transition-all duration-200 hover:bg-[#52AF32]/10 hover:text-[#52AF32] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#424846]"
+            title="Primera pagina"
+            aria-label="Ir a primera pagina"
           >
-            «
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            </svg>
           </button>
+
+          {/* Boton Anterior */}
           <button
             onClick={() => onPageChange(page - 1)}
             disabled={!hasPrev}
-            className="px-2 py-1 rounded text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Anterior"
+            className="p-2 rounded-lg text-[#424846] bg-transparent transition-all duration-200 hover:bg-[#52AF32]/10 hover:text-[#52AF32] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#424846]"
+            title="Pagina anterior"
+            aria-label="Ir a pagina anterior"
           >
-            ‹
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
           </button>
 
-          {start > 1 && <span className="px-1 text-gray-400">…</span>}
+          {/* Ellipsis inicial */}
+          {start > 1 && (
+            <span className="px-2 py-1 text-[#424846]/50 select-none">...</span>
+          )}
 
+          {/* Numeros de pagina */}
           {pages.map((p) => (
             <button
               key={p}
               onClick={() => onPageChange(p)}
-              className={`px-3 py-1 rounded text-sm font-medium ${
+              className={`min-w-[36px] h-9 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                 p === page
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
+                  ? 'bg-[#52AF32] text-white shadow-sm'
+                  : 'text-[#424846] bg-transparent hover:bg-[#67B52E]/15 hover:text-[#52AF32]'
               }`}
+              aria-label={`Ir a pagina ${p}`}
+              aria-current={p === page ? 'page' : undefined}
             >
               {p}
             </button>
           ))}
 
-          {end < totalPages && <span className="px-1 text-gray-400">…</span>}
+          {/* Ellipsis final */}
+          {end < totalPages && (
+            <span className="px-2 py-1 text-[#424846]/50 select-none">...</span>
+          )}
 
+          {/* Boton Siguiente */}
           <button
             onClick={() => onPageChange(page + 1)}
             disabled={!hasNext}
-            className="px-2 py-1 rounded text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Siguiente"
+            className="p-2 rounded-lg text-[#424846] bg-transparent transition-all duration-200 hover:bg-[#52AF32]/10 hover:text-[#52AF32] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#424846]"
+            title="Pagina siguiente"
+            aria-label="Ir a pagina siguiente"
           >
-            ›
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </button>
+
+          {/* Boton Ultima pagina */}
           <button
             onClick={() => onPageChange(totalPages)}
             disabled={!hasNext}
-            className="px-2 py-1 rounded text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Última"
+            className="p-2 rounded-lg text-[#424846] bg-transparent transition-all duration-200 hover:bg-[#52AF32]/10 hover:text-[#52AF32] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#424846]"
+            title="Ultima pagina"
+            aria-label="Ir a ultima pagina"
           >
-            »
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            </svg>
           </button>
         </nav>
       </div>

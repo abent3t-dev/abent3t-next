@@ -61,9 +61,40 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
     </svg>
   ),
+  // PDF icon
+  pdf: ({ className }: { className?: string }) => (
+    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM6 4h7v5h5v11H6V4zm2 10v4h1.5v-1.5h1a1.5 1.5 0 000-3H8zm1.5 1h.5a.5.5 0 010 1h-.5v-1zm3.5-1v4h2a2 2 0 002-2 2 2 0 00-2-2h-2zm1.5 1v2h.5a1 1 0 000-2h-.5z"/>
+    </svg>
+  ),
+  // Image icon
+  image: ({ className }: { className?: string }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+  ),
+  // Excel icon
+  excel: ({ className }: { className?: string }) => (
+    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 2l5 5h-5V4zM8 13l2 3-2 3h1.5l1.25-2 1.25 2H14l-2-3 2-3h-1.5l-1.25 2-1.25-2H8z"/>
+    </svg>
+  ),
+  // Word icon
+  word: ({ className }: { className?: string }) => (
+    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 2l5 5h-5V4zM9 13l1 6h1l1-4 1 4h1l1-6h-1.2l-.6 4-.8-4h-.8l-.8 4-.6-4H9z"/>
+    </svg>
+  ),
+  // Generic file icon
   file: ({ className }: { className?: string }) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+  ),
+  // Cloud upload icon for drag & drop
+  cloudUpload: ({ className }: { className?: string }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
     </svg>
   ),
 };
@@ -71,15 +102,44 @@ const Icons = {
 const evidenceTypeLabels: Record<string, string> = {
   certificate: 'Certificado',
   attendance: 'Constancia de Asistencia',
-  assessment: 'Evaluación',
+  assessment: 'Evaluacion',
   other: 'Otro',
 };
 
-const statusLabels: Record<string, { label: string; color: string }> = {
-  pending: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-800' },
-  approved: { label: 'Aprobado', color: 'bg-green-100 text-green-800' },
-  rejected: { label: 'Rechazado', color: 'bg-red-100 text-red-800' },
+// A3T Colors
+const A3T_COLORS = {
+  darkGray: '#424846',
+  greenMain: '#52AF32',
+  greenLight: '#67B52E',
+  navy: '#222D59',
+  gold: '#DFA922',
 };
+
+const statusLabels: Record<string, { label: string; bgColor: string; textColor: string }> = {
+  pending: { label: 'Pendiente', bgColor: 'bg-[#DFA922]/15', textColor: 'text-[#DFA922]' },
+  approved: { label: 'Aprobado', bgColor: 'bg-[#52AF32]/15', textColor: 'text-[#52AF32]' },
+  rejected: { label: 'Rechazado', bgColor: 'bg-red-100', textColor: 'text-red-700' },
+};
+
+// Helper to get file icon based on type
+function getFileIcon(fileType: string) {
+  const type = fileType.toLowerCase();
+  if (type.includes('pdf')) return Icons.pdf;
+  if (type.includes('image') || type.includes('jpg') || type.includes('jpeg') || type.includes('png')) return Icons.image;
+  if (type.includes('excel') || type.includes('spreadsheet') || type.includes('xls')) return Icons.excel;
+  if (type.includes('word') || type.includes('document') || type.includes('doc')) return Icons.word;
+  return Icons.file;
+}
+
+// Helper to get file icon color based on type
+function getFileIconColor(fileType: string): string {
+  const type = fileType.toLowerCase();
+  if (type.includes('pdf')) return 'text-red-500';
+  if (type.includes('image') || type.includes('jpg') || type.includes('jpeg') || type.includes('png')) return 'text-[#52AF32]';
+  if (type.includes('excel') || type.includes('spreadsheet') || type.includes('xls')) return 'text-green-600';
+  if (type.includes('word') || type.includes('document') || type.includes('doc')) return 'text-blue-600';
+  return 'text-[#424846]';
+}
 
 export function EvidenceModal({
   enrollmentId,
@@ -96,7 +156,9 @@ export function EvidenceModal({
   const [notes, setNotes] = useState('');
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -116,13 +178,10 @@ export function EvidenceModal({
     }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validar tamaño (10MB)
+  const handleFileUpload = async (file: File) => {
+    // Validar tamano (10MB)
     if (file.size > 10 * 1024 * 1024) {
-      notify.error('El archivo excede el tamaño máximo de 10MB');
+      notify.error('El archivo excede el tamano maximo de 10MB');
       return;
     }
 
@@ -152,6 +211,35 @@ export function EvidenceModal({
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await handleFileUpload(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      await handleFileUpload(file);
     }
   };
 
@@ -223,35 +311,39 @@ export function EvidenceModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+    // Backdrop - A3T Navy semi-transparent with blur
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#222D59]/60 backdrop-blur-sm">
+      {/* Modal Container */}
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-white">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Evidencias</h3>
+            <h3 className="text-lg font-semibold text-[#424846]">Evidencias</h3>
             <p className="text-sm text-gray-500">
               {participantName} - {courseName}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-600 rounded"
+            className="p-2 text-gray-400 hover:text-[#424846] hover:bg-gray-100 rounded-lg transition-colors"
+            aria-label="Cerrar"
           >
             <Icons.x className="w-5 h-5" />
           </button>
         </div>
 
         {/* Upload Section */}
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <div className="flex items-end gap-4">
+        <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50">
+          {/* Type and Notes Row */}
+          <div className="flex items-end gap-4 mb-4">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-[#424846] mb-1.5">
                 Tipo de Evidencia
               </label>
               <select
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-[#424846] bg-white focus:outline-none focus:ring-2 focus:ring-[#52AF32]/30 focus:border-[#52AF32] transition-all"
               >
                 {Object.entries(evidenceTypeLabels).map(([key, label]) => (
                   <option key={key} value={key}>
@@ -261,7 +353,7 @@ export function EvidenceModal({
               </select>
             </div>
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-[#424846] mb-1.5">
                 Notas (opcional)
               </label>
               <input
@@ -269,58 +361,79 @@ export function EvidenceModal({
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Observaciones..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-[#424846] bg-white focus:outline-none focus:ring-2 focus:ring-[#52AF32]/30 focus:border-[#52AF32] transition-all placeholder:text-gray-400"
               />
-            </div>
-            <div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                onChange={handleFileSelect}
-                accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.doc,.docx"
-                className="hidden"
-                id="evidence-file"
-              />
-              <label
-                htmlFor="evidence-file"
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer ${
-                  uploading
-                    ? 'bg-gray-300 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                }`}
-              >
-                <Icons.upload className="w-4 h-4" />
-                {uploading ? 'Subiendo...' : 'Subir Archivo'}
-              </label>
             </div>
           </div>
-          <p className="mt-2 text-xs text-gray-500">
-            Formatos: PDF, imágenes (JPG, PNG), Excel, Word. Máximo 10MB.
-          </p>
+
+          {/* Drag & Drop Zone */}
+          <div
+            ref={dropZoneRef}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => !uploading && fileInputRef.current?.click()}
+            className={`
+              relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200
+              ${isDragging
+                ? 'border-[#52AF32] bg-[#52AF32]/5'
+                : 'border-gray-300 hover:border-[#52AF32] hover:bg-[#52AF32]/5'
+              }
+              ${uploading ? 'opacity-60 cursor-not-allowed' : ''}
+            `}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={handleFileSelect}
+              accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.doc,.docx"
+              className="hidden"
+              id="evidence-file"
+              disabled={uploading}
+            />
+            <Icons.cloudUpload className={`w-12 h-12 mx-auto mb-3 ${isDragging ? 'text-[#52AF32]' : 'text-gray-400'}`} />
+            <p className="text-sm font-medium text-[#424846]">
+              {uploading ? 'Subiendo archivo...' : 'Arrastra y suelta tu archivo aqui'}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              o haz clic para seleccionar
+            </p>
+            <p className="text-xs text-gray-400 mt-3">
+              PDF, imagenes (JPG, PNG), Excel, Word. Maximo 10MB.
+            </p>
+          </div>
         </div>
 
         {/* Evidences List */}
         <div className="flex-1 overflow-auto px-6 py-4">
           {loading ? (
-            <div className="text-center text-gray-500 py-8">Cargando...</div>
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#52AF32] border-t-transparent"></div>
+            </div>
           ) : evidences.length === 0 ? (
-            <div className="text-center text-gray-500 py-8">
-              No hay evidencias cargadas
+            <div className="text-center py-12">
+              <Icons.file className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500 text-sm">No hay evidencias cargadas</p>
             </div>
           ) : (
             <div className="space-y-3">
               {evidences.map((evidence) => {
                 const status = statusLabels[evidence.verification_status];
+                const FileIcon = getFileIcon(evidence.file_type);
+                const iconColor = getFileIconColor(evidence.file_type);
+
                 return (
                   <div
                     key={evidence.id}
-                    className="border border-gray-200 rounded-lg p-4"
+                    className="border border-gray-200 rounded-xl p-4 hover:border-gray-300 transition-colors bg-white"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-start gap-3">
-                        <Icons.file className="w-8 h-8 text-gray-400 flex-shrink-0" />
-                        <div>
-                          <p className="font-medium text-gray-900">
+                        <div className={`p-2 rounded-lg bg-gray-50 ${iconColor}`}>
+                          <FileIcon className="w-6 h-6" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-[#424846] truncate">
                             {evidence.file_name}
                           </p>
                           <p className="text-sm text-gray-500">
@@ -334,15 +447,16 @@ export function EvidenceModal({
                             </p>
                           )}
                           {evidence.rejection_reason && (
-                            <p className="text-sm text-red-600 mt-1">
-                              Motivo: {evidence.rejection_reason}
+                            <p className="text-sm text-red-600 mt-1 flex items-start gap-1">
+                              <Icons.xCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                              <span>Motivo: {evidence.rejection_reason}</span>
                             </p>
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-shrink-0">
                         <span
-                          className={`px-2 py-1 text-xs font-medium rounded-full ${status.color}`}
+                          className={`px-2.5 py-1 text-xs font-semibold rounded-full ${status.bgColor} ${status.textColor}`}
                         >
                           {status.label}
                         </span>
@@ -351,17 +465,17 @@ export function EvidenceModal({
 
                     {/* Actions */}
                     <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleDownload(evidence)}
-                          className="flex items-center gap-1 px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded"
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[#222D59] hover:bg-[#222D59]/5 rounded-lg transition-colors"
                         >
                           <Icons.download className="w-4 h-4" />
                           Descargar
                         </button>
                         <button
                           onClick={() => handleDelete(evidence.id)}
-                          className="flex items-center gap-1 px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded"
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         >
                           <Icons.trash className="w-4 h-4" />
                           Eliminar
@@ -372,16 +486,16 @@ export function EvidenceModal({
                         <div className="flex items-center gap-2">
                           {rejectingId === evidence.id ? (
                             <div className="flex items-center gap-2">
-                              <input
-                                type="text"
+                              <textarea
                                 value={rejectReason}
                                 onChange={(e) => setRejectReason(e.target.value)}
                                 placeholder="Motivo de rechazo..."
-                                className="px-2 py-1 text-sm border border-gray-300 rounded"
+                                rows={2}
+                                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#52AF32]/30 focus:border-[#52AF32] resize-none min-w-[200px]"
                               />
                               <button
                                 onClick={() => handleReject(evidence.id)}
-                                className="px-2 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+                                className="px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
                               >
                                 Confirmar
                               </button>
@@ -390,7 +504,7 @@ export function EvidenceModal({
                                   setRejectingId(null);
                                   setRejectReason('');
                                 }}
-                                className="px-2 py-1 text-sm text-gray-600 hover:text-gray-800"
+                                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
                               >
                                 Cancelar
                               </button>
@@ -399,14 +513,14 @@ export function EvidenceModal({
                             <>
                               <button
                                 onClick={() => handleApprove(evidence.id)}
-                                className="flex items-center gap-1 px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+                                className="flex items-center gap-1.5 px-4 py-2 text-sm bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] transition-colors font-medium shadow-sm"
                               >
                                 <Icons.check className="w-4 h-4" />
                                 Aprobar
                               </button>
                               <button
                                 onClick={() => setRejectingId(evidence.id)}
-                                className="flex items-center gap-1 px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+                                className="flex items-center gap-1.5 px-4 py-2 text-sm border-2 border-red-500 text-red-600 rounded-lg hover:bg-red-50 transition-colors font-medium"
                               >
                                 <Icons.xCircle className="w-4 h-4" />
                                 Rechazar
@@ -424,10 +538,10 @@ export function EvidenceModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end bg-gray-50/50">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+            className="px-5 py-2.5 text-[#424846] bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors font-medium"
           >
             Cerrar
           </button>
