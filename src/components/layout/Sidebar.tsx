@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSocket } from '@/contexts/SocketContext';
 import { SIDEBAR_NAV, ROLE_LABELS, type NavItem } from '@/types/auth';
 import { useState } from 'react';
+import { Logo } from '@/components/ui/Logo';
 
 const Icons: Record<string, React.FC<{ className?: string }>> = {
   settings: ({ className }) => (
@@ -184,12 +185,7 @@ export function Sidebar() {
     <aside className="w-64 bg-[#424846] flex flex-col h-screen shadow-2xl">
       {/* Logo / Header */}
       <div className="h-20 px-6 py-4 bg-[#222D59]/60 border-b border-gray-600/50 flex items-center justify-center">
-        <div className="text-center w-full">
-          <h1 className="text-2xl font-bold text-white tracking-tight">
-            Abent <span className="text-[#52AF32]">3T</span>
-          </h1>
-          <p className="text-xs text-gray-300 font-medium mt-1">Sistema de Capacitación</p>
-        </div>
+        <Logo variant="white" size="md" showSubtitle />
       </div>
 
       {/* User Info */}

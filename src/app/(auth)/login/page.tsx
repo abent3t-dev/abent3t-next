@@ -27,12 +27,17 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Abent 3T
-        </h1>
-        <p className="text-gray-500 mb-8">
-          Sistema de Gestión de Capacitación
-        </p>
+        <div className="mb-8">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logos/logo-a3t.png"
+            alt="Abent 3T"
+            className="mx-auto h-16 w-auto object-contain"
+          />
+          <p className="text-gray-500 mt-4">
+            Sistema de Gestion de Capacitacion
+          </p>
+        </div>
 
         {!showEmailForm ? (
           <>

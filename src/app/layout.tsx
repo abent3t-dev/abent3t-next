@@ -14,8 +14,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Abent 3T — Sistema de Capacitación",
-  description: "Sistema de Gestión de Capacitación para Recursos Humanos",
+  title: 'Abent 3T - Sistema de Gestion de Capacitacion',
+  description: 'Plataforma integral para gestion de capacitacion empresarial de Abent 3T S.A.P.I. de C.V.',
+  icons: {
+    icon: '/logos/logo-icon.png',
+    apple: '/logos/logo-icon.png',
+  },
 };
 
 export default function RootLayout({
