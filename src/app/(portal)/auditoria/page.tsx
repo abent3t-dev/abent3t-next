@@ -76,7 +76,7 @@ export default function AuditoriaPage() {
   const [paginationMeta, setPaginationMeta] = useState<PaginationMeta>({
     total: 0,
     page: 1,
-    limit: 15,
+    limit: 10,
     totalPages: 0,
     hasNext: false,
     hasPrev: false,

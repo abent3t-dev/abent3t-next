@@ -182,7 +182,7 @@ export function Sidebar() {
   const { isConnected } = useSocket();
 
   return (
-    <aside className="w-64 bg-[#424846] flex flex-col h-screen shadow-2xl">
+    <aside className="w-64 bg-[#424846] flex flex-col h-screen sticky top-0 shadow-2xl">
       {/* Logo / Header */}
       <div className="h-20 px-6 py-4 bg-[#222D59]/60 border-b border-gray-600/50 flex items-center justify-center">
         <Logo variant="white" size="md" showSubtitle />
@@ -210,7 +210,7 @@ export function Sidebar() {
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-dark">
         {SIDEBAR_NAV.map((item) => (
           <NavItemComponent key={item.href} item={item} />
         ))}

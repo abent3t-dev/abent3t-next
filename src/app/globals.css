@@ -74,3 +74,67 @@ select option {
   color: #171717;
   background-color: #ffffff;
 }
+
+/* ================================
+   Custom Scrollbar Styles
+   ================================ */
+
+/* Scrollbar para sidebar oscuro */
+.scrollbar-dark {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(82, 175, 50, 0.4) transparent;
+}
+
+.scrollbar-dark::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb {
+  background: rgba(82, 175, 50, 0.3);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb:hover {
+  background: rgba(82, 175, 50, 0.5);
+}
+
+/* Scrollbar para contenido claro */
+.scrollbar-light {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(66, 72, 70, 0.3) transparent;
+}
+
+.scrollbar-light::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-light::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.scrollbar-light::-webkit-scrollbar-thumb {
+  background: rgba(66, 72, 70, 0.25);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.scrollbar-light::-webkit-scrollbar-thumb:hover {
+  background: rgba(66, 72, 70, 0.4);
+}
+
+/* Ocultar scrollbar pero mantener funcionalidad */
+.scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
