@@ -99,24 +99,24 @@ const Icons = {
   ),
 };
 
-const statusConfig: Record<RequestStatus, { label: string; bg: string; text: string; border: string }> = {
-  pendiente: { label: 'Pendiente de Revisión', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
-  aprobada: { label: 'Aprobada', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
-  rechazada: { label: 'Rechazada', bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
+const statusConfig: Record<RequestStatus, { label: string; bg: string; text: string; border: string; iconColor: string }> = {
+  pendiente: { label: 'Pendiente de Revisión', bg: 'bg-[#DFA922]/10', text: 'text-[#DFA922]', border: 'border-[#DFA922]/30', iconColor: 'text-[#DFA922]' },
+  aprobada: { label: 'Aprobada', bg: 'bg-[#52AF32]/10', text: 'text-[#52AF32]', border: 'border-[#52AF32]/30', iconColor: 'text-[#52AF32]' },
+  rechazada: { label: 'Rechazada', bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200', iconColor: 'text-red-600' },
 };
 
 const proposalStatusLabels: Record<string, string> = {
   pendiente: 'Pendiente',
-  en_investigacion: 'En Investigación',
+  en_investigacion: 'En Investigacion',
   aprobada: 'Aprobada',
   rechazada: 'Rechazada',
 };
 
 const proposalStatusColors: Record<string, string> = {
-  pendiente: 'bg-yellow-100 text-yellow-800',
-  en_investigacion: 'bg-blue-100 text-blue-800',
-  aprobada: 'bg-green-100 text-green-800',
-  rechazada: 'bg-red-100 text-red-800',
+  pendiente: 'bg-[#DFA922]/10 text-[#DFA922]',
+  en_investigacion: 'bg-[#222D59]/10 text-[#222D59]',
+  aprobada: 'bg-[#52AF32]/10 text-[#52AF32]',
+  rechazada: 'bg-red-100 text-red-600',
 };
 
 export default function SolicitudesPage() {
@@ -442,25 +442,25 @@ export default function SolicitudesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
+    <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Solicitudes de Capacitación</h1>
+            <h1 className="text-2xl font-bold text-[#424846]">Solicitudes de Capacitacion</h1>
             <p className="text-gray-500 mt-1">
               {isAdmin
-                ? 'Revisa y gestiona las solicitudes de capacitación de todas las áreas'
+                ? 'Revisa y gestiona las solicitudes de capacitacion de todas las areas'
                 : isManager
-                ? 'Solicita cursos para tu equipo o propón cursos externos'
-                : 'Propón cursos externos para tu desarrollo profesional'}
+                ? 'Solicita cursos para tu equipo o propon cursos externos'
+                : 'Propon cursos externos para tu desarrollo profesional'}
             </p>
           </div>
           <div className="flex gap-3">
             {!isAdmin && (
               <button
                 onClick={openProposalModal}
-                className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all shadow-lg shadow-purple-200"
+                className="flex items-center gap-2 px-4 py-2.5 bg-[#222D59] text-white rounded-xl hover:bg-[#222D59]/90 transition-all shadow-md"
               >
                 {Icons.lightbulb}
                 <span>Proponer Curso</span>
@@ -469,7 +469,7 @@ export default function SolicitudesPage() {
             {isManager && (
               <button
                 onClick={openCreateModal}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[#52AF32] text-white rounded-xl hover:bg-[#67B52E] transition-all shadow-lg shadow-blue-200"
+                className="flex items-center gap-2 px-4 py-2.5 bg-[#52AF32] text-white rounded-xl hover:bg-[#67B52E] transition-all shadow-md"
               >
                 {Icons.plus}
                 <span>Nueva Solicitud</span>
@@ -480,13 +480,13 @@ export default function SolicitudesPage() {
 
         {/* Tabs - Solo para no-admins */}
         {!isAdmin && (
-          <div className="bg-white/60 backdrop-blur-sm rounded-xl p-1 inline-flex gap-1">
+          <div className="bg-white rounded-xl p-1 inline-flex gap-1 shadow-sm">
             <button
               onClick={() => setActiveTab('solicitudes')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 activeTab === 'solicitudes'
-                  ? 'bg-white text-[#52AF32] shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-[#52AF32]/10 text-[#52AF32] shadow-sm'
+                  : 'text-gray-500 hover:text-[#424846]'
               }`}
             >
               {isManager ? 'Solicitudes de Equipo' : 'Solicitudes'}
@@ -495,13 +495,13 @@ export default function SolicitudesPage() {
               onClick={() => setActiveTab('propuestas')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
                 activeTab === 'propuestas'
-                  ? 'bg-white text-purple-600 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-[#222D59]/10 text-[#222D59] shadow-sm'
+                  : 'text-gray-500 hover:text-[#424846]'
               }`}
             >
               Mis Propuestas
               {proposals.filter(p => ['pendiente', 'en_investigacion'].includes(p.status)).length > 0 && (
-                <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full">
+                <span className="px-2 py-0.5 text-xs bg-[#222D59]/10 text-[#222D59] rounded-full">
                   {proposals.filter(p => ['pendiente', 'en_investigacion'].includes(p.status)).length}
                 </span>
               )}
@@ -512,47 +512,47 @@ export default function SolicitudesPage() {
         {/* Contenido de Solicitudes */}
         {activeTab === 'solicitudes' && (
           <>
-            {/* Stats Cards */}
+            {/* Stats Cards - KPIs con colores A3T */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <button
                 onClick={() => setFilter('all')}
                 className={`p-4 rounded-xl transition-all ${
                   filter === 'all'
-                    ? 'bg-white shadow-lg ring-2 ring-blue-500'
-                    : 'bg-white/60 hover:bg-white hover:shadow-md'
+                    ? 'bg-white shadow-lg border-2 border-[#424846]'
+                    : 'bg-white hover:shadow-md border border-gray-200'
                 }`}
               >
-                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-                <p className="text-sm text-gray-500">Total</p>
+                <p className="text-2xl font-bold text-[#424846]">{stats.total}</p>
+                <p className="text-sm text-[#424846]/70">Total</p>
               </button>
               <button
                 onClick={() => setFilter('pendiente')}
                 className={`p-4 rounded-xl transition-all ${
                   filter === 'pendiente'
-                    ? 'bg-amber-50 shadow-lg ring-2 ring-amber-500'
-                    : 'bg-white/60 hover:bg-amber-50 hover:shadow-md'
+                    ? 'bg-[#DFA922]/10 shadow-lg border-2 border-[#DFA922]'
+                    : 'bg-white hover:bg-[#DFA922]/5 hover:shadow-md border border-gray-200'
                 }`}
               >
-                <p className="text-2xl font-bold text-amber-600">{stats.pendientes}</p>
-                <p className="text-sm text-amber-600/70">Pendientes</p>
+                <p className="text-2xl font-bold text-[#DFA922]">{stats.pendientes}</p>
+                <p className="text-sm text-[#DFA922]/70">Pendientes</p>
               </button>
               <button
                 onClick={() => setFilter('aprobada')}
                 className={`p-4 rounded-xl transition-all ${
                   filter === 'aprobada'
-                    ? 'bg-emerald-50 shadow-lg ring-2 ring-emerald-500'
-                    : 'bg-white/60 hover:bg-emerald-50 hover:shadow-md'
+                    ? 'bg-[#52AF32]/10 shadow-lg border-2 border-[#52AF32]'
+                    : 'bg-white hover:bg-[#52AF32]/5 hover:shadow-md border border-gray-200'
                 }`}
               >
-                <p className="text-2xl font-bold text-emerald-600">{stats.aprobadas}</p>
-                <p className="text-sm text-emerald-600/70">Aprobadas</p>
+                <p className="text-2xl font-bold text-[#52AF32]">{stats.aprobadas}</p>
+                <p className="text-sm text-[#52AF32]/70">Aprobadas</p>
               </button>
               <button
                 onClick={() => setFilter('rechazada')}
                 className={`p-4 rounded-xl transition-all ${
                   filter === 'rechazada'
-                    ? 'bg-red-50 shadow-lg ring-2 ring-red-500'
-                    : 'bg-white/60 hover:bg-red-50 hover:shadow-md'
+                    ? 'bg-red-50 shadow-lg border-2 border-red-500'
+                    : 'bg-white hover:bg-red-50 hover:shadow-md border border-gray-200'
                 }`}
               >
                 <p className="text-2xl font-bold text-red-600">{stats.rechazadas}</p>
@@ -562,18 +562,18 @@ export default function SolicitudesPage() {
 
             {/* Lista de solicitudes */}
             {loading ? (
-              <div className="bg-white rounded-2xl p-12 text-center">
-                <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto" />
+              <div className="bg-white rounded-xl p-12 text-center shadow-sm">
+                <div className="animate-spin w-8 h-8 border-4 border-[#52AF32] border-t-transparent rounded-full mx-auto" />
                 <p className="text-gray-500 mt-4">Cargando solicitudes...</p>
               </div>
             ) : requests.length === 0 ? (
-              <div className="bg-white rounded-2xl p-12 text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="bg-white rounded-xl p-12 text-center shadow-sm">
+                <div className="w-16 h-16 bg-[#52AF32]/10 rounded-full flex items-center justify-center mx-auto mb-4 text-[#52AF32]">
                   {Icons.book}
                 </div>
-                <p className="text-gray-600 font-medium">No hay solicitudes</p>
+                <p className="text-[#424846] font-medium">No hay solicitudes</p>
                 <p className="text-gray-400 text-sm mt-1">
-                  {filter !== 'all' ? `No hay solicitudes con este estado` : 'Aún no se han creado solicitudes de capacitación'}
+                  {filter !== 'all' ? `No hay solicitudes con este estado` : 'Aun no se han creado solicitudes de capacitacion'}
                 </p>
               </div>
             ) : (
@@ -589,18 +589,20 @@ export default function SolicitudesPage() {
                   return (
                     <div
                       key={req.id}
-                      className={`bg-white rounded-2xl shadow-sm border overflow-hidden transition-all hover:shadow-md ${status.border}`}
+                      className={`bg-white rounded-xl shadow-sm border overflow-hidden transition-all hover:shadow-md ${status.border}`}
                     >
                       {/* Header con estado */}
                       <div className={`px-6 py-3 ${status.bg} border-b ${status.border} flex items-center justify-between`}>
                         <div className="flex items-center gap-3">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${status.bg} ${status.text}`}>
-                            {req.status === 'pendiente' && Icons.clock}
-                            {req.status === 'aprobada' && Icons.check}
-                            {req.status === 'rechazada' && Icons.x}
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-white ${status.text} border ${status.border}`}>
+                            <span className={status.iconColor}>
+                              {req.status === 'pendiente' && Icons.clock}
+                              {req.status === 'aprobada' && Icons.check}
+                              {req.status === 'rechazada' && Icons.x}
+                            </span>
                             {status.label}
                           </span>
-                          <span className="text-sm text-gray-500 flex items-center gap-1">
+                          <span className="text-sm text-[#424846]/70 flex items-center gap-1">
                             {Icons.calendar}
                             Solicitado el {formatDate(req.created_at)}
                           </span>
@@ -611,14 +613,14 @@ export default function SolicitudesPage() {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => openReviewModal(req, 'aprobada')}
-                              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
+                              className="flex items-center gap-2 px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] transition-colors text-sm font-medium"
                             >
                               {Icons.check}
                               Aprobar
                             </button>
                             <button
                               onClick={() => openReviewModal(req, 'rechazada')}
-                              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                              className="flex items-center gap-2 px-4 py-2 bg-white text-red-600 border-2 border-red-500 rounded-lg hover:bg-red-50 transition-colors text-sm font-medium"
                             >
                               {Icons.x}
                               Rechazar
@@ -628,7 +630,7 @@ export default function SolicitudesPage() {
                         {isManager && req.status === 'pendiente' && (
                           <button
                             onClick={() => handleCancel(req.id)}
-                            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-[#424846] rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
                           >
                             {Icons.x}
                             Cancelar
@@ -641,61 +643,61 @@ export default function SolicitudesPage() {
                         <div className="grid md:grid-cols-3 gap-6">
                           {/* Columna 1: Flujo de solicitud */}
                           <div className="md:col-span-1 space-y-4">
-                            {/* Solicitante (quien pide) */}
-                            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4">
-                              <div className="flex items-center gap-2 text-[#52AF32] mb-2">
+                            {/* Solicitante (quien pide) - Azul marino suave */}
+                            <div className="bg-[#222D59]/5 rounded-xl p-4 border border-[#222D59]/10">
+                              <div className="flex items-center gap-2 text-[#222D59] mb-2">
                                 {Icons.userGroup}
                                 <span className="text-xs font-semibold uppercase tracking-wide">Solicitado por</span>
                               </div>
-                              <p className="font-semibold text-gray-900">{requester?.full_name || '—'}</p>
-                              <p className="text-sm text-gray-500">Jefe de Área</p>
+                              <p className="font-semibold text-[#424846]">{requester?.full_name || '—'}</p>
+                              <p className="text-sm text-[#424846]/70">Jefe de Area</p>
                             </div>
 
                             {/* Flecha */}
-                            <div className="flex justify-center text-gray-300">
+                            <div className="flex justify-center text-[#52AF32]/50">
                               <svg className="w-6 h-6 transform rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                               </svg>
                             </div>
 
-                            {/* Beneficiario (para quien es) */}
-                            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-4">
-                              <div className="flex items-center gap-2 text-emerald-600 mb-2">
+                            {/* Beneficiario (para quien es) - Verde suave */}
+                            <div className="bg-[#52AF32]/5 rounded-xl p-4 border border-[#52AF32]/10">
+                              <div className="flex items-center gap-2 text-[#52AF32] mb-2">
                                 {Icons.user}
                                 <span className="text-xs font-semibold uppercase tracking-wide">Beneficiario</span>
                               </div>
-                              <p className="font-semibold text-gray-900">{profile?.full_name || '—'}</p>
-                              <p className="text-sm text-gray-500">{profile?.position || 'Sin puesto'}</p>
-                              <p className="text-xs text-gray-400 mt-1">{profile?.email}</p>
+                              <p className="font-semibold text-[#424846]">{profile?.full_name || '—'}</p>
+                              <p className="text-sm text-[#424846]/70">{profile?.position || 'Sin puesto'}</p>
+                              <p className="text-xs text-[#424846]/50 mt-1">{profile?.email}</p>
                             </div>
                           </div>
 
-                          {/* Columna 2: Información del curso */}
+                          {/* Columna 2: Informacion del curso - Gris suave */}
                           <div className="md:col-span-1">
-                            <div className="bg-gray-50 rounded-xl p-4 h-full">
-                              <div className="flex items-center gap-2 text-gray-600 mb-3">
+                            <div className="bg-[#424846]/5 rounded-xl p-4 h-full border border-[#424846]/10">
+                              <div className="flex items-center gap-2 text-[#424846] mb-3">
                                 {Icons.book}
                                 <span className="text-xs font-semibold uppercase tracking-wide">Curso Solicitado</span>
                               </div>
-                              <h3 className="font-bold text-lg text-gray-900 mb-3">{course?.name || '—'}</h3>
+                              <h3 className="font-bold text-lg text-[#424846] mb-3">{course?.name || '—'}</h3>
 
                               <div className="space-y-2 text-sm">
-                                <div className="flex items-center gap-2 text-gray-600">
+                                <div className="flex items-center gap-2 text-[#424846]/70">
                                   {Icons.calendar}
                                   <span>Inicio: {edition?.start_date ? formatDate(edition.start_date) : '—'}</span>
                                 </div>
                                 {edition?.end_date && (
-                                  <div className="flex items-center gap-2 text-gray-600">
+                                  <div className="flex items-center gap-2 text-[#424846]/70">
                                     {Icons.calendar}
                                     <span>Fin: {formatDate(edition.end_date)}</span>
                                   </div>
                                 )}
-                                <div className="flex items-center gap-2 text-gray-600">
+                                <div className="flex items-center gap-2 text-[#424846]/70">
                                   {Icons.clock}
                                   <span>{course?.total_hours || 0} horas</span>
                                 </div>
                                 {edition?.instructor && (
-                                  <div className="flex items-center gap-2 text-gray-600">
+                                  <div className="flex items-center gap-2 text-[#424846]/70">
                                     {Icons.user}
                                     <span>Instructor: {edition.instructor}</span>
                                   </div>
@@ -704,26 +706,26 @@ export default function SolicitudesPage() {
                             </div>
                           </div>
 
-                          {/* Columna 3: Área y costo */}
+                          {/* Columna 3: Area y costo */}
                           <div className="md:col-span-1 space-y-4">
-                            {/* Área/Departamento */}
-                            <div className="bg-purple-50 rounded-xl p-4">
-                              <div className="flex items-center gap-2 text-purple-600 mb-2">
+                            {/* Area/Departamento - Azul marino */}
+                            <div className="bg-[#222D59]/5 rounded-xl p-4 border border-[#222D59]/10">
+                              <div className="flex items-center gap-2 text-[#222D59] mb-2">
                                 {Icons.office}
-                                <span className="text-xs font-semibold uppercase tracking-wide">Área</span>
+                                <span className="text-xs font-semibold uppercase tracking-wide">Area</span>
                               </div>
-                              <p className="font-semibold text-gray-900">{profile?.departments?.name || '—'}</p>
+                              <p className="font-semibold text-[#424846]">{profile?.departments?.name || '—'}</p>
                             </div>
 
-                            {/* Costo */}
-                            <div className="bg-amber-50 rounded-xl p-4">
-                              <div className="flex items-center gap-2 text-amber-600 mb-2">
+                            {/* Costo - Dorado */}
+                            <div className="bg-[#DFA922]/10 rounded-xl p-4 border border-[#DFA922]/20">
+                              <div className="flex items-center gap-2 text-[#DFA922] mb-2">
                                 {Icons.currency}
-                                <span className="text-xs font-semibold uppercase tracking-wide">Inversión</span>
+                                <span className="text-xs font-semibold uppercase tracking-wide">Inversion</span>
                               </div>
-                              <p className="font-bold text-2xl text-gray-900">
+                              <p className="font-bold text-2xl text-[#424846]">
                                 ${course?.cost?.toLocaleString() || '0'}
-                                <span className="text-sm font-normal text-gray-500 ml-1">MXN</span>
+                                <span className="text-sm font-normal text-[#424846]/60 ml-1">MXN</span>
                               </p>
                             </div>
                           </div>
@@ -731,12 +733,12 @@ export default function SolicitudesPage() {
 
                         {/* Motivo de la solicitud */}
                         {req.request_reason && (
-                          <div className="mt-6 pt-4 border-t border-gray-100">
+                          <div className="mt-6 pt-4 border-t border-[#424846]/10">
                             <div className="flex items-start gap-3">
-                              <div className="text-gray-400 mt-0.5">{Icons.chat}</div>
+                              <div className="text-[#424846]/50 mt-0.5">{Icons.chat}</div>
                               <div>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Motivo de la solicitud</p>
-                                <p className="text-gray-700">{req.request_reason}</p>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-[#424846]/70 mb-1">Motivo de la solicitud</p>
+                                <p className="text-[#424846]">{req.request_reason}</p>
                               </div>
                             </div>
                           </div>
@@ -745,7 +747,7 @@ export default function SolicitudesPage() {
                         {/* Motivo de rechazo */}
                         {req.status === 'rechazada' && req.rejection_reason && (
                           <div className="mt-6 pt-4 border-t border-red-100">
-                            <div className="bg-red-50 rounded-lg p-4">
+                            <div className="bg-red-50 rounded-xl p-4 border border-red-200">
                               <p className="text-xs font-semibold uppercase tracking-wide text-red-600 mb-1">Motivo del rechazo</p>
                               <p className="text-red-700">{req.rejection_reason}</p>
                             </div>
@@ -758,7 +760,7 @@ export default function SolicitudesPage() {
               </div>
 
               {/* Pagination */}
-              <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                 <Pagination
                   meta={meta}
                   onPageChange={handlePageChange}
@@ -772,40 +774,40 @@ export default function SolicitudesPage() {
 
         {/* Contenido de Propuestas - Solo para no-admins */}
         {!isAdmin && activeTab === 'propuestas' && (
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             {loadingProposals ? (
               <div className="p-12 text-center">
-                <div className="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full mx-auto" />
+                <div className="animate-spin w-8 h-8 border-4 border-[#222D59] border-t-transparent rounded-full mx-auto" />
                 <p className="text-gray-500 mt-4">Cargando propuestas...</p>
               </div>
             ) : proposals.length === 0 ? (
               <div className="p-12 text-center">
-                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 text-purple-600">
+                <div className="w-16 h-16 bg-[#222D59]/10 rounded-full flex items-center justify-center mx-auto mb-4 text-[#222D59]">
                   {Icons.lightbulb}
                 </div>
-                <p className="text-gray-600 font-medium">No tienes propuestas de cursos</p>
+                <p className="text-[#424846] font-medium">No tienes propuestas de cursos</p>
                 <p className="text-gray-400 text-sm mt-1">
-                  ¿Encontraste un curso interesante? Haz clic en &quot;Proponer Curso&quot; para enviarlo a revisión.
+                  Encontraste un curso interesante? Haz clic en &quot;Proponer Curso&quot; para enviarlo a revision.
                 </p>
               </div>
             ) : (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-[#424846]/10">
                 {proposals.map((proposal) => (
                   <div key={proposal.id} className="p-6 hover:bg-gray-50 transition-colors">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3">
-                          <span className="font-semibold text-gray-900 text-lg">{proposal.course_name}</span>
+                          <span className="font-semibold text-[#424846] text-lg">{proposal.course_name}</span>
                           <span className={`px-3 py-1 text-xs font-medium rounded-full ${proposalStatusColors[proposal.status]}`}>
                             {proposalStatusLabels[proposal.status]}
                           </span>
                         </div>
-                        <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-gray-500">
+                        <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-[#424846]/70">
                           {proposal.institution_name && (
                             <span className="flex items-center gap-1">{Icons.office} {proposal.institution_name}</span>
                           )}
                           {proposal.modality && (
-                            <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">{proposal.modality}</span>
+                            <span className="bg-[#424846]/10 px-2 py-0.5 rounded text-xs text-[#424846]">{proposal.modality}</span>
                           )}
                           <span className="flex items-center gap-1">{Icons.currency} ${proposal.estimated_cost.toLocaleString()}</span>
                           <span className="flex items-center gap-1">{Icons.clock} {proposal.estimated_hours}h</span>
@@ -816,20 +818,20 @@ export default function SolicitudesPage() {
                             href={proposal.course_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm text-[#52AF32] hover:underline mt-2 inline-block"
+                            className="text-sm text-[#52AF32] hover:text-[#67B52E] hover:underline mt-2 inline-block font-medium"
                           >
                             Ver curso externo →
                           </a>
                         )}
                         {proposal.justification && (
-                          <p className="text-sm text-gray-600 mt-3 italic bg-gray-50 p-3 rounded-lg">&quot;{proposal.justification}&quot;</p>
+                          <p className="text-sm text-[#424846]/80 mt-3 italic bg-[#424846]/5 p-3 rounded-xl border border-[#424846]/10">&quot;{proposal.justification}&quot;</p>
                         )}
                         {proposal.review_notes && (
-                          <p className="text-sm text-[#52AF32] mt-2">📝 Notas de revisión: {proposal.review_notes}</p>
+                          <p className="text-sm text-[#52AF32] mt-2 font-medium">Notas de revision: {proposal.review_notes}</p>
                         )}
                         {proposal.rejection_reason && (
-                          <div className="mt-3 bg-red-50 rounded-lg p-3">
-                            <p className="text-sm text-red-600">❌ Motivo de rechazo: {proposal.rejection_reason}</p>
+                          <div className="mt-3 bg-red-50 rounded-xl p-3 border border-red-200">
+                            <p className="text-sm text-red-600">Motivo de rechazo: {proposal.rejection_reason}</p>
                           </div>
                         )}
                       </div>
@@ -837,7 +839,7 @@ export default function SolicitudesPage() {
                         {['pendiente', 'en_investigacion'].includes(proposal.status) && (
                           <button
                             onClick={() => handleCancelProposal(proposal.id)}
-                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-2 text-[#424846]/50 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                             title="Cancelar propuesta"
                           >
                             {Icons.x}
@@ -855,14 +857,14 @@ export default function SolicitudesPage() {
         {/* Modal Crear Solicitud */}
         {createModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
-                <h2 className="text-lg font-semibold text-white">Nueva Solicitud de Capacitación</h2>
-                <p className="text-blue-100 text-sm">Solicita un curso para un colaborador de tu equipo</p>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+              <div className="bg-[#52AF32] px-6 py-4">
+                <h2 className="text-lg font-semibold text-white">Nueva Solicitud de Capacitacion</h2>
+                <p className="text-white/80 text-sm">Solicita un curso para un colaborador de tu equipo</p>
               </div>
               <form onSubmit={handleCreate} className="p-6 space-y-4">
                 <label className="block">
-                  <span className="text-sm font-medium text-gray-700">Curso *</span>
+                  <span className="text-sm font-medium text-[#424846]">Curso *</span>
                   <select
                     value={selectedCourse}
                     onChange={(e) => handleCourseChange(e.target.value)}
@@ -879,7 +881,7 @@ export default function SolicitudesPage() {
                 </label>
 
                 <label className="block">
-                  <span className="text-sm font-medium text-gray-700">Edición *</span>
+                  <span className="text-sm font-medium text-[#424846]">Edicion *</span>
                   <select
                     value={selectedEdition}
                     onChange={(e) => setSelectedEdition(e.target.value)}
@@ -887,7 +889,7 @@ export default function SolicitudesPage() {
                     disabled={!selectedCourse}
                     className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm disabled:bg-gray-50 disabled:text-gray-400 focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                   >
-                    <option value="">— Seleccionar edición —</option>
+                    <option value="">— Seleccionar edicion —</option>
                     {editions.map((ed) => (
                       <option key={ed.id} value={ed.id}>
                         {ed.start_date} {ed.instructor ? `- ${ed.instructor}` : ''}
@@ -897,7 +899,7 @@ export default function SolicitudesPage() {
                 </label>
 
                 <label className="block">
-                  <span className="text-sm font-medium text-gray-700">Colaborador *</span>
+                  <span className="text-sm font-medium text-[#424846]">Colaborador *</span>
                   <select
                     value={selectedCollaborator}
                     onChange={(e) => setSelectedCollaborator(e.target.value)}
@@ -914,12 +916,12 @@ export default function SolicitudesPage() {
                 </label>
 
                 <label className="block">
-                  <span className="text-sm font-medium text-gray-700">Motivo de la solicitud</span>
+                  <span className="text-sm font-medium text-[#424846]">Motivo de la solicitud</span>
                   <textarea
                     value={requestReason}
                     onChange={(e) => setRequestReason(e.target.value)}
                     rows={3}
-                    placeholder="¿Por qué se solicita esta capacitación?"
+                    placeholder="Por que se solicita esta capacitacion?"
                     className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#52AF32] focus:border-transparent resize-none"
                   />
                 </label>
@@ -928,7 +930,7 @@ export default function SolicitudesPage() {
                   <button
                     type="button"
                     onClick={() => setCreateModalOpen(false)}
-                    className="px-5 py-2.5 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors font-medium"
+                    className="px-5 py-2.5 text-[#424846] bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors font-medium"
                   >
                     Cancelar
                   </button>
@@ -948,55 +950,55 @@ export default function SolicitudesPage() {
         {/* Modal Revisar Solicitud */}
         {reviewModalOpen && reviewingRequest && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl mx-4 overflow-hidden">
-              <div className={`px-6 py-4 ${reviewAction === 'aprobada' ? 'bg-gradient-to-r from-emerald-600 to-teal-600' : 'bg-gradient-to-r from-red-600 to-rose-600'}`}>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4 overflow-hidden">
+              <div className={`px-6 py-4 ${reviewAction === 'aprobada' ? 'bg-[#52AF32]' : 'bg-red-600'}`}>
                 <h2 className="text-lg font-semibold text-white">
                   {reviewAction === 'aprobada' ? 'Aprobar Solicitud' : 'Rechazar Solicitud'}
                 </h2>
                 <p className="text-white/80 text-sm">
                   {reviewAction === 'aprobada'
-                    ? 'Confirma la aprobación de esta solicitud de capacitación'
+                    ? 'Confirma la aprobacion de esta solicitud de capacitacion'
                     : 'Indica el motivo del rechazo de esta solicitud'}
                 </p>
               </div>
               <form onSubmit={handleReview} className="p-6 space-y-4">
                 {/* Resumen de la solicitud */}
-                <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                <div className="bg-[#424846]/5 rounded-xl p-4 space-y-3 border border-[#424846]/10">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Solicitante</p>
-                      <p className="font-medium text-gray-900">{reviewingRequest.requester?.full_name}</p>
+                      <p className="text-xs text-[#424846]/70 uppercase tracking-wide">Solicitante</p>
+                      <p className="font-medium text-[#424846]">{reviewingRequest.requester?.full_name}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Beneficiario</p>
-                      <p className="font-medium text-gray-900">{reviewingRequest.profiles?.full_name}</p>
+                      <p className="text-xs text-[#424846]/70 uppercase tracking-wide">Beneficiario</p>
+                      <p className="font-medium text-[#424846]">{reviewingRequest.profiles?.full_name}</p>
                     </div>
                   </div>
-                  <div className="pt-3 border-t border-gray-200">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Curso</p>
-                    <p className="font-semibold text-gray-900">{reviewingRequest.course_editions?.courses?.name}</p>
+                  <div className="pt-3 border-t border-[#424846]/10">
+                    <p className="text-xs text-[#424846]/70 uppercase tracking-wide">Curso</p>
+                    <p className="font-semibold text-[#424846]">{reviewingRequest.course_editions?.courses?.name}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Área</p>
-                      <p className="font-medium text-gray-900">{reviewingRequest.profiles?.departments?.name}</p>
+                      <p className="text-xs text-[#424846]/70 uppercase tracking-wide">Area</p>
+                      <p className="font-medium text-[#424846]">{reviewingRequest.profiles?.departments?.name}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Costo</p>
-                      <p className="font-bold text-gray-900">${reviewingRequest.course_editions?.courses?.cost?.toLocaleString()} MXN</p>
+                      <p className="text-xs text-[#424846]/70 uppercase tracking-wide">Costo</p>
+                      <p className="font-bold text-[#424846]">${reviewingRequest.course_editions?.courses?.cost?.toLocaleString()} MXN</p>
                     </div>
                   </div>
                   {reviewingRequest.request_reason && (
-                    <div className="pt-3 border-t border-gray-200">
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Motivo</p>
-                      <p className="text-gray-700">{reviewingRequest.request_reason}</p>
+                    <div className="pt-3 border-t border-[#424846]/10">
+                      <p className="text-xs text-[#424846]/70 uppercase tracking-wide">Motivo</p>
+                      <p className="text-[#424846]">{reviewingRequest.request_reason}</p>
                     </div>
                   )}
                 </div>
 
                 {reviewAction === 'rechazada' && (
                   <label className="block">
-                    <span className="text-sm font-medium text-gray-700">Motivo del rechazo *</span>
+                    <span className="text-sm font-medium text-[#424846]">Motivo del rechazo *</span>
                     <textarea
                       value={rejectionReason}
                       onChange={(e) => setRejectionReason(e.target.value)}
@@ -1009,11 +1011,11 @@ export default function SolicitudesPage() {
                 )}
 
                 {reviewAction === 'aprobada' && (
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800">
-                    <p className="font-medium mb-1">Al aprobar esta solicitud:</p>
-                    <ul className="list-disc list-inside space-y-1 text-emerald-700">
-                      <li>Se inscribirá automáticamente al colaborador en el curso</li>
-                      <li>Se actualizará el presupuesto del área correspondiente</li>
+                  <div className="bg-[#52AF32]/10 border border-[#52AF32]/20 rounded-xl p-4 text-sm text-[#424846]">
+                    <p className="font-medium mb-1 text-[#52AF32]">Al aprobar esta solicitud:</p>
+                    <ul className="list-disc list-inside space-y-1 text-[#424846]/80">
+                      <li>Se inscribira automaticamente al colaborador en el curso</li>
+                      <li>Se actualizara el presupuesto del area correspondiente</li>
                     </ul>
                   </div>
                 )}
@@ -1022,7 +1024,7 @@ export default function SolicitudesPage() {
                   <button
                     type="button"
                     onClick={() => setReviewModalOpen(false)}
-                    className="px-5 py-2.5 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors font-medium"
+                    className="px-5 py-2.5 text-[#424846] bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors font-medium"
                   >
                     Cancelar
                   </button>
@@ -1031,14 +1033,14 @@ export default function SolicitudesPage() {
                     disabled={reviewing}
                     className={`px-5 py-2.5 text-white rounded-xl disabled:opacity-50 transition-colors font-medium ${
                       reviewAction === 'aprobada'
-                        ? 'bg-emerald-600 hover:bg-emerald-700'
+                        ? 'bg-[#52AF32] hover:bg-[#67B52E]'
                         : 'bg-red-600 hover:bg-red-700'
                     }`}
                   >
                     {reviewing
                       ? 'Procesando...'
                       : reviewAction === 'aprobada'
-                      ? 'Confirmar Aprobación'
+                      ? 'Confirmar Aprobacion'
                       : 'Confirmar Rechazo'}
                   </button>
                 </div>
@@ -1050,116 +1052,116 @@ export default function SolicitudesPage() {
         {/* Modal Proponer Curso - Solo para no-admins */}
         {!isAdmin && proposalModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 sticky top-0">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="bg-[#222D59] px-6 py-4 sticky top-0">
                 <h2 className="text-lg font-semibold text-white">Proponer Curso Externo</h2>
-                <p className="text-purple-100 text-sm">
-                  ¿Encontraste un curso que te interesa? Comparte los detalles y lo revisaremos.
+                <p className="text-white/80 text-sm">
+                  Encontraste un curso que te interesa? Comparte los detalles y lo revisaremos.
                 </p>
               </div>
               <form onSubmit={handleCreateProposal} className="p-6 space-y-4">
                 <label className="block">
-                  <span className="text-sm font-medium text-gray-700">Nombre del Curso *</span>
+                  <span className="text-sm font-medium text-[#424846]">Nombre del Curso *</span>
                   <input
                     type="text"
                     value={proposalForm.course_name}
                     onChange={(e) => setProposalForm({ ...proposalForm, course_name: e.target.value })}
                     required
-                    placeholder="Ej: Certificación Scrum Master"
-                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Ej: Certificacion Scrum Master"
+                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#222D59] focus:border-transparent"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="text-sm font-medium text-gray-700">Institución / Plataforma</span>
+                  <span className="text-sm font-medium text-[#424846]">Institucion / Plataforma</span>
                   <input
                     type="text"
                     value={proposalForm.institution_name}
                     onChange={(e) => setProposalForm({ ...proposalForm, institution_name: e.target.value })}
                     placeholder="Ej: Coursera, Udemy, Universidad XYZ"
-                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#222D59] focus:border-transparent"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="text-sm font-medium text-gray-700">URL del Curso</span>
+                  <span className="text-sm font-medium text-[#424846]">URL del Curso</span>
                   <input
                     type="url"
                     value={proposalForm.course_url}
                     onChange={(e) => setProposalForm({ ...proposalForm, course_url: e.target.value })}
                     placeholder="https://..."
-                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#222D59] focus:border-transparent"
                   />
                 </label>
 
                 <div className="grid grid-cols-2 gap-4">
                   <label className="block">
-                    <span className="text-sm font-medium text-gray-700">Costo Estimado (MXN)</span>
+                    <span className="text-sm font-medium text-[#424846]">Costo Estimado (MXN)</span>
                     <input
                       type="number"
                       value={proposalForm.estimated_cost}
                       onChange={(e) => setProposalForm({ ...proposalForm, estimated_cost: Number(e.target.value) })}
                       min="0"
-                      className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#222D59] focus:border-transparent"
                     />
                   </label>
 
                   <label className="block">
-                    <span className="text-sm font-medium text-gray-700">Horas Estimadas</span>
+                    <span className="text-sm font-medium text-[#424846]">Horas Estimadas</span>
                     <input
                       type="number"
                       value={proposalForm.estimated_hours}
                       onChange={(e) => setProposalForm({ ...proposalForm, estimated_hours: Number(e.target.value) })}
                       min="0"
-                      className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#222D59] focus:border-transparent"
                     />
                   </label>
                 </div>
 
                 <label className="block">
-                  <span className="text-sm font-medium text-gray-700">Modalidad</span>
+                  <span className="text-sm font-medium text-[#424846]">Modalidad</span>
                   <select
                     value={proposalForm.modality}
                     onChange={(e) => setProposalForm({ ...proposalForm, modality: e.target.value })}
-                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#222D59] focus:border-transparent"
                   >
                     <option value="">— Seleccionar —</option>
                     <option value="presencial">Presencial</option>
                     <option value="virtual">Virtual</option>
-                    <option value="hibrido">Híbrido</option>
+                    <option value="hibrido">Hibrido</option>
                   </select>
                 </label>
 
                 <div className="grid grid-cols-2 gap-4">
                   <label className="block">
-                    <span className="text-sm font-medium text-gray-700">Fecha de Inicio</span>
+                    <span className="text-sm font-medium text-[#424846]">Fecha de Inicio</span>
                     <input
                       type="date"
                       value={proposalForm.start_date}
                       onChange={(e) => setProposalForm({ ...proposalForm, start_date: e.target.value })}
-                      className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#222D59] focus:border-transparent"
                     />
                   </label>
 
                   <label className="block">
-                    <span className="text-sm font-medium text-gray-700">Fecha de Fin</span>
+                    <span className="text-sm font-medium text-[#424846]">Fecha de Fin</span>
                     <input
                       type="date"
                       value={proposalForm.end_date}
                       onChange={(e) => setProposalForm({ ...proposalForm, end_date: e.target.value })}
-                      className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#222D59] focus:border-transparent"
                     />
                   </label>
                 </div>
 
                 <label className="block">
-                  <span className="text-sm font-medium text-gray-700">¿Por qué te interesa este curso?</span>
+                  <span className="text-sm font-medium text-[#424846]">Por que te interesa este curso?</span>
                   <textarea
                     value={proposalForm.justification}
                     onChange={(e) => setProposalForm({ ...proposalForm, justification: e.target.value })}
                     rows={3}
-                    placeholder="Explica cómo te ayudará en tu trabajo..."
-                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                    placeholder="Explica como te ayudara en tu trabajo..."
+                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#222D59] focus:border-transparent resize-none"
                   />
                 </label>
 
@@ -1167,14 +1169,14 @@ export default function SolicitudesPage() {
                   <button
                     type="button"
                     onClick={() => setProposalModalOpen(false)}
-                    className="px-5 py-2.5 text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors font-medium"
+                    className="px-5 py-2.5 text-[#424846] bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors font-medium"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
                     disabled={creatingProposal}
-                    className="px-5 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 transition-colors font-medium"
+                    className="px-5 py-2.5 bg-[#222D59] text-white rounded-xl hover:bg-[#222D59]/90 disabled:opacity-50 transition-colors font-medium"
                   >
                     {creatingProposal ? 'Enviando...' : 'Enviar Propuesta'}
                   </button>

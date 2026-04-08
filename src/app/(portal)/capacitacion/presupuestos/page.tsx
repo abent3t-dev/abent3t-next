@@ -370,14 +370,14 @@ export default function PresupuestosPage() {
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Presupuestos de Capacitación</h1>
+            <h1 className="text-2xl font-bold text-[#424846]">Presupuestos de Capacitación</h1>
             <p className="text-gray-500">Control de presupuesto por área y periodo</p>
           </div>
           {canManage && (
             <div className="flex items-center gap-2">
               <button
                 onClick={openImportModal}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-[#222D59] text-white rounded-lg hover:bg-[#2d3a6e] transition-colors"
                 title="Importar desde Excel"
               >
                 <Icons.upload className="w-5 h-5" />
@@ -396,68 +396,81 @@ export default function PresupuestosPage() {
 
         {/* Summary Cards */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+          {/* Total Asignado - Azul Marino */}
+          <div className="bg-white p-5 rounded-xl border-l-4 border-[#222D59] shadow-sm">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-gray-500">Presupuesto Total</p>
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                <svg className="w-5 h-5 text-[#52AF32]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="w-10 h-10 bg-[#222D59]/10 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-[#222D59]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
             </div>
-            <p className="text-2xl font-bold text-[#52AF32] mt-2">{formatCurrency(totalAssigned)}</p>
+            <p className="text-2xl font-bold text-[#222D59] mt-2">{formatCurrency(totalAssigned)}</p>
           </div>
-          <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+          {/* Consumido - Verde A3T */}
+          <div className="bg-white p-5 rounded-xl border-l-4 border-[#52AF32] shadow-sm">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-gray-500">Gastado</p>
-              <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                <svg className="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <p className="text-sm font-medium text-gray-500">Consumido</p>
+              <div className="w-10 h-10 bg-[#52AF32]/10 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-[#52AF32]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               </div>
             </div>
-            <p className="text-2xl font-bold text-orange-600 mt-2">{formatCurrency(totalSpent)}</p>
+            <p className="text-2xl font-bold text-[#52AF32] mt-2">{formatCurrency(totalSpent)}</p>
           </div>
-          <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-gray-500">Disponible</p>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${totalRemaining < 0 ? 'bg-red-100' : 'bg-green-100'}`}>
-                <svg className={`w-5 h-5 ${totalRemaining < 0 ? 'text-red-600' : 'text-green-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+          {/* Disponible - Dinámico según nivel */}
+          {(() => {
+            const availablePercent = totalAssigned > 0 ? (totalRemaining / totalAssigned) * 100 : 0;
+            const borderColor = totalRemaining < 0 ? 'border-red-500' : availablePercent > 50 ? 'border-[#67B52E]' : availablePercent > 20 ? 'border-[#DFA922]' : 'border-red-500';
+            const bgColor = totalRemaining < 0 ? 'bg-red-500/10' : availablePercent > 50 ? 'bg-[#67B52E]/10' : availablePercent > 20 ? 'bg-[#DFA922]/10' : 'bg-red-500/10';
+            const iconColor = totalRemaining < 0 ? 'text-red-500' : availablePercent > 50 ? 'text-[#67B52E]' : availablePercent > 20 ? 'text-[#DFA922]' : 'text-red-500';
+            const textColor = totalRemaining < 0 ? 'text-red-500' : availablePercent > 50 ? 'text-[#67B52E]' : availablePercent > 20 ? 'text-[#DFA922]' : 'text-red-500';
+
+            return (
+              <div className={`bg-white p-5 rounded-xl border-l-4 ${borderColor} shadow-sm`}>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-gray-500">Disponible</p>
+                  <div className={`w-10 h-10 ${bgColor} rounded-full flex items-center justify-center`}>
+                    <svg className={`w-5 h-5 ${iconColor}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+                <p className={`text-2xl font-bold mt-2 ${textColor}`}>
+                  {formatCurrency(totalRemaining)}
+                </p>
               </div>
-            </div>
-            <p className={`text-2xl font-bold mt-2 ${totalRemaining < 0 ? 'text-red-600' : 'text-green-600'}`}>
-              {formatCurrency(totalRemaining)}
-            </p>
-          </div>
+            );
+          })()}
         </div>
 
         {/* Budgets Table */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-[#424846]">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wide">
                   Área
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wide">
                   Periodo
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">
+                <th className="px-6 py-3 text-right text-xs font-medium text-white uppercase tracking-wide">
                   Asignado
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">
-                  Gastado
+                <th className="px-6 py-3 text-right text-xs font-medium text-white uppercase tracking-wide">
+                  Consumido
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">
+                <th className="px-6 py-3 text-right text-xs font-medium text-white uppercase tracking-wide">
                   Disponible
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wide">
+                <th className="px-6 py-3 text-center text-xs font-medium text-white uppercase tracking-wide">
                   % Uso
                 </th>
                 {canManage && (
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  <th className="px-6 py-3 text-center text-xs font-medium text-white uppercase tracking-wide">
                     Acciones
                   </th>
                 )}
@@ -484,27 +497,33 @@ export default function PresupuestosPage() {
                       {formatCurrency(budget.consumed_amount)}
                     </td>
                     <td className="px-6 py-4 text-sm text-right">
-                      <span className={budget.available_amount < 0 ? 'text-red-600 font-medium' : 'text-green-600 font-medium'}>
-                        {formatCurrency(budget.available_amount)}
-                      </span>
+                      {(() => {
+                        const availPercent = budget.assigned_amount > 0 ? (budget.available_amount / budget.assigned_amount) * 100 : 0;
+                        const textColor = budget.available_amount < 0 ? 'text-red-600' : availPercent > 50 ? 'text-[#52AF32]' : availPercent > 20 ? 'text-[#DFA922]' : 'text-red-600';
+                        return (
+                          <span className={`${textColor} font-medium`}>
+                            {formatCurrency(budget.available_amount)}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
                           <div
-                            className={`h-full transition-all ${
-                              usagePercent > 90
-                                ? 'bg-red-500'
-                                : usagePercent > 70
-                                ? 'bg-yellow-500'
-                                : 'bg-green-500'
-                            }`}
-                            style={{ width: `${Math.min(usagePercent, 100)}%` }}
+                            className="h-full transition-all"
+                            style={{
+                              width: `${Math.min(usagePercent, 100)}%`,
+                              backgroundColor: usagePercent > 80 ? '#ef4444' : usagePercent > 50 ? '#DFA922' : '#52AF32'
+                            }}
                           />
                         </div>
-                        <span className={`text-sm font-medium ${
-                          usagePercent > 90 ? 'text-red-600' : usagePercent > 70 ? 'text-yellow-600' : 'text-gray-600'
-                        }`}>
+                        <span
+                          className="text-sm font-medium"
+                          style={{
+                            color: usagePercent > 80 ? '#ef4444' : usagePercent > 50 ? '#DFA922' : '#424846'
+                          }}
+                        >
                           {usagePercent}%
                         </span>
                       </div>
@@ -545,7 +564,7 @@ export default function PresupuestosPage() {
                       {canManage && (
                         <button
                           onClick={openCreateModal}
-                          className="mt-3 text-[#52AF32] hover:text-blue-700 text-sm font-medium"
+                          className="mt-3 text-[#52AF32] hover:text-[#67B52E] text-sm font-medium"
                         >
                           Crear primer presupuesto
                         </button>
@@ -562,24 +581,24 @@ export default function PresupuestosPage() {
         {showModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
-              <div className="flex items-center justify-between px-6 py-4 border-b">
-                <h2 className="text-lg font-semibold text-gray-900">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-[#424846] rounded-t-xl">
+                <h2 className="text-lg font-semibold text-white">
                   {editingBudget ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}
                 </h2>
-                <button onClick={closeModal} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
-                  <Icons.x className="w-5 h-5 text-gray-500" />
+                <button onClick={closeModal} className="p-1 hover:bg-white/10 rounded-lg transition-colors">
+                  <Icons.x className="w-5 h-5 text-white" />
                 </button>
               </div>
 
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-[#424846] mb-1">
                     Departamento *
                   </label>
                   <select
                     value={formData.department_id}
                     onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 outline-none"
                     required
                   >
                     <option value="">Seleccionar departamento</option>
@@ -592,13 +611,13 @@ export default function PresupuestosPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-[#424846] mb-1">
                     Periodo *
                   </label>
                   <select
                     value={formData.period_id}
                     onChange={(e) => setFormData({ ...formData, period_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 outline-none"
                     required
                   >
                     <option value="">Seleccionar periodo</option>
@@ -613,7 +632,7 @@ export default function PresupuestosPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-[#424846] mb-1">
                     Monto Asignado *
                   </label>
                   <input
@@ -622,7 +641,7 @@ export default function PresupuestosPage() {
                     step="0.01"
                     value={formData.assigned_amount}
                     onChange={(e) => setFormData({ ...formData, assigned_amount: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 outline-none"
                     placeholder="0.00"
                     required
                   />
@@ -656,14 +675,14 @@ export default function PresupuestosPage() {
               <div className="p-6">
                 {/* Icono de advertencia */}
                 <div className="flex justify-center mb-4">
-                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-                    <Icons.warning className="w-8 h-8 text-red-600" />
+                  <div className="w-16 h-16 bg-[#DFA922]/10 rounded-full flex items-center justify-center">
+                    <Icons.warning className="w-8 h-8 text-[#DFA922]" />
                   </div>
                 </div>
 
                 {/* Título y mensaje */}
                 <div className="text-center mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  <h3 className="text-lg font-semibold text-[#424846] mb-2">
                     Eliminar Presupuesto
                   </h3>
                   <p className="text-gray-600">
@@ -715,31 +734,31 @@ export default function PresupuestosPage() {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
               {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white">
-                <h2 className="text-lg font-semibold text-gray-900">Importar Presupuestos desde Excel</h2>
-                <button onClick={closeImportModal} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
-                  <Icons.x className="w-5 h-5 text-gray-500" />
+              <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-[#424846] rounded-t-xl">
+                <h2 className="text-lg font-semibold text-white">Importar Presupuestos desde Excel</h2>
+                <button onClick={closeImportModal} className="p-1 hover:bg-white/10 rounded-lg transition-colors">
+                  <Icons.x className="w-5 h-5 text-white" />
                 </button>
               </div>
 
               <div className="p-6 space-y-6">
                 {/* Descargar Plantilla - Sección destacada */}
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-5">
+                <div className="bg-[#52AF32]/5 border-2 border-[#52AF32]/30 rounded-xl p-5">
                   <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <div className="flex-shrink-0 w-12 h-12 bg-[#52AF32] rounded-xl flex items-center justify-center shadow-lg">
                       <Icons.download className="w-6 h-6 text-white" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-lg font-bold text-green-900 mb-1">
+                      <h3 className="text-lg font-bold text-[#424846] mb-1">
                         Paso 1: Descarga la Plantilla
                       </h3>
-                      <p className="text-sm text-green-700 mb-3">
+                      <p className="text-sm text-gray-600 mb-3">
                         La plantilla incluye dropdowns preconfigurados para departamentos y períodos.
                         Esto evita errores de escritura y facilita la importación.
                       </p>
                       <button
                         onClick={handleDownloadTemplate}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-md hover:shadow-lg font-medium"
+                        className="flex items-center gap-2 px-5 py-2.5 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] transition-all shadow-md hover:shadow-lg font-medium"
                       >
                         <Icons.download className="w-5 h-5" />
                         Descargar Plantilla Excel
@@ -749,54 +768,54 @@ export default function PresupuestosPage() {
                 </div>
 
                 {/* Instrucciones */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                <div className="bg-[#222D59]/5 border border-[#222D59]/20 rounded-lg p-4">
+                  <h3 className="font-semibold text-[#222D59] mb-2 flex items-center gap-2">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     Paso 2: Completa la Plantilla
                   </h3>
-                  <ol className="text-sm text-blue-800 space-y-1.5 ml-7">
+                  <ol className="text-sm text-[#424846] space-y-1.5 ml-7">
                     <li>1. Abre el archivo descargado en Excel</li>
                     <li>2. Completa los siguientes datos:</li>
                   </ol>
 
                   <div className="mt-3 ml-7 space-y-2">
                     <div className="text-sm">
-                      <p className="font-medium text-blue-900 mb-1">Columnas requeridas:</p>
-                      <ul className="text-blue-800 space-y-0.5 ml-4">
-                        <li>• <strong>Departamento:</strong> Nombre exacto del departamento (ej: &quot;Compras&quot;, &quot;Comercial y Medición&quot;)</li>
-                        <li>• <strong>Período:</strong> Label del período (ej: &quot;2026-S1&quot;, &quot;2026-S2&quot;)</li>
-                        <li>• <strong>Monto Asignado:</strong> Cantidad numérica sin símbolos (ej: 45000, 150000.50)</li>
+                      <p className="font-medium text-[#424846] mb-1">Columnas requeridas:</p>
+                      <ul className="text-gray-600 space-y-0.5 ml-4">
+                        <li>- <strong>Departamento:</strong> Nombre exacto del departamento (ej: &quot;Compras&quot;, &quot;Comercial y Medicion&quot;)</li>
+                        <li>- <strong>Periodo:</strong> Label del periodo (ej: &quot;2026-S1&quot;, &quot;2026-S2&quot;)</li>
+                        <li>- <strong>Monto Asignado:</strong> Cantidad numerica sin simbolos (ej: 45000, 150000.50)</li>
                       </ul>
                     </div>
 
-                    <div className="text-sm bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
-                      <p className="font-medium text-yellow-900 mb-1">Validaciones importantes:</p>
-                      <ul className="text-yellow-800 space-y-0.5 ml-4">
-                        <li>✓ El departamento debe existir en el sistema</li>
-                        <li>✓ El período debe existir en el sistema</li>
-                        <li>✓ El monto debe ser un número positivo</li>
-                        <li>✓ No puede haber presupuestos duplicados (mismo departamento + período)</li>
-                        <li>✓ Los nombres deben coincidir exactamente con los del sistema</li>
+                    <div className="text-sm bg-[#DFA922]/10 border border-[#DFA922]/30 rounded p-2 mt-2">
+                      <p className="font-medium text-[#424846] mb-1">Validaciones importantes:</p>
+                      <ul className="text-gray-600 space-y-0.5 ml-4">
+                        <li>- El departamento debe existir en el sistema</li>
+                        <li>- El periodo debe existir en el sistema</li>
+                        <li>- El monto debe ser un numero positivo</li>
+                        <li>- No puede haber presupuestos duplicados (mismo departamento + periodo)</li>
+                        <li>- Los nombres deben coincidir exactamente con los del sistema</li>
                       </ul>
                     </div>
 
-                    <div className="text-sm text-blue-700 bg-blue-100 rounded p-2 mt-2">
-                      💡 <strong>Tip:</strong> Descarga la plantilla con datos existentes para ver ejemplos
+                    <div className="text-sm text-[#222D59] bg-[#222D59]/5 rounded p-2 mt-2">
+                      <strong>Tip:</strong> Descarga la plantilla con datos existentes para ver ejemplos
                     </div>
                   </div>
                 </div>
 
                 {/* Zona de upload */}
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <div className="border-2 border-dashed border-[#424846]/30 rounded-lg p-6 text-center hover:border-[#52AF32]/50 transition-colors">
                   <div className="flex flex-col items-center gap-3">
-                    <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center">
-                      <Icons.upload className="w-8 h-8 text-purple-600" />
+                    <div className="w-16 h-16 bg-[#222D59]/10 rounded-full flex items-center justify-center">
+                      <Icons.upload className="w-8 h-8 text-[#222D59]" />
                     </div>
                     <div>
                       <label className="cursor-pointer">
-                        <span className="text-[#52AF32] hover:text-blue-700 font-medium">Seleccionar archivo</span>
+                        <span className="text-[#52AF32] hover:text-[#67B52E] font-medium">Seleccionar archivo</span>
                         <input
                           type="file"
                           accept=".xlsx,.xls"
@@ -804,15 +823,15 @@ export default function PresupuestosPage() {
                           className="hidden"
                         />
                       </label>
-                      <p className="text-sm text-gray-500 mt-1">o arrastra y suelta aquí</p>
+                      <p className="text-sm text-gray-500 mt-1">o arrastra y suelta aqui</p>
                     </div>
-                    <p className="text-xs text-gray-400">Solo archivos .xlsx o .xls (máx. 5MB)</p>
+                    <p className="text-xs text-gray-400">Solo archivos .xlsx o .xls (max. 5MB)</p>
                     {selectedFile && (
-                      <div className="mt-2 flex items-center gap-2 bg-green-50 px-4 py-2 rounded-lg">
-                        <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <div className="mt-2 flex items-center gap-2 bg-[#52AF32]/10 px-4 py-2 rounded-lg">
+                        <svg className="w-5 h-5 text-[#52AF32]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <span className="text-sm text-green-800 font-medium">{selectedFile.name}</span>
+                        <span className="text-sm text-[#424846] font-medium">{selectedFile.name}</span>
                       </div>
                     )}
                   </div>
@@ -822,9 +841,9 @@ export default function PresupuestosPage() {
                 {importResult && (
                   <div className="space-y-3">
                     {importResult.success > 0 && (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <p className="text-green-800 font-medium">
-                          ✅ {importResult.success} presupuestos creados exitosamente
+                      <div className="bg-[#52AF32]/10 border border-[#52AF32]/30 rounded-lg p-4">
+                        <p className="text-[#424846] font-medium">
+                          {importResult.success} presupuestos creados exitosamente
                         </p>
                       </div>
                     )}
@@ -832,7 +851,7 @@ export default function PresupuestosPage() {
                     {importResult.errors.length > 0 && (
                       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                         <p className="text-red-800 font-medium mb-2">
-                          ❌ {importResult.errors.length} filas con errores:
+                          {importResult.errors.length} filas con errores:
                         </p>
                         <div className="max-h-40 overflow-y-auto space-y-1.5">
                           {importResult.errors.map((error, idx) => (
@@ -851,14 +870,14 @@ export default function PresupuestosPage() {
                   <button
                     onClick={closeImportModal}
                     disabled={importing}
-                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                    className="px-4 py-2 text-[#424846] bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={handleImport}
                     disabled={!selectedFile || importing}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-4 py-2 bg-[#222D59] text-white rounded-lg hover:bg-[#2d3a6e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {importing ? 'Importando...' : 'Importar'}
                   </button>

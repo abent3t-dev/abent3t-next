@@ -293,21 +293,21 @@ export default function EvidenciasPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Revisión de Evidencias</h1>
+            <h1 className="text-2xl font-bold text-[#424846]">Revision de Evidencias</h1>
             <p className="text-gray-500 mt-1">Aprueba o rechaza las evidencias subidas por los colaboradores</p>
           </div>
           {stats.pending > 0 && (
-            <div className="flex items-center gap-2 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center gap-2 px-4 py-2 bg-[#DFA922]/10 border border-[#DFA922]/30 rounded-lg">
               <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#DFA922] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-[#DFA922]"></span>
               </span>
-              <span className="text-sm font-medium text-yellow-700">
+              <span className="text-sm font-medium text-[#DFA922]">
                 {stats.pending} evidencia{stats.pending !== 1 ? 's' : ''} pendiente{stats.pending !== 1 ? 's' : ''}
               </span>
             </div>
@@ -320,19 +320,19 @@ export default function EvidenciasPage() {
             onClick={() => handleFilterChange('pending')}
             className={`text-left p-5 rounded-xl border-2 transition-all ${
               filter === 'pending'
-                ? 'bg-yellow-50 border-yellow-300 shadow-md'
-                : 'bg-white border-gray-100 hover:border-yellow-200 hover:shadow-sm'
+                ? 'bg-[#DFA922]/10 border-[#DFA922] shadow-md'
+                : 'bg-white border-gray-100 hover:border-[#DFA922]/50 hover:shadow-sm'
             }`}
           >
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-gray-500">Pendientes</p>
-              <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-                <svg className="w-5 h-5 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="w-10 h-10 bg-[#DFA922]/20 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-[#DFA922]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
             </div>
-            <p className="text-3xl font-bold text-yellow-600 mt-2">{stats.pending}</p>
+            <p className="text-3xl font-bold text-[#DFA922] mt-2">{stats.pending}</p>
             <p className="text-xs text-gray-400 mt-1">Por revisar</p>
           </button>
 
@@ -340,19 +340,19 @@ export default function EvidenciasPage() {
             onClick={() => handleFilterChange('approved')}
             className={`text-left p-5 rounded-xl border-2 transition-all ${
               filter === 'approved'
-                ? 'bg-green-50 border-green-300 shadow-md'
-                : 'bg-white border-gray-100 hover:border-green-200 hover:shadow-sm'
+                ? 'bg-[#52AF32]/10 border-[#52AF32] shadow-md'
+                : 'bg-white border-gray-100 hover:border-[#52AF32]/50 hover:shadow-sm'
             }`}
           >
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-gray-500">Aprobadas</p>
-              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="w-10 h-10 bg-[#52AF32]/20 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-[#52AF32]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
             </div>
-            <p className="text-3xl font-bold text-green-600 mt-2">{stats.approved}</p>
+            <p className="text-3xl font-bold text-[#52AF32] mt-2">{stats.approved}</p>
             <p className="text-xs text-gray-400 mt-1">Validadas</p>
           </button>
 
@@ -360,7 +360,7 @@ export default function EvidenciasPage() {
             onClick={() => handleFilterChange('rejected')}
             className={`text-left p-5 rounded-xl border-2 transition-all ${
               filter === 'rejected'
-                ? 'bg-red-50 border-red-300 shadow-md'
+                ? 'bg-red-50 border-red-500 shadow-md'
                 : 'bg-white border-gray-100 hover:border-red-200 hover:shadow-sm'
             }`}
           >
@@ -373,26 +373,26 @@ export default function EvidenciasPage() {
               </div>
             </div>
             <p className="text-3xl font-bold text-red-600 mt-2">{stats.rejected}</p>
-            <p className="text-xs text-gray-400 mt-1">No válidas</p>
+            <p className="text-xs text-gray-400 mt-1">No validas</p>
           </button>
 
           <button
             onClick={() => handleFilterChange('all')}
             className={`text-left p-5 rounded-xl border-2 transition-all ${
               filter === 'all'
-                ? 'bg-blue-50 border-blue-300 shadow-md'
-                : 'bg-white border-gray-100 hover:border-blue-200 hover:shadow-sm'
+                ? 'bg-[#424846]/10 border-[#424846] shadow-md'
+                : 'bg-white border-gray-100 hover:border-[#424846]/50 hover:shadow-sm'
             }`}
           >
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-gray-500">Total</p>
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="w-10 h-10 bg-[#424846]/20 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-[#424846]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
             </div>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{stats.total}</p>
+            <p className="text-3xl font-bold text-[#424846] mt-2">{stats.total}</p>
             <p className="text-xs text-gray-400 mt-1">Evidencias</p>
           </button>
         </div>
@@ -402,21 +402,18 @@ export default function EvidenciasPage() {
           <span className="text-sm text-gray-500">Mostrando:</span>
           <div className="flex gap-2">
             {[
-              { value: 'pending', label: 'Pendientes', color: 'yellow' },
-              { value: 'approved', label: 'Aprobadas', color: 'green' },
-              { value: 'rejected', label: 'Rechazadas', color: 'red' },
-              { value: 'all', label: 'Todas', color: 'blue' },
+              { value: 'pending', label: 'Pendientes', activeClass: 'bg-[#DFA922] text-white' },
+              { value: 'approved', label: 'Aprobadas', activeClass: 'bg-[#52AF32] text-white' },
+              { value: 'rejected', label: 'Rechazadas', activeClass: 'bg-red-500 text-white' },
+              { value: 'all', label: 'Todas', activeClass: 'bg-[#424846] text-white' },
             ].map((f) => (
               <button
                 key={f.value}
                 onClick={() => handleFilterChange(f.value as typeof filter)}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
                   filter === f.value
-                    ? f.color === 'yellow' ? 'bg-yellow-500 text-white shadow-sm' :
-                      f.color === 'green' ? 'bg-green-500 text-white shadow-sm' :
-                      f.color === 'red' ? 'bg-red-500 text-white shadow-sm' :
-                      'bg-blue-500 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? `${f.activeClass} shadow-sm`
+                    : 'bg-white text-[#424846] border border-gray-200 hover:bg-gray-50'
                 }`}
               >
                 {f.label}
@@ -428,7 +425,7 @@ export default function EvidenciasPage() {
         {/* Evidences List */}
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#52AF32]"></div>
           </div>
         ) : filteredEvidences.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
@@ -463,18 +460,18 @@ export default function EvidenciasPage() {
                 >
                   {/* Card Header con status */}
                   <div className={`px-5 py-3 border-b ${
-                    evidence.verification_status === 'pending' ? 'bg-yellow-50 border-yellow-100' :
-                    evidence.verification_status === 'approved' ? 'bg-green-50 border-green-100' :
+                    evidence.verification_status === 'pending' ? 'bg-[#DFA922]/10 border-[#DFA922]/20' :
+                    evidence.verification_status === 'approved' ? 'bg-[#52AF32]/10 border-[#52AF32]/20' :
                     'bg-red-50 border-red-100'
                   }`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                          evidence.verification_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          evidence.verification_status === 'approved' ? 'bg-green-100 text-green-800' :
+                          evidence.verification_status === 'pending' ? 'bg-[#DFA922]/20 text-[#DFA922]' :
+                          evidence.verification_status === 'approved' ? 'bg-[#52AF32]/20 text-[#52AF32]' :
                           'bg-red-100 text-red-800'
                         }`}>
-                          {evidence.verification_status === 'pending' ? 'Pendiente de revisión' :
+                          {evidence.verification_status === 'pending' ? 'Pendiente de revision' :
                            evidence.verification_status === 'approved' ? 'Aprobada' : 'Rechazada'}
                         </span>
                         <span className="text-xs text-gray-500 flex items-center gap-1">
@@ -516,7 +513,7 @@ export default function EvidenciasPage() {
                       <div className="col-span-3">
                         <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Colaborador</p>
                         <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                          <div className="w-10 h-10 bg-[#52AF32] rounded-full flex items-center justify-center text-white font-semibold text-sm">
                             {participant?.full_name?.charAt(0) || '?'}
                           </div>
                           <div>
@@ -602,7 +599,7 @@ export default function EvidenciasPage() {
                               <button
                                 onClick={() => handleApprove(evidence.id)}
                                 disabled={approveMutation.isPending}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-[#52AF32] text-white rounded-lg hover:bg-[#52AF32]/90 disabled:opacity-50 transition-colors"
                               >
                                 {Icons.check}
                                 Aprobar
@@ -616,7 +613,7 @@ export default function EvidenciasPage() {
                               </button>
                               <button
                                 onClick={() => handleDownload(evidence)}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-colors"
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-[#424846] hover:text-[#424846]/80 hover:bg-gray-50 rounded-lg transition-colors"
                               >
                                 {Icons.download}
                                 Descargar

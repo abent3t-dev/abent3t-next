@@ -90,7 +90,7 @@ export default function CatalogTable<
   return (
     <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
       {/* Header */}
-      <div className="px-6 py-4 bg-gradient-to-r from-[#424846] to-[#52AF32]/80 flex items-center justify-between">
+      <div className="px-6 py-4 bg-[#424846] flex items-center justify-between">
         <h2 className="text-lg font-semibold text-white">{title}</h2>
         <div className="flex gap-3">
           {/* Search */}

@@ -305,17 +305,17 @@ export default function ReportesPage() {
   const years = Array.from(new Set(periodData.map((p) => p.year))).sort((a, b) => b - a);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reportes</h1>
-          <p className="text-gray-500">Análisis de inversión y horas de capacitación</p>
+          <h1 className="text-2xl font-bold text-[#424846]">Reportes</h1>
+          <p className="text-gray-500">Analisis de inversion y horas de capacitacion</p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-[#424846] rounded-lg hover:bg-gray-100 transition-colors"
           >
             {Icons.filter}
             <span>{showFilters ? 'Ocultar' : 'Filtros'}</span>
@@ -323,7 +323,7 @@ export default function ReportesPage() {
           <button
             onClick={handleExport}
             disabled={exporting || loading}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-[#222D59] text-white rounded-lg hover:bg-[#1a2347] disabled:opacity-50 transition-colors"
           >
             {Icons.download}
             <span>{exporting ? 'Exportando...' : 'Exportar CSV'}</span>
@@ -333,8 +333,8 @@ export default function ReportesPage() {
 
       {/* Filters */}
       {showFilters && (
-        <div className="bg-white rounded-lg shadow p-4 space-y-4">
-          <h3 className="font-medium text-gray-900">Filtros</h3>
+        <div className="bg-white rounded-xl shadow p-4 space-y-4">
+          <h3 className="font-medium text-[#424846]">Filtros</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Date Range - Not functional yet but UI is ready */}
             <DateRangePicker
@@ -392,7 +392,7 @@ export default function ReportesPage() {
             </button>
             <button
               onClick={handleClearFilters}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-white border border-gray-300 text-[#424846] rounded-lg hover:bg-gray-100 transition-colors flex items-center gap-2"
             >
               {Icons.x}
               Limpiar
@@ -402,15 +402,15 @@ export default function ReportesPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-200">
+      <div className="flex gap-2 bg-white rounded-xl p-2 shadow">
         {reportTabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
               activeTab === tab.id
-                ? 'border-[#52AF32] text-[#52AF32]'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'bg-[#52AF32] text-white'
+                : 'bg-white text-[#424846] border border-gray-200 hover:bg-gray-50'
             }`}
           >
             {tab.icon}
@@ -421,37 +421,37 @@ export default function ReportesPage() {
 
       {/* Content */}
       {loading ? (
-        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">Cargando...</div>
+        <div className="bg-white rounded-xl shadow p-8 text-center text-gray-500">Cargando...</div>
       ) : (
         <>
           {/* Por Persona */}
           {activeTab === 'person' && (
             <>
               {/* Table */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Departamento</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cursos</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Completados</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Horas</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Inversión</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[#424846] uppercase">Nombre</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[#424846] uppercase">Departamento</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">Cursos</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">Completados</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">Horas</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">Inversion</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filtered.personData.map((row) => (
                       <tr key={row.profile_id} className="hover:bg-gray-50">
                         <td className="px-4 py-3">
-                          <div className="font-medium text-gray-900">{row.full_name}</div>
+                          <div className="font-medium text-[#424846]">{row.full_name}</div>
                           <div className="text-sm text-gray-500">{row.position || '—'}</div>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">{row.department}</td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">{row.courses_enrolled}</td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">{row.courses_completed}</td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">{row.completed_hours}h / {row.total_hours}h</td>
-                        <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">{formatCurrency(row.total_investment)}</td>
+                        <td className="px-4 py-3 text-sm text-right text-[#424846]">{row.courses_enrolled}</td>
+                        <td className="px-4 py-3 text-sm text-right text-[#424846]">{row.courses_completed}</td>
+                        <td className="px-4 py-3 text-sm text-right text-[#424846]">{row.completed_hours}h / {row.total_hours}h</td>
+                        <td className="px-4 py-3 text-sm text-right font-medium text-[#424846]">{formatCurrency(row.total_investment)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -463,8 +463,8 @@ export default function ReportesPage() {
 
               {/* Charts */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                <div className="bg-white rounded-xl shadow p-6">
+                  <h3 className="text-lg font-semibold text-[#424846] mb-4">
                     Top 10 Colaboradores por Horas
                   </h3>
                   {topPersonsByHours.length > 0 ? (
@@ -472,7 +472,7 @@ export default function ReportesPage() {
                       data={topPersonsByHours}
                       dataKey="hours"
                       xAxisKey="name"
-                      color="#3b82f6"
+                      color="#222D59"
                       horizontal
                       formatValue={(v) => `${v}h`}
                     />
@@ -483,16 +483,16 @@ export default function ReportesPage() {
                   )}
                 </div>
 
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Top 10 Colaboradores por Inversión
+                <div className="bg-white rounded-xl shadow p-6">
+                  <h3 className="text-lg font-semibold text-[#424846] mb-4">
+                    Top 10 Colaboradores por Inversion
                   </h3>
                   {topPersonsByInvestment.length > 0 ? (
                     <BarChart
                       data={topPersonsByInvestment}
                       dataKey="investment"
                       xAxisKey="name"
-                      color="#10b981"
+                      color="#52AF32"
                       horizontal
                       formatValue={formatCurrencyShort}
                     />
@@ -510,26 +510,26 @@ export default function ReportesPage() {
           {activeTab === 'department' && (
             <>
               {/* Table */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Departamento</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Período</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Asignado</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Consumido</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">% Ejecución</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Horas</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cursos</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[#424846] uppercase">Departamento</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[#424846] uppercase">Periodo</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">Asignado</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">Consumido</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">% Ejecucion</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">Horas</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">Cursos</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filtered.departmentData.map((row) => (
                       <tr key={`${row.department_id}-${row.period}`} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-900">{row.department_name}</td>
+                        <td className="px-4 py-3 font-medium text-[#424846]">{row.department_name}</td>
                         <td className="px-4 py-3 text-sm text-gray-600">{row.period}</td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">{formatCurrency(row.assigned_amount)}</td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">{formatCurrency(row.consumed_amount)}</td>
+                        <td className="px-4 py-3 text-sm text-right text-[#424846]">{formatCurrency(row.assigned_amount)}</td>
+                        <td className="px-4 py-3 text-sm text-right text-[#424846]">{formatCurrency(row.consumed_amount)}</td>
                         <td className="px-4 py-3 text-sm text-right">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                             row.execution_percentage >= 80 ? 'bg-green-100 text-green-800' :
@@ -539,8 +539,8 @@ export default function ReportesPage() {
                             {row.execution_percentage}%
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">{row.completed_hours}h / {row.total_hours}h</td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">{row.courses_completed} / {row.courses_enrolled}</td>
+                        <td className="px-4 py-3 text-sm text-right text-[#424846]">{row.completed_hours}h / {row.total_hours}h</td>
+                        <td className="px-4 py-3 text-sm text-right text-[#424846]">{row.courses_completed} / {row.courses_enrolled}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -552,16 +552,16 @@ export default function ReportesPage() {
 
               {/* Charts */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Inversión por Departamento
+                <div className="bg-white rounded-xl shadow p-6">
+                  <h3 className="text-lg font-semibold text-[#424846] mb-4">
+                    Inversion por Departamento
                   </h3>
                   {departmentInvestmentData.length > 0 ? (
                     <BarChart
                       data={departmentInvestmentData}
                       dataKey="investment"
                       xAxisKey="name"
-                      color="#f59e0b"
+                      color="#DFA922"
                       formatValue={formatCurrencyShort}
                     />
                   ) : (
@@ -571,8 +571,8 @@ export default function ReportesPage() {
                   )}
                 </div>
 
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                <div className="bg-white rounded-xl shadow p-6">
+                  <h3 className="text-lg font-semibold text-[#424846] mb-4">
                     Horas por Departamento
                   </h3>
                   {departmentHoursData.length > 0 ? (
@@ -580,7 +580,7 @@ export default function ReportesPage() {
                       data={departmentHoursData}
                       dataKey="hours"
                       xAxisKey="name"
-                      color="#8b5cf6"
+                      color="#222D59"
                       formatValue={(v) => `${v}h`}
                     />
                   ) : (
@@ -590,9 +590,9 @@ export default function ReportesPage() {
                   )}
                 </div>
 
-                <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Distribución de Inversión
+                <div className="bg-white rounded-xl shadow p-6 lg:col-span-2">
+                  <h3 className="text-lg font-semibold text-[#424846] mb-4">
+                    Distribucion de Inversion
                   </h3>
                   {departmentInvestmentData.length > 0 ? (
                     <PieChart
@@ -611,33 +611,33 @@ export default function ReportesPage() {
             </>
           )}
 
-          {/* Por Institución */}
+          {/* Por Institucion */}
           {activeTab === 'institution' && (
             <>
               {/* Table */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Institución</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cursos</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Inscripciones</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Completados</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Horas</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Inversión</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[#424846] uppercase">Institucion</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[#424846] uppercase">Tipo</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">Cursos</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">Inscripciones</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">Completados</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">Horas</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">Inversion</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filtered.institutionData.map((row) => (
                       <tr key={row.institution_id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-900">{row.institution_name}</td>
+                        <td className="px-4 py-3 font-medium text-[#424846]">{row.institution_name}</td>
                         <td className="px-4 py-3 text-sm text-gray-600 capitalize">{row.institution_type}</td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">{row.courses_count}</td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">{row.enrollments_count}</td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">{row.completed_count}</td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">{row.total_hours}h</td>
-                        <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">{formatCurrency(row.total_investment)}</td>
+                        <td className="px-4 py-3 text-sm text-right text-[#424846]">{row.courses_count}</td>
+                        <td className="px-4 py-3 text-sm text-right text-[#424846]">{row.enrollments_count}</td>
+                        <td className="px-4 py-3 text-sm text-right text-[#424846]">{row.completed_count}</td>
+                        <td className="px-4 py-3 text-sm text-right text-[#424846]">{row.total_hours}h</td>
+                        <td className="px-4 py-3 text-sm text-right font-medium text-[#424846]">{formatCurrency(row.total_investment)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -649,9 +649,9 @@ export default function ReportesPage() {
 
               {/* Charts */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Inversión por Institución
+                <div className="bg-white rounded-xl shadow p-6">
+                  <h3 className="text-lg font-semibold text-[#424846] mb-4">
+                    Inversion por Institucion
                   </h3>
                   {institutionInvestmentData.length > 0 ? (
                     <PieChart
@@ -667,16 +667,16 @@ export default function ReportesPage() {
                   )}
                 </div>
 
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Número de Cursos por Institución
+                <div className="bg-white rounded-xl shadow p-6">
+                  <h3 className="text-lg font-semibold text-[#424846] mb-4">
+                    Numero de Cursos por Institucion
                   </h3>
                   {institutionCoursesData.length > 0 ? (
                     <BarChart
                       data={institutionCoursesData}
                       dataKey="courses"
                       xAxisKey="name"
-                      color="#06b6d4"
+                      color="#67B52E"
                       formatValue={(v) => `${v}`}
                     />
                   ) : (
@@ -689,29 +689,29 @@ export default function ReportesPage() {
             </>
           )}
 
-          {/* Por Período */}
+          {/* Por Periodo */}
           {activeTab === 'period' && (
             <>
               {/* Table */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Período</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Presupuesto</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Consumido</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">% Ejecución</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Inscripciones</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">% Completación</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Horas</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[#424846] uppercase">Periodo</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">Presupuesto</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">Consumido</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">% Ejecucion</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">Inscripciones</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">% Completacion</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[#424846] uppercase">Horas</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filtered.periodData.map((row) => (
                       <tr key={row.period_id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-900">{row.period_label}</td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">{formatCurrency(row.total_assigned)}</td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">{formatCurrency(row.total_consumed)}</td>
+                        <td className="px-4 py-3 font-medium text-[#424846]">{row.period_label}</td>
+                        <td className="px-4 py-3 text-sm text-right text-[#424846]">{formatCurrency(row.total_assigned)}</td>
+                        <td className="px-4 py-3 text-sm text-right text-[#424846]">{formatCurrency(row.total_consumed)}</td>
                         <td className="px-4 py-3 text-sm text-right">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                             row.execution_percentage >= 80 ? 'bg-green-100 text-green-800' :
@@ -721,7 +721,7 @@ export default function ReportesPage() {
                             {row.execution_percentage}%
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">{row.total_enrollments}</td>
+                        <td className="px-4 py-3 text-sm text-right text-[#424846]">{row.total_enrollments}</td>
                         <td className="px-4 py-3 text-sm text-right">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                             row.completion_rate >= 80 ? 'bg-green-100 text-green-800' :
@@ -731,7 +731,7 @@ export default function ReportesPage() {
                             {row.completion_rate}%
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">{row.total_hours}h</td>
+                        <td className="px-4 py-3 text-sm text-right text-[#424846]">{row.total_hours}h</td>
                       </tr>
                     ))}
                   </tbody>
@@ -743,16 +743,16 @@ export default function ReportesPage() {
 
               {/* Charts */}
               <div className="grid grid-cols-1 gap-6">
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Tendencia de Inversión y Horas
+                <div className="bg-white rounded-xl shadow p-6">
+                  <h3 className="text-lg font-semibold text-[#424846] mb-4">
+                    Tendencia de Inversion y Horas
                   </h3>
                   {periodInvestmentTrend.length > 0 ? (
                     <LineChart
                       data={periodInvestmentTrend}
                       lines={[
-                        { dataKey: 'investment', name: 'Inversión', color: '#3b82f6' },
-                        { dataKey: 'hours', name: 'Horas', color: '#10b981' },
+                        { dataKey: 'investment', name: 'Inversion', color: '#52AF32' },
+                        { dataKey: 'hours', name: 'Horas', color: '#222D59' },
                       ]}
                       xAxisKey="period"
                       formatValue={(v) => formatCurrencyShort(v)}
@@ -765,9 +765,9 @@ export default function ReportesPage() {
                 </div>
 
                 {years.length > 1 && (
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Comparativa Año vs Año
+                  <div className="bg-white rounded-xl shadow p-6">
+                    <h3 className="text-lg font-semibold text-[#424846] mb-4">
+                      Comparativa Ano vs Ano
                     </h3>
                     {periodData.length > 0 ? (
                       <BarChart
@@ -777,7 +777,7 @@ export default function ReportesPage() {
                         }))}
                         dataKey="consumed"
                         xAxisKey="period"
-                        color="#ef4444"
+                        color="#DFA922"
                         formatValue={formatCurrencyShort}
                       />
                     ) : (

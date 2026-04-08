@@ -43,33 +43,37 @@ interface Catalog {
   name: string;
 }
 
-const statusConfig: Record<string, { label: string; bg: string; text: string; border: string; icon: string }> = {
+const statusConfig: Record<string, { label: string; bg: string; text: string; border: string; borderColor: string; icon: string }> = {
   pendiente: {
     label: 'Pendiente de Revisión',
-    bg: 'bg-amber-50',
-    text: 'text-amber-700',
-    border: 'border-amber-200',
+    bg: 'bg-[#DFA922]/10',
+    text: 'text-[#DFA922]',
+    border: 'border-[#DFA922]/30',
+    borderColor: '#DFA922',
     icon: 'clock'
   },
   en_investigacion: {
     label: 'En Investigación',
-    bg: 'bg-blue-50',
-    text: 'text-blue-700',
-    border: 'border-blue-200',
+    bg: 'bg-[#222D59]/10',
+    text: 'text-[#222D59]',
+    border: 'border-[#222D59]/30',
+    borderColor: '#222D59',
     icon: 'search'
   },
   aprobada: {
     label: 'Aprobada',
-    bg: 'bg-emerald-50',
-    text: 'text-emerald-700',
-    border: 'border-emerald-200',
+    bg: 'bg-[#52AF32]/10',
+    text: 'text-[#52AF32]',
+    border: 'border-[#52AF32]/30',
+    borderColor: '#52AF32',
     icon: 'check'
   },
   rechazada: {
     label: 'Rechazada',
     bg: 'bg-red-50',
-    text: 'text-red-700',
+    text: 'text-red-600',
     border: 'border-red-200',
+    borderColor: '#ef4444',
     icon: 'x'
   },
 };
@@ -318,11 +322,11 @@ export default function PropuestasPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-indigo-50 p-6">
+    <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Propuestas de Cursos Externos</h1>
+          <h1 className="text-2xl font-bold text-[#424846]">Propuestas de Cursos Externos</h1>
           <p className="text-gray-500 mt-1">Revisa y gestiona las propuestas de cursos enviadas por los colaboradores</p>
         </div>
 
@@ -330,55 +334,55 @@ export default function PropuestasPage() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <button
             onClick={() => handleFilterChange('pendiente')}
-            className={`p-4 rounded-xl transition-all ${
+            className={`p-4 rounded-xl transition-all bg-white ${
               filter === 'pendiente'
-                ? 'bg-amber-50 shadow-lg ring-2 ring-amber-400'
-                : 'bg-white/60 hover:bg-amber-50 hover:shadow-md'
+                ? 'shadow-lg border-2 border-[#DFA922]'
+                : 'border border-gray-200 hover:border-[#DFA922] hover:shadow-md'
             }`}
           >
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-amber-500">{Icons.clock}</span>
-              <span className="text-xs font-medium text-amber-600 uppercase tracking-wide">Pendientes</span>
+              <span className="text-[#DFA922]">{Icons.clock}</span>
+              <span className="text-xs font-medium text-[#DFA922] uppercase tracking-wide">Pendientes</span>
             </div>
-            <p className="text-3xl font-bold text-amber-600">{stats.pendientes}</p>
+            <p className="text-3xl font-bold text-[#DFA922]">{stats.pendientes}</p>
           </button>
 
           <button
             onClick={() => handleFilterChange('en_investigacion')}
-            className={`p-4 rounded-xl transition-all ${
+            className={`p-4 rounded-xl transition-all bg-white ${
               filter === 'en_investigacion'
-                ? 'bg-blue-50 shadow-lg ring-2 ring-blue-400'
-                : 'bg-white/60 hover:bg-blue-50 hover:shadow-md'
+                ? 'shadow-lg border-2 border-[#222D59]'
+                : 'border border-gray-200 hover:border-[#222D59] hover:shadow-md'
             }`}
           >
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-blue-500">{Icons.search}</span>
-              <span className="text-xs font-medium text-blue-600 uppercase tracking-wide">Investigando</span>
+              <span className="text-[#222D59]">{Icons.search}</span>
+              <span className="text-xs font-medium text-[#222D59] uppercase tracking-wide">Investigando</span>
             </div>
-            <p className="text-3xl font-bold text-blue-600">{stats.enInvestigacion}</p>
+            <p className="text-3xl font-bold text-[#222D59]">{stats.enInvestigacion}</p>
           </button>
 
           <button
             onClick={() => handleFilterChange('aprobada')}
-            className={`p-4 rounded-xl transition-all ${
+            className={`p-4 rounded-xl transition-all bg-white ${
               filter === 'aprobada'
-                ? 'bg-emerald-50 shadow-lg ring-2 ring-emerald-400'
-                : 'bg-white/60 hover:bg-emerald-50 hover:shadow-md'
+                ? 'shadow-lg border-2 border-[#52AF32]'
+                : 'border border-gray-200 hover:border-[#52AF32] hover:shadow-md'
             }`}
           >
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-emerald-500">{Icons.check}</span>
-              <span className="text-xs font-medium text-emerald-600 uppercase tracking-wide">Aprobadas</span>
+              <span className="text-[#52AF32]">{Icons.check}</span>
+              <span className="text-xs font-medium text-[#52AF32] uppercase tracking-wide">Aprobadas</span>
             </div>
-            <p className="text-3xl font-bold text-emerald-600">{stats.aprobadas}</p>
+            <p className="text-3xl font-bold text-[#52AF32]">{stats.aprobadas}</p>
           </button>
 
           <button
             onClick={() => handleFilterChange('rechazada')}
-            className={`p-4 rounded-xl transition-all ${
+            className={`p-4 rounded-xl transition-all bg-white ${
               filter === 'rechazada'
-                ? 'bg-red-50 shadow-lg ring-2 ring-red-400'
-                : 'bg-white/60 hover:bg-red-50 hover:shadow-md'
+                ? 'shadow-lg border-2 border-red-500'
+                : 'border border-gray-200 hover:border-red-500 hover:shadow-md'
             }`}
           >
             <div className="flex items-center gap-2 mb-1">
@@ -390,32 +394,32 @@ export default function PropuestasPage() {
 
           <button
             onClick={() => handleFilterChange('all')}
-            className={`p-4 rounded-xl transition-all ${
+            className={`p-4 rounded-xl transition-all bg-white ${
               filter === 'all'
-                ? 'bg-white shadow-lg ring-2 ring-gray-400'
-                : 'bg-white/60 hover:bg-white hover:shadow-md'
+                ? 'shadow-lg border-2 border-[#424846]'
+                : 'border border-gray-200 hover:border-[#424846] hover:shadow-md'
             }`}
           >
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-gray-500">{Icons.lightbulb}</span>
-              <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">Total</span>
+              <span className="text-[#424846]">{Icons.lightbulb}</span>
+              <span className="text-xs font-medium text-[#424846] uppercase tracking-wide">Total</span>
             </div>
-            <p className="text-3xl font-bold text-gray-700">{stats.total}</p>
+            <p className="text-3xl font-bold text-[#424846]">{stats.total}</p>
           </button>
         </div>
 
         {/* Proposals List */}
         {isLoading ? (
-          <div className="bg-white rounded-2xl p-12 text-center">
-            <div className="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full mx-auto" />
+          <div className="bg-white rounded-xl p-12 text-center">
+            <div className="animate-spin w-8 h-8 border-4 border-[#52AF32] border-t-transparent rounded-full mx-auto" />
             <p className="text-gray-500 mt-4">Cargando propuestas...</p>
           </div>
         ) : filteredProposals.length === 0 ? (
-          <div className="bg-white rounded-2xl p-12 text-center">
-            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 text-purple-600">
+          <div className="bg-white rounded-xl p-12 text-center">
+            <div className="w-16 h-16 bg-[#52AF32]/10 rounded-full flex items-center justify-center mx-auto mb-4 text-[#52AF32]">
               {Icons.lightbulb}
             </div>
-            <p className="text-gray-600 font-medium">No hay propuestas</p>
+            <p className="text-[#424846] font-medium">No hay propuestas</p>
             <p className="text-gray-400 text-sm mt-1">
               {filter !== 'all'
                 ? `No hay propuestas ${statusConfig[filter]?.label.toLowerCase() || ''}`
@@ -431,7 +435,7 @@ export default function PropuestasPage() {
                 return (
                   <div
                     key={proposal.id}
-                    className={`bg-white rounded-2xl shadow-sm border overflow-hidden transition-all hover:shadow-md ${status.border}`}
+                    className={`bg-white rounded-xl shadow-sm border overflow-hidden transition-all hover:shadow-md ${status.border}`}
                   >
                   {/* Header con estado */}
                   <div className={`px-6 py-3 ${status.bg} border-b ${status.border} flex items-center justify-between`}>
@@ -456,7 +460,7 @@ export default function PropuestasPage() {
                           <button
                             onClick={() => handleInvestigate(proposal.id)}
                             disabled={investigateMutation.isPending}
-                            className="flex items-center gap-2 px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] transition-colors text-sm font-medium disabled:opacity-50"
+                            className="flex items-center gap-2 px-4 py-2 bg-[#222D59] text-white rounded-lg hover:bg-[#222D59]/90 transition-colors text-sm font-medium disabled:opacity-50"
                           >
                             {Icons.search}
                             Investigar
@@ -464,14 +468,14 @@ export default function PropuestasPage() {
                         )}
                         <button
                           onClick={() => handleOpenApproval(proposal)}
-                          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
+                          className="flex items-center gap-2 px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] transition-colors text-sm font-medium"
                         >
                           {Icons.check}
                           Aprobar
                         </button>
                         <button
                           onClick={() => setRejectingId(proposal.id)}
-                          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                          className="flex items-center gap-2 px-4 py-2 border border-red-500 text-red-500 rounded-lg hover:bg-red-50 transition-colors text-sm font-medium"
                         >
                           {Icons.x}
                           Rechazar
@@ -486,12 +490,12 @@ export default function PropuestasPage() {
                       {/* Columna 1: Información de personas */}
                       <div className="space-y-4">
                         {/* Quién propone */}
-                        <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-4">
-                          <div className="flex items-center gap-2 text-purple-600 mb-2">
+                        <div className="bg-[#222D59]/5 rounded-xl p-4">
+                          <div className="flex items-center gap-2 text-[#222D59] mb-2">
                             {Icons.user}
                             <span className="text-xs font-semibold uppercase tracking-wide">Propuesto por</span>
                           </div>
-                          <p className="font-semibold text-gray-900">{proposal.proposer?.full_name || '—'}</p>
+                          <p className="font-semibold text-[#424846]">{proposal.proposer?.full_name || '—'}</p>
                           <p className="text-sm text-gray-500">{proposal.proposer?.email}</p>
                         </div>
 
@@ -503,12 +507,12 @@ export default function PropuestasPage() {
                         </div>
 
                         {/* Para quién es */}
-                        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-4">
-                          <div className="flex items-center gap-2 text-emerald-600 mb-2">
+                        <div className="bg-[#52AF32]/5 rounded-xl p-4">
+                          <div className="flex items-center gap-2 text-[#52AF32] mb-2">
                             {Icons.userGroup}
                             <span className="text-xs font-semibold uppercase tracking-wide">Beneficiario</span>
                           </div>
-                          <p className="font-semibold text-gray-900">{proposal.profile?.full_name || '—'}</p>
+                          <p className="font-semibold text-[#424846]">{proposal.profile?.full_name || '—'}</p>
                           <p className="text-sm text-gray-500">{proposal.profile?.position || 'Sin puesto'}</p>
                           {proposal.profile?.departments?.name && (
                             <span className="inline-flex items-center gap-1 mt-2 text-xs text-gray-500 bg-white px-2 py-1 rounded">
@@ -522,12 +526,12 @@ export default function PropuestasPage() {
                       {/* Columna 2: Información del curso */}
                       <div className="md:col-span-2">
                         <div className="bg-gray-50 rounded-xl p-5 h-full">
-                          <div className="flex items-center gap-2 text-gray-600 mb-3">
+                          <div className="flex items-center gap-2 text-[#424846] mb-3">
                             {Icons.book}
                             <span className="text-xs font-semibold uppercase tracking-wide">Curso Propuesto</span>
                           </div>
 
-                          <h3 className="font-bold text-xl text-gray-900 mb-4">{proposal.course_name}</h3>
+                          <h3 className="font-bold text-xl text-[#424846] mb-4">{proposal.course_name}</h3>
 
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                             {/* Institución */}
@@ -583,10 +587,10 @@ export default function PropuestasPage() {
                               href={proposal.course_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 px-4 py-2 bg-[#52AF32]/10 text-[#52AF32] rounded-lg hover:bg-[#52AF32]/20 transition-colors text-sm font-medium"
+                              className="inline-flex items-center gap-2 text-[#52AF32] hover:underline text-sm font-medium"
                             >
                               {Icons.link}
-                              Ver página del curso
+                              Ver pagina del curso
                             </a>
                           )}
                         </div>
@@ -670,7 +674,7 @@ export default function PropuestasPage() {
 
             {/* Pagination */}
             {paginationMeta && paginationMeta.total > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+              <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
                 <Pagination
                   meta={paginationMeta}
                   onPageChange={handlePageChange}
@@ -684,8 +688,8 @@ export default function PropuestasPage() {
         {/* Confirmation Modal - Before Approval */}
         {confirmingApproval && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
-              <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+              <div className="bg-[#DFA922] px-6 py-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-white/20 rounded-lg">
                     <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -697,25 +701,25 @@ export default function PropuestasPage() {
               </div>
 
               <div className="p-6 space-y-4">
-                <p className="text-sm text-gray-600">
-                  <strong>Importante:</strong> Antes de aprobar esta propuesta, asegúrate de:
+                <p className="text-sm text-[#424846]">
+                  <strong>Importante:</strong> Antes de aprobar esta propuesta, asegurate de:
                 </p>
                 <ul className="text-sm text-gray-600 space-y-3">
                   <li className="flex items-start gap-3 bg-gray-50 p-3 rounded-lg">
-                    <span className="text-amber-500 mt-0.5">{Icons.search}</span>
+                    <span className="text-[#DFA922] mt-0.5">{Icons.search}</span>
                     <span>Investigar el curso propuesto (revisar URL, contenido, calidad)</span>
                   </li>
                   <li className="flex items-start gap-3 bg-gray-50 p-3 rounded-lg">
-                    <span className="text-amber-500 mt-0.5">{Icons.office}</span>
-                    <span>Verificar que la <strong>institución</strong> exista en el catálogo</span>
+                    <span className="text-[#DFA922] mt-0.5">{Icons.office}</span>
+                    <span>Verificar que la <strong>institucion</strong> exista en el catalogo</span>
                   </li>
                   <li className="flex items-start gap-3 bg-gray-50 p-3 rounded-lg">
-                    <span className="text-amber-500 mt-0.5">{Icons.book}</span>
-                    <span>Verificar <strong>tipo de curso</strong> y <strong>modalidad</strong> en catálogos</span>
+                    <span className="text-[#DFA922] mt-0.5">{Icons.book}</span>
+                    <span>Verificar <strong>tipo de curso</strong> y <strong>modalidad</strong> en catalogos</span>
                   </li>
                 </ul>
-                <p className="text-xs text-gray-500 italic bg-blue-50 p-3 rounded-lg">
-                  Los catálogos se pueden administrar desde el menú &quot;Catálogos&quot; en la barra lateral.
+                <p className="text-xs text-gray-500 italic bg-[#222D59]/5 p-3 rounded-lg">
+                  Los catalogos se pueden administrar desde el menu &quot;Catalogos&quot; en la barra lateral.
                 </p>
               </div>
 
@@ -728,7 +732,7 @@ export default function PropuestasPage() {
                 </button>
                 <button
                   onClick={handleConfirmApproval}
-                  className="px-5 py-2.5 text-sm bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-medium"
+                  className="px-5 py-2.5 text-sm bg-[#52AF32] text-white rounded-xl hover:bg-[#67B52E] font-medium"
                 >
                   Entendido, continuar
                 </button>
@@ -740,32 +744,32 @@ export default function PropuestasPage() {
         {/* Approval Modal */}
         {approvingProposal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-4">
-              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4 sticky top-0 z-10">
+            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-4">
+              <div className="bg-[#52AF32] px-6 py-4 sticky top-0 z-10">
                 <h2 className="text-xl font-bold text-white">Aprobar Propuesta y Crear Curso</h2>
-                <p className="text-emerald-100 text-sm">Verifica y completa los datos del curso antes de crear</p>
+                <p className="text-white/80 text-sm">Verifica y completa los datos del curso antes de crear</p>
               </div>
 
               <div className="p-6 space-y-6">
                 {/* Original proposal info */}
                 <div className="bg-gray-50 p-4 rounded-xl">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Datos de la propuesta original</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#424846] mb-3">Datos de la propuesta original</p>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-gray-500">Curso:</span>
-                      <p className="font-medium text-gray-900">{approvingProposal.course_name}</p>
+                      <p className="font-medium text-[#424846]">{approvingProposal.course_name}</p>
                     </div>
                     <div>
-                      <span className="text-gray-500">Institución sugerida:</span>
-                      <p className="font-medium text-gray-900">{approvingProposal.institution_name || 'No especificada'}</p>
+                      <span className="text-gray-500">Institucion sugerida:</span>
+                      <p className="font-medium text-[#424846]">{approvingProposal.institution_name || 'No especificada'}</p>
                     </div>
                     <div>
                       <span className="text-gray-500">Beneficiario:</span>
-                      <p className="font-medium text-gray-900">{approvingProposal.profile?.full_name}</p>
+                      <p className="font-medium text-[#424846]">{approvingProposal.profile?.full_name}</p>
                     </div>
                     <div>
                       {approvingProposal.course_url && (
-                        <a href={approvingProposal.course_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm flex items-center gap-1">
+                        <a href={approvingProposal.course_url} target="_blank" rel="noopener noreferrer" className="text-[#52AF32] hover:underline text-sm flex items-center gap-1">
                           {Icons.link} Ver URL del curso
                         </a>
                       )}
@@ -783,7 +787,7 @@ export default function PropuestasPage() {
                       type="text"
                       value={approvalForm.course_name}
                       onChange={(e) => setApprovalForm({ ...approvalForm, course_name: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                     />
                   </div>
 
@@ -794,7 +798,7 @@ export default function PropuestasPage() {
                     <select
                       value={approvalForm.institution_id}
                       onChange={(e) => setApprovalForm({ ...approvalForm, institution_id: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                     >
                       <option value="">Seleccionar...</option>
                       {institutions.map((inst) => (
@@ -810,7 +814,7 @@ export default function PropuestasPage() {
                     <select
                       value={approvalForm.course_type_id}
                       onChange={(e) => setApprovalForm({ ...approvalForm, course_type_id: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                     >
                       <option value="">Seleccionar...</option>
                       {courseTypes.map((ct) => (
@@ -826,7 +830,7 @@ export default function PropuestasPage() {
                     <select
                       value={approvalForm.modality_id}
                       onChange={(e) => setApprovalForm({ ...approvalForm, modality_id: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                     >
                       <option value="">Seleccionar...</option>
                       {modalities.map((mod) => (
@@ -843,7 +847,7 @@ export default function PropuestasPage() {
                       type="number"
                       value={approvalForm.cost}
                       onChange={(e) => setApprovalForm({ ...approvalForm, cost: Number(e.target.value) })}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                       min="0"
                     />
                   </div>
@@ -856,7 +860,7 @@ export default function PropuestasPage() {
                       type="number"
                       value={approvalForm.total_hours}
                       onChange={(e) => setApprovalForm({ ...approvalForm, total_hours: Number(e.target.value) })}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                       min="0"
                     />
                   </div>
@@ -869,7 +873,7 @@ export default function PropuestasPage() {
                       type="date"
                       value={approvalForm.start_date}
                       onChange={(e) => setApprovalForm({ ...approvalForm, start_date: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                     />
                   </div>
 
@@ -881,7 +885,7 @@ export default function PropuestasPage() {
                       type="date"
                       value={approvalForm.end_date}
                       onChange={(e) => setApprovalForm({ ...approvalForm, end_date: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                     />
                   </div>
 
@@ -893,7 +897,7 @@ export default function PropuestasPage() {
                       type="text"
                       value={approvalForm.location}
                       onChange={(e) => setApprovalForm({ ...approvalForm, location: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                       placeholder="Ej: Udemy, Presencial CDMX"
                     />
                   </div>
@@ -906,7 +910,7 @@ export default function PropuestasPage() {
                       type="text"
                       value={approvalForm.instructor}
                       onChange={(e) => setApprovalForm({ ...approvalForm, instructor: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                     />
                   </div>
 
@@ -917,7 +921,7 @@ export default function PropuestasPage() {
                     <textarea
                       value={approvalForm.description}
                       onChange={(e) => setApprovalForm({ ...approvalForm, description: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent resize-none"
                       rows={2}
                     />
                   </div>
@@ -929,7 +933,7 @@ export default function PropuestasPage() {
                     <textarea
                       value={approvalForm.review_notes}
                       onChange={(e) => setApprovalForm({ ...approvalForm, review_notes: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent resize-none"
                       rows={2}
                       placeholder="Notas opcionales..."
                     />
@@ -937,13 +941,13 @@ export default function PropuestasPage() {
                 </div>
 
                 {/* Info box */}
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800">
+                <div className="bg-[#52AF32]/10 border border-[#52AF32]/30 rounded-xl p-4 text-sm text-[#424846]">
                   <p className="font-medium mb-1">Al aprobar esta propuesta:</p>
-                  <ul className="list-disc list-inside space-y-1 text-emerald-700">
-                    <li>Se creará el curso con los datos verificados</li>
-                    <li>Se creará una edición con las fechas indicadas</li>
-                    <li>Se inscribirá automáticamente al beneficiario</li>
-                    <li>Se actualizará el presupuesto del departamento</li>
+                  <ul className="list-disc list-inside space-y-1 text-[#424846]/80">
+                    <li>Se creara el curso con los datos verificados</li>
+                    <li>Se creara una edicion con las fechas indicadas</li>
+                    <li>Se inscribira automaticamente al beneficiario</li>
+                    <li>Se actualizara el presupuesto del departamento</li>
                   </ul>
                 </div>
               </div>
@@ -958,7 +962,7 @@ export default function PropuestasPage() {
                 <button
                   onClick={handleApprove}
                   disabled={approveMutation.isPending}
-                  className="px-5 py-2.5 text-sm bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-50 font-medium"
+                  className="px-5 py-2.5 text-sm bg-[#52AF32] text-white rounded-xl hover:bg-[#67B52E] disabled:opacity-50 font-medium"
                 >
                   {approveMutation.isPending ? 'Procesando...' : 'Aprobar y Crear Curso'}
                 </button>
