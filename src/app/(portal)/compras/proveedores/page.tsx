@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
 import { Supplier } from '@/types/purchases';
+import SupplierModal from '@/components/compras/SupplierModal';
 
 interface PaginatedResponse {
   data: Supplier[];
@@ -42,11 +43,6 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
     </svg>
   ),
-  x: (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  ),
   star: (
     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
       <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -65,18 +61,7 @@ export default function ProveedoresPage() {
   const [search, setSearch] = useState('');
   const [blockedFilter, setBlockedFilter] = useState<'' | 'true' | 'false'>('');
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({
-    legal_name: '',
-    commercial_name: '',
-    tax_id: '',
-    email: '',
-    phone: '',
-    address: '',
-    contact_name: '',
-    contact_email: '',
-    contact_phone: '',
-  });
-  const [error, setError] = useState('');
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
 
   const queryParams = new URLSearchParams();
   if (search) queryParams.set('search', search);
@@ -88,30 +73,6 @@ export default function ProveedoresPage() {
   });
 
   const suppliers = data?.data ?? [];
-
-  const createMutation = useMutation({
-    mutationFn: (data: typeof formData) => api.post('/suppliers', data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['suppliers'] });
-      setShowModal(false);
-      setFormData({
-        legal_name: '',
-        commercial_name: '',
-        tax_id: '',
-        email: '',
-        phone: '',
-        address: '',
-        contact_name: '',
-        contact_email: '',
-        contact_phone: '',
-      });
-      notify.success('Proveedor creado correctamente');
-    },
-    onError: (err: Error) => {
-      setError(err.message || 'Error al crear proveedor');
-      notify.error(err.message || 'Error al crear proveedor');
-    },
-  });
 
   const blockMutation = useMutation({
     mutationFn: (params: { id: string; reason: string }) =>
@@ -132,15 +93,6 @@ export default function ProveedoresPage() {
     onError: () => notify.error('Error al desbloquear proveedor'),
   });
 
-  const handleCreate = () => {
-    if (!formData.legal_name || !formData.tax_id) {
-      setError('Razon social y RFC son requeridos');
-      return;
-    }
-    setError('');
-    createMutation.mutate(formData);
-  };
-
   const handleBlock = async (id: string) => {
     const reason = prompt('Motivo del bloqueo:');
     if (!reason) return;
@@ -151,6 +103,16 @@ export default function ProveedoresPage() {
     const confirmed = await notify.confirm('Desbloquear este proveedor?');
     if (!confirmed) return;
     unblockMutation.mutate(id);
+  };
+
+  const handleEdit = (supplier: Supplier) => {
+    setEditingSupplier(supplier);
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingSupplier(null);
   };
 
   return (
@@ -251,7 +213,7 @@ export default function ProveedoresPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-2">
                       <button
-                        onClick={() => console.log('Editar:', supplier.id)}
+                        onClick={() => handleEdit(supplier)}
                         className="p-2 text-[#52AF32] hover:bg-[#52AF32]/10 rounded-lg transition-colors"
                         title="Editar"
                       >
@@ -290,126 +252,12 @@ export default function ProveedoresPage() {
         )}
       </div>
 
-      {/* Create Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-bold text-[#424846]">Nuevo Proveedor</h2>
-              <button onClick={() => setShowModal(false)} className="p-1 text-gray-400 hover:text-gray-600">
-                {Icons.x}
-              </button>
-            </div>
-
-            <div className="px-6 py-4 space-y-4">
-              {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">{error}</div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Razon Social *</label>
-                  <input
-                    type="text"
-                    value={formData.legal_name}
-                    onChange={(e) => setFormData({ ...formData, legal_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Comercial</label>
-                  <input
-                    type="text"
-                    value={formData.commercial_name}
-                    onChange={(e) => setFormData({ ...formData, commercial_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">RFC *</label>
-                  <input
-                    type="text"
-                    value={formData.tax_id}
-                    onChange={(e) => setFormData({ ...formData, tax_id: e.target.value.toUpperCase() })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900 uppercase"
-                    maxLength={13}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Telefono</label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Contacto</label>
-                  <input
-                    type="text"
-                    value={formData.contact_name}
-                    onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email Contacto</label>
-                  <input
-                    type="email"
-                    value={formData.contact_email}
-                    onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Telefono Contacto</label>
-                  <input
-                    type="tel"
-                    value={formData.contact_phone}
-                    onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Direccion</label>
-                <textarea
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
-              <button
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleCreate}
-                disabled={createMutation.isPending}
-                className="px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] disabled:opacity-50"
-              >
-                {createMutation.isPending ? 'Guardando...' : 'Crear Proveedor'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Supplier Modal */}
+      <SupplierModal
+        isOpen={showModal}
+        onClose={handleCloseModal}
+        supplier={editingSupplier}
+      />
     </div>
   );
 }

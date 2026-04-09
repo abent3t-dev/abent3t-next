@@ -69,14 +69,14 @@ const PURCHASE_TEAM: UserRole[] = ['lider_procura', 'coordinador_compras', 'comp
 // Cadena de aprobadores
 const APPROVERS: UserRole[] = ['aprobador_nivel_1', 'aprobador_nivel_2', 'aprobador_nivel_3', 'director_general'];
 
-// Acceso a compras (lectura)
-const PURCHASE_VIEWERS: UserRole[] = [...PURCHASE_TEAM, ...APPROVERS, 'solicitante'];
+// Acceso a compras (lectura) - super_admin tiene acceso total
+const PURCHASE_VIEWERS: UserRole[] = ['super_admin', ...PURCHASE_TEAM, ...APPROVERS, 'solicitante'];
 
 // Administracion de compras
 const PURCHASE_ADMINS: UserRole[] = ['super_admin', 'lider_procura'];
 
-// Todos los roles de compras
-const ALL_PURCHASE_ROLES: UserRole[] = [...PURCHASE_TEAM, ...APPROVERS, 'solicitante'];
+// Todos los roles de compras (incluyendo super_admin para acceso completo)
+const ALL_PURCHASE_ROLES: UserRole[] = ['super_admin', ...PURCHASE_TEAM, ...APPROVERS, 'solicitante'];
 
 /** Navegacion principal del sidebar */
 export const SIDEBAR_NAV: NavItem[] = [
@@ -118,12 +118,12 @@ export const SIDEBAR_NAV: NavItem[] = [
     icon: 'shopping-cart',
     roles: [...PURCHASE_VIEWERS, ...EXEC_ROLES],
     children: [
-      { label: 'Dashboard', href: '/compras/dashboard', icon: 'chart', roles: [...PURCHASE_TEAM, ...APPROVERS, ...EXEC_ROLES] },
-      { label: 'Solicitudes (RQ)', href: '/compras/solicitudes', icon: 'file-text', roles: [...PURCHASE_TEAM, 'solicitante'] },
-      { label: 'Aprobaciones', href: '/compras/aprobaciones', icon: 'check-circle', roles: [...PURCHASE_TEAM, ...APPROVERS] },
-      { label: 'Ordenes (PO)', href: '/compras/ordenes', icon: 'clipboard', roles: PURCHASE_TEAM },
-      { label: 'Proveedores', href: '/compras/proveedores', icon: 'truck', roles: PURCHASE_TEAM },
-      { label: 'Reportes', href: '/compras/reportes', icon: 'bar-chart', roles: [...PURCHASE_TEAM, ...APPROVERS, ...EXEC_ROLES] },
+      { label: 'Dashboard', href: '/compras/dashboard', icon: 'chart', roles: ['super_admin', ...PURCHASE_TEAM, ...APPROVERS, ...EXEC_ROLES] },
+      { label: 'Solicitudes (RQ)', href: '/compras/solicitudes', icon: 'file-text', roles: ['super_admin', ...PURCHASE_TEAM, 'solicitante'] },
+      { label: 'Aprobaciones', href: '/compras/aprobaciones', icon: 'check-circle', roles: ['super_admin', ...PURCHASE_TEAM, ...APPROVERS] },
+      { label: 'Ordenes (PO)', href: '/compras/ordenes', icon: 'clipboard', roles: ['super_admin', ...PURCHASE_TEAM] },
+      { label: 'Proveedores', href: '/compras/proveedores', icon: 'truck', roles: ['super_admin', ...PURCHASE_TEAM] },
+      { label: 'Reportes', href: '/compras/reportes', icon: 'bar-chart', roles: ['super_admin', ...PURCHASE_TEAM, ...APPROVERS, ...EXEC_ROLES] },
     ],
   },
   // Catalogos (solo admins de RRHH)
