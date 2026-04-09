@@ -392,6 +392,14 @@ export default function SolicitudesPage() {
       notify.error('Ingresa el nombre del curso');
       return;
     }
+    if (!proposalForm.justification.trim()) {
+      notify.error('La justificación es obligatoria. Explica por qué te interesa este curso.');
+      return;
+    }
+    if (proposalForm.justification.trim().length < 50) {
+      notify.error('La justificación debe ser más detallada (mínimo 50 caracteres)');
+      return;
+    }
 
     setCreatingProposal(true);
     try {
@@ -1155,13 +1163,24 @@ export default function SolicitudesPage() {
                 </div>
 
                 <label className="block">
-                  <span className="text-sm font-medium text-[#424846]">Por que te interesa este curso?</span>
+                  <span className="text-sm font-medium text-[#424846]">¿Por qué te interesa este curso? *</span>
+                  <div className="mt-1 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                    <p className="text-xs text-amber-700 flex items-start gap-2">
+                      <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <span>
+                        <strong>Este campo es fundamental para la aprobación.</strong> Explica detalladamente cómo este curso contribuirá a tu desarrollo profesional y beneficiará a la empresa.
+                      </span>
+                    </p>
+                  </div>
                   <textarea
                     value={proposalForm.justification}
                     onChange={(e) => setProposalForm({ ...proposalForm, justification: e.target.value })}
-                    rows={3}
-                    placeholder="Explica como te ayudara en tu trabajo..."
-                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#222D59] focus:border-transparent resize-none"
+                    required
+                    rows={4}
+                    placeholder="Describe: &#10;• ¿Qué habilidades o conocimientos adquirirás?&#10;• ¿Cómo aplicarás lo aprendido en tu trabajo diario?&#10;• ¿Qué beneficios traerá para tu equipo o la empresa?"
+                    className="mt-2 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#222D59] focus:border-transparent resize-none"
                   />
                 </label>
 

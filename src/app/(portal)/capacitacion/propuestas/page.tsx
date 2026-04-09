@@ -151,7 +151,7 @@ export default function PropuestasPage() {
   const [filter, setFilter] = useState<'pendiente' | 'en_investigacion' | 'aprobada' | 'rechazada' | 'all'>('pendiente');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
-  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectingProposal, setRejectingProposal] = useState<Proposal | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [approvingProposal, setApprovingProposal] = useState<Proposal | null>(null);
   const [confirmingApproval, setConfirmingApproval] = useState<Proposal | null>(null);
@@ -223,7 +223,7 @@ export default function PropuestasPage() {
       api.put(`/proposals/${id}/review`, { status: 'rechazada', rejection_reason: reason }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['proposals'] });
-      setRejectingId(null);
+      setRejectingProposal(null);
       setRejectReason('');
       notify.success('Propuesta rechazada');
     },
@@ -245,12 +245,22 @@ export default function PropuestasPage() {
     investigateMutation.mutate(id);
   };
 
-  const handleReject = (id: string) => {
+  const handleReject = () => {
+    if (!rejectingProposal) return;
     if (!rejectReason.trim()) {
       notify.error('Ingresa un motivo de rechazo');
       return;
     }
-    rejectMutation.mutate({ id, reason: rejectReason });
+    if (rejectReason.trim().length < 20) {
+      notify.error('El motivo debe ser más detallado (mínimo 20 caracteres)');
+      return;
+    }
+    rejectMutation.mutate({ id: rejectingProposal.id, reason: rejectReason });
+  };
+
+  const openRejectModal = (proposal: Proposal) => {
+    setRejectingProposal(proposal);
+    setRejectReason('');
   };
 
   const handleOpenApproval = (proposal: Proposal) => {
@@ -474,7 +484,7 @@ export default function PropuestasPage() {
                           Aprobar
                         </button>
                         <button
-                          onClick={() => setRejectingId(proposal.id)}
+                          onClick={() => openRejectModal(proposal)}
                           className="flex items-center gap-2 px-4 py-2 border border-red-500 text-red-500 rounded-lg hover:bg-red-50 transition-colors text-sm font-medium"
                         >
                           {Icons.x}
@@ -630,42 +640,6 @@ export default function PropuestasPage() {
                       </div>
                     )}
 
-                    {/* Input de rechazo inline */}
-                    {rejectingId === proposal.id && (
-                      <div className="mt-4 pt-4 border-t border-gray-100">
-                        <div className="flex items-end gap-3">
-                          <div className="flex-1">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Motivo del rechazo *
-                            </label>
-                            <input
-                              type="text"
-                              value={rejectReason}
-                              onChange={(e) => setRejectReason(e.target.value)}
-                              placeholder="Indica por qué se rechaza esta propuesta..."
-                              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                              autoFocus
-                            />
-                          </div>
-                          <button
-                            onClick={() => handleReject(proposal.id)}
-                            disabled={rejectMutation.isPending}
-                            className="px-4 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50 text-sm font-medium"
-                          >
-                            Confirmar Rechazo
-                          </button>
-                          <button
-                            onClick={() => {
-                              setRejectingId(null);
-                              setRejectReason('');
-                            }}
-                            className="px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 text-sm font-medium"
-                          >
-                            Cancelar
-                          </button>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               );
@@ -965,6 +939,102 @@ export default function PropuestasPage() {
                   className="px-5 py-2.5 text-sm bg-[#52AF32] text-white rounded-xl hover:bg-[#67B52E] disabled:opacity-50 font-medium"
                 >
                   {approveMutation.isPending ? 'Procesando...' : 'Aprobar y Crear Curso'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Rejection Modal */}
+        {rejectingProposal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden">
+              <div className="bg-red-600 px-6 py-4">
+                <h2 className="text-lg font-semibold text-white">Rechazar Propuesta</h2>
+                <p className="text-white/80 text-sm">Indica el motivo del rechazo para que el colaborador pueda entenderlo</p>
+              </div>
+
+              <div className="p-6 space-y-4">
+                {/* Resumen de la propuesta */}
+                <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase tracking-wide">Curso Propuesto</p>
+                      <p className="font-semibold text-[#424846]">{rejectingProposal.course_name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase tracking-wide">Solicitante</p>
+                      <p className="font-medium text-[#424846]">{rejectingProposal.proposer?.full_name}</p>
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-gray-200">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Beneficiario</p>
+                    <p className="font-medium text-[#424846]">{rejectingProposal.profile?.full_name}</p>
+                    {rejectingProposal.profile?.departments?.name && (
+                      <p className="text-sm text-gray-500">{rejectingProposal.profile.departments.name}</p>
+                    )}
+                  </div>
+                  {rejectingProposal.justification && (
+                    <div className="pt-3 border-t border-gray-200">
+                      <p className="text-xs text-gray-500 uppercase tracking-wide">Justificación del colaborador</p>
+                      <p className="text-sm text-gray-700 italic mt-1">&quot;{rejectingProposal.justification}&quot;</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Campo de motivo de rechazo */}
+                <div>
+                  <label className="block text-sm font-medium text-[#424846] mb-1">
+                    Motivo del rechazo *
+                  </label>
+                  <div className="mb-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                    <p className="text-xs text-amber-700 flex items-start gap-2">
+                      <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      <span>
+                        Este mensaje será visible para el colaborador. Sé claro y constructivo al explicar por qué no se puede aprobar esta propuesta.
+                      </span>
+                    </p>
+                  </div>
+                  <textarea
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    rows={4}
+                    placeholder="Ej: El curso no está alineado con los objetivos del área, el costo excede el presupuesto disponible, existe un curso similar ya programado..."
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+                    autoFocus
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Mínimo 20 caracteres</p>
+                </div>
+
+                {/* Warning box */}
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+                  <p className="font-medium mb-1">Al rechazar esta propuesta:</p>
+                  <ul className="list-disc list-inside space-y-1 text-red-600">
+                    <li>El colaborador recibirá una notificación</li>
+                    <li>El motivo del rechazo será visible en su historial</li>
+                    <li>Esta acción no se puede deshacer</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setRejectingProposal(null);
+                    setRejectReason('');
+                  }}
+                  className="px-5 py-2.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleReject}
+                  disabled={rejectMutation.isPending}
+                  className="px-5 py-2.5 text-sm bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50 font-medium"
+                >
+                  {rejectMutation.isPending ? 'Procesando...' : 'Confirmar Rechazo'}
                 </button>
               </div>
             </div>
