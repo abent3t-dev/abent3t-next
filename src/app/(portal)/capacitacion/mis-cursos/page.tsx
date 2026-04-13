@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
 import { createClient } from '@/lib/supabase/client';
+import { PlatformEnrollment, PLATFORM_LABELS } from '@/types/platforms';
 
 interface Evidence {
   id: string;
@@ -166,10 +167,12 @@ function getEffectiveStatus(course: MyCourse): EffectiveStatus {
 export default function MisCursosPage() {
   const { user } = useAuth();
   const [courses, setCourses] = useState<MyCourse[]>([]);
+  const [platformCourses, setPlatformCourses] = useState<PlatformEnrollment[]>([]);
   const [evidences, setEvidences] = useState<Record<string, Evidence[]>>({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
   const [finishingId, setFinishingId] = useState<string | null>(null);
+  const [viewTab, setViewTab] = useState<'internal' | 'external'>('internal');
 
   // Evidence upload modal
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -185,8 +188,18 @@ export default function MisCursosPage() {
   const loadData = async () => {
     if (!user) return;
     try {
+      // Cargar cursos internos
       const data = await api.get<MyCourse[]>(`/enrollments/profile/${user.id}`);
       setCourses(data);
+
+      // Cargar cursos de plataformas externas
+      try {
+        const platformData = await api.get<PlatformEnrollment[]>(`/platforms/enrollments/profile/${user.id}`);
+        setPlatformCourses(platformData);
+      } catch {
+        // Si no hay plataformas configuradas, simplemente no mostrar
+        setPlatformCourses([]);
+      }
 
       const evidencesMap: Record<string, Evidence[]> = {};
       for (const course of data) {
@@ -278,7 +291,7 @@ export default function MisCursosPage() {
     return true;
   });
 
-  // Estadísticas
+  // Estadísticas cursos internos
   const activeCourses = courses.filter((c) => {
     const e = getEffectiveStatus(c);
     return ['inscrito', 'en_curso', 'pendiente_evidencia'].includes(e.effectiveStatus);
@@ -289,6 +302,17 @@ export default function MisCursosPage() {
   const totalHours = courses
     .filter((c) => getEffectiveStatus(c).effectiveStatus === 'completo')
     .reduce((acc, c) => acc + (c.course_editions?.courses?.total_hours || 0), 0);
+
+  // Estadísticas cursos externos (plataformas)
+  const activePlatformCourses = platformCourses.filter((c) =>
+    ['enrolled', 'in_progress'].includes(c.status)
+  ).length;
+
+  const completedPlatformCourses = platformCourses.filter((c) => c.status === 'completed').length;
+
+  const totalPlatformHours = platformCourses
+    .filter((c) => c.status === 'completed')
+    .reduce((acc, c) => acc + (c.platform_courses?.duration_hours || 0), 0);
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('es-MX', {
@@ -369,25 +393,211 @@ export default function MisCursosPage() {
           </button>
         </div>
 
-        {/* Courses List */}
-        {filteredCourses.length === 0 ? (
-          <div className="bg-white rounded-2xl p-12 text-center">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
-              {Icons.book}
-            </div>
-            <p className="text-gray-600 font-medium">
-              {filter === 'active'
-                ? 'No tienes cursos activos'
-                : filter === 'completed'
-                ? 'No tienes cursos completados'
-                : 'No tienes cursos registrados'}
-            </p>
-            <p className="text-gray-400 text-sm mt-1">
-              Los cursos que te inscriban aparecerán aquí
-            </p>
+        {/* Tabs para cambiar entre internos y externos */}
+        {platformCourses.length > 0 && (
+          <div className="flex items-center gap-2 border-b border-gray-200">
+            <button
+              onClick={() => setViewTab('internal')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                viewTab === 'internal'
+                  ? 'border-[#52AF32] text-[#52AF32]'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                {Icons.book}
+                Cursos Internos ({courses.length})
+              </span>
+            </button>
+            <button
+              onClick={() => setViewTab('external')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                viewTab === 'external'
+                  ? 'border-[#52AF32] text-[#52AF32]'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                </svg>
+                Plataformas Externas ({platformCourses.length})
+              </span>
+            </button>
           </div>
-        ) : (
+        )}
+
+        {/* External Platform Courses */}
+        {viewTab === 'external' && platformCourses.length > 0 && (
           <div className="space-y-4">
+            {/* Stats de plataformas */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-white/60 rounded-xl">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-blue-500">{Icons.play}</span>
+                  <span className="text-xs font-semibold text-blue-600 uppercase">En Progreso</span>
+                </div>
+                <p className="text-2xl font-bold text-blue-600">{activePlatformCourses}</p>
+              </div>
+              <div className="p-4 bg-white/60 rounded-xl">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-emerald-500">{Icons.check}</span>
+                  <span className="text-xs font-semibold text-emerald-600 uppercase">Completados</span>
+                </div>
+                <p className="text-2xl font-bold text-emerald-600">{completedPlatformCourses}</p>
+              </div>
+              <div className="p-4 bg-white/60 rounded-xl">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-purple-500">{Icons.clock}</span>
+                  <span className="text-xs font-semibold text-purple-600 uppercase">Horas</span>
+                </div>
+                <p className="text-2xl font-bold text-purple-600">{totalPlatformHours}h</p>
+              </div>
+            </div>
+
+            {/* Lista de cursos de plataformas */}
+            {platformCourses.map((enrollment) => {
+              const course = enrollment.platform_courses;
+              const statusColors: Record<string, string> = {
+                enrolled: 'bg-blue-50 text-blue-700 border-blue-200',
+                in_progress: 'bg-amber-50 text-amber-700 border-amber-200',
+                completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                dropped: 'bg-red-50 text-red-700 border-red-200',
+              };
+              const statusLabels: Record<string, string> = {
+                enrolled: 'Inscrito',
+                in_progress: 'En Progreso',
+                completed: 'Completado',
+                dropped: 'Abandonado',
+              };
+
+              return (
+                <div
+                  key={enrollment.id}
+                  className="bg-white rounded-2xl shadow-sm border overflow-hidden hover:shadow-md transition-all"
+                >
+                  {/* Header */}
+                  <div className={`px-6 py-3 border-b flex items-center justify-between ${statusColors[enrollment.status]?.split(' ')[0] || 'bg-gray-50'}`}>
+                    <div className="flex items-center gap-3">
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${statusColors[enrollment.status] || 'bg-gray-100 text-gray-700'}`}>
+                        {enrollment.status === 'completed' && Icons.check}
+                        {enrollment.status === 'in_progress' && Icons.play}
+                        {enrollment.status === 'enrolled' && Icons.calendar}
+                        {statusLabels[enrollment.status] || enrollment.status}
+                      </span>
+                      {course?.platform_integrations?.platform_type && (
+                        <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-medium">
+                          {PLATFORM_LABELS[course.platform_integrations.platform_type] || course.platform_integrations.platform_type}
+                        </span>
+                      )}
+                    </div>
+                    {enrollment.progress_percentage !== undefined && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-[#52AF32] rounded-full transition-all"
+                            style={{ width: `${enrollment.progress_percentage}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-gray-700">
+                          {enrollment.progress_percentage}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Contenido */}
+                  <div className="p-6">
+                    <h3 className="font-bold text-xl text-gray-900 mb-3">
+                      {course?.title || 'Curso sin nombre'}
+                    </h3>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                      {course?.category && (
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <div className="flex items-center gap-1 text-gray-500 mb-1">
+                            <span className="text-xs">Categoría</span>
+                          </div>
+                          <p className="font-medium text-gray-900 text-sm">{course.category}</p>
+                        </div>
+                      )}
+
+                      {course?.duration_hours && (
+                        <div className="bg-purple-50 rounded-lg p-3">
+                          <div className="flex items-center gap-1 text-purple-600 mb-1">
+                            {Icons.clock}
+                            <span className="text-xs">Duración</span>
+                          </div>
+                          <p className="font-bold text-purple-700">{course.duration_hours} horas</p>
+                        </div>
+                      )}
+
+                      {enrollment.score !== null && enrollment.score !== undefined && (
+                        <div className="bg-emerald-50 rounded-lg p-3">
+                          <div className="flex items-center gap-1 text-emerald-600 mb-1">
+                            {Icons.check}
+                            <span className="text-xs">Calificación</span>
+                          </div>
+                          <p className="font-bold text-emerald-700">{enrollment.score}</p>
+                        </div>
+                      )}
+
+                      {enrollment.completed_at && (
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <div className="flex items-center gap-1 text-gray-500 mb-1">
+                            {Icons.calendar}
+                            <span className="text-xs">Completado</span>
+                          </div>
+                          <p className="font-medium text-gray-900 text-sm">
+                            {formatDate(enrollment.completed_at)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* URL del curso */}
+                    {course?.course_url && (
+                      <div className="mt-4 pt-4 border-t border-gray-100">
+                        <a
+                          href={course.course_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 text-[#52AF32] hover:text-[#67B52E] text-sm font-medium"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                          Ir al curso en {PLATFORM_LABELS[course.platform_integrations?.platform_type || 'other']}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Internal Courses List */}
+        {viewTab === 'internal' && (
+          filteredCourses.length === 0 ? (
+            <div className="bg-white rounded-2xl p-12 text-center">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
+                {Icons.book}
+              </div>
+              <p className="text-gray-600 font-medium">
+                {filter === 'active'
+                  ? 'No tienes cursos activos'
+                  : filter === 'completed'
+                  ? 'No tienes cursos completados'
+                  : 'No tienes cursos registrados'}
+              </p>
+              <p className="text-gray-400 text-sm mt-1">
+                Los cursos que te inscriban aparecerán aquí
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
             {filteredCourses.map((course) => {
               const courseData = course.course_editions?.courses;
               const edition = course.course_editions;
@@ -572,6 +782,7 @@ export default function MisCursosPage() {
               );
             })}
           </div>
+          )
         )}
 
         {/* Upload Modal */}

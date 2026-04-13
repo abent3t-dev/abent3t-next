@@ -138,6 +138,7 @@ export const SIDEBAR_NAV: NavItem[] = [
       { label: 'Tipos de Curso', href: '/catalogs/course-types', icon: 'tag', roles: HR_ADMIN_ROLES },
       { label: 'Modalidades', href: '/catalogs/modalities', icon: 'layers', roles: HR_ADMIN_ROLES },
       { label: 'Periodos', href: '/catalogs/periods', icon: 'calendar', roles: HR_ADMIN_ROLES },
+      { label: 'Plataformas', href: '/catalogs/platforms', icon: 'link', roles: HR_ADMIN_ROLES },
     ],
   },
   // Personal (colaboradores)
