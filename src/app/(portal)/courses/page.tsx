@@ -99,9 +99,6 @@ const emptyCourseForm = {
   modality_id: '',
   total_hours: 0,
   cost: 0,
-  payment_status: 'pending' as PaymentStatus,
-  payment_reference: '',
-  payment_date: '',
   description: '',
 };
 
@@ -113,6 +110,11 @@ const emptyEditionForm = {
   max_participants: '',
   prorate_cost: false,
   require_evidence_for_completion: true,
+  // Campos de costo y pago por edición
+  cost_override: '',
+  payment_status: 'pending' as PaymentStatus,
+  payment_reference: '',
+  payment_date: '',
 };
 
 // Extended course with editions cache
@@ -209,9 +211,6 @@ export default function CoursesPage() {
       modality_id: item.modality_id || '',
       total_hours: item.total_hours,
       cost: item.cost,
-      payment_status: item.payment_status,
-      payment_reference: item.payment_reference || '',
-      payment_date: item.payment_date || '',
       description: item.description || '',
     });
     setModalOpen(true);
@@ -225,8 +224,6 @@ export default function CoursesPage() {
       institution_id: form.institution_id || null,
       course_type_id: form.course_type_id || null,
       modality_id: form.modality_id || null,
-      payment_reference: form.payment_reference || null,
-      payment_date: form.payment_date || null,
       description: form.description || null,
     };
     if (editing) {
@@ -273,6 +270,11 @@ export default function CoursesPage() {
       max_participants: edition.max_participants?.toString() || '',
       prorate_cost: edition.prorate_cost || false,
       require_evidence_for_completion: edition.require_evidence_for_completion ?? true,
+      // Campos de pago
+      cost_override: edition.cost_override?.toString() || '',
+      payment_status: edition.payment_status || 'pending',
+      payment_reference: edition.payment_reference || '',
+      payment_date: edition.payment_date || '',
     });
     setEditionModalOpen(true);
   };
@@ -291,6 +293,13 @@ export default function CoursesPage() {
         : null,
       prorate_cost: editionForm.prorate_cost,
       require_evidence_for_completion: editionForm.require_evidence_for_completion,
+      // Campos de pago por edición
+      cost_override: editionForm.cost_override
+        ? parseFloat(editionForm.cost_override)
+        : null,
+      payment_status: editionForm.payment_status,
+      payment_reference: editionForm.payment_reference || null,
+      payment_date: editionForm.payment_date || null,
     };
     if (editingEdition) {
       await api.put(`/courses/${editionCourseId}/editions/${editingEdition.id}`, payload);
@@ -505,12 +514,6 @@ export default function CoursesPage() {
                             {formatCurrency(course.cost)}
                           </p>
                         </div>
-                        <div className="text-center px-3 border-l border-gray-100">
-                          <p className="text-gray-400 text-xs uppercase tracking-wide">Pago</p>
-                          <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full border ${paymentColors[course.payment_status]}`}>
-                            {paymentLabels[course.payment_status]}
-                          </span>
-                        </div>
                       </div>
 
                       {/* Actions */}
@@ -555,9 +558,6 @@ export default function CoursesPage() {
                     </span>
                     <span className="flex items-center gap-1 text-gray-600">
                       {Icons.money} {formatCurrency(course.cost)}
-                    </span>
-                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${paymentColors[course.payment_status]}`}>
-                      {paymentLabels[course.payment_status]}
                     </span>
                   </div>
                 </div>
@@ -656,6 +656,19 @@ export default function CoursesPage() {
                                       <span className="flex items-center gap-1">
                                         {Icons.users}
                                         Máx. {edition.max_participants}
+                                      </span>
+                                    )}
+                                    {/* Costo efectivo de la edición */}
+                                    {(edition.cost_override !== null && edition.cost_override !== undefined) && (
+                                      <span className="flex items-center gap-1 text-[#DFA922] font-medium">
+                                        {Icons.money}
+                                        {formatCurrency(edition.cost_override)}
+                                      </span>
+                                    )}
+                                    {/* Estado de pago de la edición */}
+                                    {edition.payment_status && (
+                                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${paymentColors[edition.payment_status]}`}>
+                                        {paymentLabels[edition.payment_status]}
                                       </span>
                                     )}
                                     {edition.prorate_cost && (
@@ -787,40 +800,6 @@ export default function CoursesPage() {
           </label>
         </div>
         <label className="block text-sm font-medium text-gray-700">
-          Estatus de pago
-          <select
-            value={form.payment_status}
-            onChange={(e) => setForm({ ...form, payment_status: e.target.value as PaymentStatus })}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
-          >
-            <option value="pending">Pendiente</option>
-            <option value="paid">Pagado</option>
-            <option value="cancelled">Cancelado</option>
-            <option value="na">N/A</option>
-          </select>
-        </label>
-        <div className="grid grid-cols-2 gap-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Referencia de pago
-            <input
-              type="text"
-              value={form.payment_reference}
-              onChange={(e) => setForm({ ...form, payment_reference: e.target.value })}
-              placeholder="Factura, transferencia, etc."
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
-            />
-          </label>
-          <label className="block text-sm font-medium text-gray-700">
-            Fecha de pago
-            <input
-              type="date"
-              value={form.payment_date}
-              onChange={(e) => setForm({ ...form, payment_date: e.target.value })}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
-            />
-          </label>
-        </div>
-        <label className="block text-sm font-medium text-gray-700">
           Descripción
           <textarea
             value={form.description}
@@ -916,6 +895,66 @@ export default function CoursesPage() {
               Sin diploma/evidencia aprobada, el colaborador NO puede inscribirse en otro curso.
             </p>
           </label>
+        </div>
+
+        {/* Sección de Costo y Pago de la Edición */}
+        <div className="border-t border-gray-200 pt-4 mt-2">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            {Icons.money}
+            Costo y Pago de esta Edición
+          </h4>
+
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Costo específico (opcional)
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={editionForm.cost_override}
+              onChange={(e) => setEditionForm({ ...editionForm, cost_override: e.target.value })}
+              placeholder="Dejar vacío para usar costo del curso"
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Si esta edición tiene un costo diferente al del curso base
+            </p>
+          </label>
+
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Estado de pago
+            <select
+              value={editionForm.payment_status}
+              onChange={(e) => setEditionForm({ ...editionForm, payment_status: e.target.value as PaymentStatus })}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
+            >
+              <option value="pending">Pendiente</option>
+              <option value="paid">Pagado</option>
+              <option value="cancelled">Cancelado</option>
+              <option value="na">N/A</option>
+            </select>
+          </label>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm font-medium text-gray-700">
+              Referencia de pago
+              <input
+                type="text"
+                value={editionForm.payment_reference}
+                onChange={(e) => setEditionForm({ ...editionForm, payment_reference: e.target.value })}
+                placeholder="Factura, transferencia..."
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
+              />
+            </label>
+            <label className="block text-sm font-medium text-gray-700">
+              Fecha de pago
+              <input
+                type="date"
+                value={editionForm.payment_date}
+                onChange={(e) => setEditionForm({ ...editionForm, payment_date: e.target.value })}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
+              />
+            </label>
+          </div>
         </div>
       </CatalogModal>
     </div>
