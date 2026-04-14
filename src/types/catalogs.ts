@@ -116,6 +116,9 @@ export interface CourseEnrollment {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // Campos de semáforo (agregados por el backend)
+  has_approved_evidence: boolean;
+  requires_evidence: boolean;
   profiles: {
     id: string;
     full_name: string;
@@ -129,6 +132,7 @@ export interface CourseEnrollment {
     start_date: string;
     end_date: string | null;
     max_participants: number | null;
+    require_evidence_for_completion?: boolean;
     courses: { id: string; name: string } | null;
   } | null;
 }

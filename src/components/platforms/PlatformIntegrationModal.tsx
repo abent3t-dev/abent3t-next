@@ -109,20 +109,27 @@ export default function PlatformIntegrationModal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-        {/* Backdrop */}
-        <div
-          className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
-          onClick={onClose}
-        />
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
+        onClick={onClose}
+      />
 
+      <div className="flex min-h-full items-center justify-center p-4">
         {/* Modal */}
-        <div className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+        <div className="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-lg">
           <form onSubmit={handleSubmit}>
-            <div className="bg-white px-4 pb-4 pt-5 sm:p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#52AF32] to-[#67B52E] px-6 py-4">
+              <h3 className="text-lg font-semibold text-white">
                 {isEditing ? 'Editar Integración' : 'Nueva Integración de Plataforma'}
               </h3>
+              <p className="text-green-100 text-sm mt-1">
+                {isEditing ? 'Modifica las credenciales y configuración' : 'Conecta con una plataforma de e-learning'}
+              </p>
+            </div>
+
+            <div className="px-6 py-5 max-h-[60vh] overflow-y-auto">
 
               <div className="space-y-4">
                 {/* Institución */}
@@ -268,21 +275,24 @@ export default function PlatformIntegrationModal({
             </div>
 
             {/* Acciones */}
-            <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 gap-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="inline-flex w-full justify-center rounded-md bg-[#52AF32] px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#67B52E] sm:ml-3 sm:w-auto disabled:opacity-50"
-              >
-                {loading ? 'Guardando...' : isEditing ? 'Guardar Cambios' : 'Crear Integración'}
-              </button>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-2xl">
               <button
                 type="button"
                 onClick={onClose}
                 disabled={loading}
-                className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
+                className="px-5 py-2.5 text-gray-700 hover:bg-gray-200 rounded-xl font-medium transition-colors"
               >
                 Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-5 py-2.5 bg-[#52AF32] text-white rounded-xl hover:bg-[#67B52E] disabled:opacity-50 flex items-center gap-2 font-medium transition-colors"
+              >
+                {loading && (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
+                {loading ? 'Guardando...' : isEditing ? 'Guardar Cambios' : 'Crear Integración'}
               </button>
             </div>
           </form>

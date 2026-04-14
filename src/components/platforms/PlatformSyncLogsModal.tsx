@@ -31,24 +31,26 @@ export default function PlatformSyncLogsModal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-        {/* Backdrop */}
-        <div
-          className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
-          onClick={onClose}
-        />
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
+        onClick={onClose}
+      />
 
+      <div className="flex min-h-full items-center justify-center p-4">
         {/* Modal */}
-        <div className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
-          <div className="bg-white px-4 pb-4 pt-5 sm:p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Historial de Sincronización
-              </h3>
-              <span className="text-sm text-gray-500">
-                {integration.institutions?.name || 'Sin nombre'}
-              </span>
-            </div>
+        <div className="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-2xl">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+            <h3 className="text-lg font-semibold text-white">
+              Historial de Sincronización
+            </h3>
+            <p className="text-blue-100 text-sm mt-1">
+              {integration.institutions?.name || 'Sin nombre'}
+            </p>
+          </div>
+
+          <div className="px-6 py-5">
 
             {isLoading ? (
               <div className="flex justify-center py-8">
@@ -149,11 +151,11 @@ export default function PlatformSyncLogsModal({
           </div>
 
           {/* Footer */}
-          <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+          <div className="flex justify-end px-6 py-4 border-t bg-gray-50 rounded-b-2xl">
             <button
               type="button"
               onClick={onClose}
-              className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
+              className="px-5 py-2.5 text-gray-700 hover:bg-gray-200 rounded-xl font-medium transition-colors"
             >
               Cerrar
             </button>

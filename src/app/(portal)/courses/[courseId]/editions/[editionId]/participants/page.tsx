@@ -83,14 +83,66 @@ const roleColors: Record<string, string> = {
   executive: 'bg-orange-100 text-orange-800 border border-orange-200',
 };
 
-// Semáforo visual: colores de círculo indicador
+// Semáforo visual: colores de círculo indicador (base)
 const trafficLightColors: Record<EnrollmentStatus, string> = {
   inscrito: 'bg-blue-500',      // Azul: recién inscrito
   en_curso: 'bg-yellow-500',    // Amarillo: en progreso
-  completo: 'bg-green-500',     // Verde: completado
-  pendiente_evidencia: 'bg-orange-500', // Naranja: falta evidencia
-  cancelado: 'bg-red-500',      // Rojo: cancelado
+  completo: 'bg-green-500',     // Verde: completado CON evidencia aprobada
+  pendiente_evidencia: 'bg-red-500', // Rojo: falta evidencia (regla de Denisse)
+  cancelado: 'bg-gray-400',      // Gris: cancelado
 };
+
+/**
+ * Calcula el color del semáforo considerando el estado Y la evidencia aprobada.
+ * Regla: "verde = completado Y diploma recibido, rojo = pendiente"
+ */
+function getTrafficLightColor(enrollment: CourseEnrollment): string {
+  const { status, has_approved_evidence, requires_evidence } = enrollment;
+
+  // Si no requiere evidencia, el semáforo sigue el estado normal
+  if (!requires_evidence) {
+    return trafficLightColors[status];
+  }
+
+  // Si está completo pero NO tiene evidencia aprobada → mostrar rojo (pendiente)
+  if (status === 'completo' && !has_approved_evidence) {
+    return 'bg-orange-500'; // Naranja: completó pero falta diploma
+  }
+
+  // Si tiene evidencia aprobada pero aún no está marcado como completo
+  if (status === 'pendiente_evidencia' && has_approved_evidence) {
+    return 'bg-yellow-500'; // Amarillo: tiene diploma, falta actualizar status
+  }
+
+  return trafficLightColors[status];
+}
+
+/**
+ * Obtiene el tooltip descriptivo del semáforo
+ */
+function getTrafficLightTooltip(enrollment: CourseEnrollment): string {
+  const { status, has_approved_evidence, requires_evidence } = enrollment;
+
+  if (!requires_evidence) {
+    return statusLabels[status];
+  }
+
+  if (status === 'completo' && has_approved_evidence) {
+    return 'Completado con diploma aprobado ✓';
+  }
+
+  if (status === 'completo' && !has_approved_evidence) {
+    return 'Completado pero SIN diploma aprobado';
+  }
+
+  if (status === 'pendiente_evidencia') {
+    return has_approved_evidence
+      ? 'Diploma aprobado, pendiente actualizar status'
+      : 'Pendiente subir diploma';
+  }
+
+  return statusLabels[status];
+}
 
 export default function ParticipantsPage() {
   const params = useParams();
@@ -380,8 +432,8 @@ export default function ParticipantsPage() {
                   ) : (
                     <div className="flex items-center gap-2">
                       <span
-                        className={`w-3 h-3 rounded-full ${trafficLightColors[enrollment.status]}`}
-                        title={`Semáforo: ${statusLabels[enrollment.status]}`}
+                        className={`w-3 h-3 rounded-full ${getTrafficLightColor(enrollment)}`}
+                        title={getTrafficLightTooltip(enrollment)}
                       />
                       <span
                         className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full cursor-pointer ${statusColors[enrollment.status]}`}
@@ -390,6 +442,15 @@ export default function ParticipantsPage() {
                       >
                         {statusLabels[enrollment.status]}
                       </span>
+                      {/* Indicador de evidencia */}
+                      {enrollment.requires_evidence && (
+                        <span
+                          className={`text-xs ${enrollment.has_approved_evidence ? 'text-green-600' : 'text-orange-600'}`}
+                          title={enrollment.has_approved_evidence ? 'Diploma aprobado' : 'Sin diploma'}
+                        >
+                          {enrollment.has_approved_evidence ? '📄✓' : '📄⚠'}
+                        </span>
+                      )}
                     </div>
                   )}
                 </td>
