@@ -15,7 +15,12 @@ export type UserRole =
   | 'aprobador_nivel_2'     // Segundo nivel (Gilberto)
   | 'aprobador_nivel_3'     // Tercer nivel (Uriel)
   | 'director_general'      // Aprobacion final
-  | 'solicitante';          // Usuario que solicita compras
+  | 'solicitante'           // Usuario que solicita compras
+  // Roles de Contabilidad y Fiscal
+  | 'contabilidad'          // Equipo de contabilidad (Irene, Henry)
+  | 'fiscal'                // Especialista fiscal (Francisco)
+  | 'director_financiero'   // Director financiero
+  | 'accionista';           // Accionista (solo lectura)
 
 export interface UserProfile {
   id: string;
@@ -78,6 +83,22 @@ const PURCHASE_ADMINS: UserRole[] = ['super_admin', 'lider_procura'];
 // Todos los roles de compras (incluyendo super_admin para acceso completo)
 const ALL_PURCHASE_ROLES: UserRole[] = ['super_admin', ...PURCHASE_TEAM, ...APPROVERS, 'solicitante'];
 
+// ==========================================
+// GRUPOS DE ROLES - CONTABILIDAD Y FISCAL
+// ==========================================
+
+// Equipo de contabilidad y fiscal
+const ACCOUNTING_TEAM: UserRole[] = ['contabilidad', 'fiscal'];
+
+// Roles con acceso de lectura a contabilidad
+const ACCOUNTING_VIEWERS: UserRole[] = ['super_admin', ...ACCOUNTING_TEAM, 'director_financiero', 'accionista', 'executive'];
+
+// Roles con acceso de edicion a contabilidad
+const ACCOUNTING_EDITORS: UserRole[] = ['super_admin', 'contabilidad', 'fiscal'];
+
+// Todos los roles de contabilidad
+const ALL_ACCOUNTING_ROLES: UserRole[] = ['super_admin', ...ACCOUNTING_TEAM, 'director_financiero', 'accionista'];
+
 /** Navegacion principal del sidebar */
 export const SIDEBAR_NAV: NavItem[] = [
   // Administracion del Sistema (Solo Super Admin)
@@ -124,6 +145,29 @@ export const SIDEBAR_NAV: NavItem[] = [
       { label: 'Ordenes (PO)', href: '/compras/ordenes', icon: 'clipboard', roles: ['super_admin', ...PURCHASE_TEAM] },
       { label: 'Proveedores', href: '/compras/proveedores', icon: 'truck', roles: ['super_admin', ...PURCHASE_TEAM] },
       { label: 'Reportes', href: '/compras/reportes', icon: 'bar-chart', roles: ['super_admin', ...PURCHASE_TEAM, ...APPROVERS, ...EXEC_ROLES] },
+    ],
+  },
+  // ==========================================
+  // MODULO DE CONTABILIDAD Y COMPLIANCE FISCAL
+  // ==========================================
+  {
+    label: 'Contabilidad',
+    href: '/contabilidad/dashboard',
+    icon: 'calculator',
+    roles: ACCOUNTING_VIEWERS,
+    children: [
+      { label: 'Dashboard', href: '/contabilidad/dashboard', icon: 'chart', roles: ACCOUNTING_VIEWERS },
+      { label: 'EBITDA', href: '/contabilidad/ebitda', icon: 'trending-up', roles: ACCOUNTING_VIEWERS },
+      { label: 'Costos', href: '/contabilidad/costos', icon: 'dollar', roles: ACCOUNTING_VIEWERS },
+      { label: 'Utilidad', href: '/contabilidad/utilidad', icon: 'pie-chart', roles: ACCOUNTING_VIEWERS },
+      { label: 'Perdidas Fiscales', href: '/contabilidad/perdidas-fiscales', icon: 'alert-triangle', roles: [...ACCOUNTING_EDITORS, 'director_financiero'] },
+      { label: 'No Deducibles', href: '/contabilidad/no-deducibles', icon: 'x-circle', roles: [...ACCOUNTING_EDITORS, 'director_financiero'] },
+      { label: 'Financiamiento', href: '/contabilidad/financiamiento', icon: 'credit-card', roles: ACCOUNTING_VIEWERS },
+      { label: 'Tenencia', href: '/contabilidad/tenencia', icon: 'users', roles: ['super_admin', 'director_financiero', 'accionista'] },
+      { label: 'OKRs', href: '/contabilidad/okrs', icon: 'target', roles: ACCOUNTING_EDITORS },
+      { label: 'Complementos Pago', href: '/contabilidad/complementos-pago', icon: 'file-check', roles: ACCOUNTING_EDITORS },
+      { label: 'Compliance', href: '/contabilidad/compliance', icon: 'shield', roles: ACCOUNTING_EDITORS },
+      { label: 'Configuracion', href: '/contabilidad/configuracion', icon: 'settings', roles: ['super_admin'] },
     ],
   },
   // Catalogos (solo admins de RRHH)
@@ -182,6 +226,11 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   aprobador_nivel_3: 'Aprobador Nivel 3',
   director_general: 'Director General',
   solicitante: 'Solicitante',
+  // Roles de Contabilidad
+  contabilidad: 'Contabilidad',
+  fiscal: 'Fiscal',
+  director_financiero: 'Director Financiero',
+  accionista: 'Accionista',
 };
 
 /** Pagina de inicio por rol */
@@ -202,6 +251,11 @@ export const HOME_ROUTES: Record<UserRole, string> = {
   aprobador_nivel_3: '/compras/aprobaciones',
   director_general: '/compras/aprobaciones',
   solicitante: '/compras/solicitudes',
+  // Roles de Contabilidad
+  contabilidad: '/contabilidad/dashboard',
+  fiscal: '/contabilidad/dashboard',
+  director_financiero: '/contabilidad/dashboard',
+  accionista: '/contabilidad/tenencia',
 };
 
 /** Roles que pueden gestionar usuarios */
@@ -221,3 +275,12 @@ export const APPROVER_ROLES = APPROVERS;
 
 /** Roles de administradores de compras (para exportar) */
 export const PURCHASE_ADMIN_ROLES = PURCHASE_ADMINS;
+
+/** Roles del equipo de contabilidad (para exportar) */
+export const ACCOUNTING_TEAM_ROLES = ACCOUNTING_TEAM;
+
+/** Roles con acceso de lectura a contabilidad (para exportar) */
+export const ACCOUNTING_VIEWER_ROLES = ACCOUNTING_VIEWERS;
+
+/** Roles con acceso de edicion a contabilidad (para exportar) */
+export const ACCOUNTING_EDITOR_ROLES = ACCOUNTING_EDITORS;
