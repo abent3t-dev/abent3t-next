@@ -25,7 +25,9 @@ export type ApprovalStatus = 'pendiente' | 'aprobada' | 'rechazada' | 'esperando
 
 // Estados de PO
 export type POStatus =
-  | 'emitida'
+  | 'borrador'
+  | 'enviada'
+  | 'confirmada'
   | 'en_transito'
   | 'entregada_parcial'
   | 'entregada_completa'
@@ -315,7 +317,9 @@ export const REQUISITION_STATUS_COLORS: Record<RequisitionStatus, string> = {
 };
 
 export const PO_STATUS_LABELS: Record<POStatus, string> = {
-  emitida: 'Emitida',
+  borrador: 'Borrador',
+  enviada: 'Enviada',
+  confirmada: 'Confirmada',
   en_transito: 'En Transito',
   entregada_parcial: 'Entregada Parcial',
   entregada_completa: 'Entregada Completa',
@@ -323,7 +327,9 @@ export const PO_STATUS_LABELS: Record<POStatus, string> = {
 };
 
 export const PO_STATUS_COLORS: Record<POStatus, string> = {
-  emitida: 'blue',
+  borrador: 'gray',
+  enviada: 'blue',
+  confirmada: 'indigo',
   en_transito: 'yellow',
   entregada_parcial: 'orange',
   entregada_completa: 'green',

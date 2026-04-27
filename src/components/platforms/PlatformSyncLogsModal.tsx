@@ -137,7 +137,7 @@ export default function PlatformSyncLogsModal({
                                 Ver errores
                               </summary>
                               <pre className="mt-1 text-xs text-red-700 whitespace-pre-wrap max-w-xs overflow-x-auto">
-                                {log.error_details}
+                                {JSON.stringify(log.error_details, null, 2)}
                               </pre>
                             </details>
                           )}

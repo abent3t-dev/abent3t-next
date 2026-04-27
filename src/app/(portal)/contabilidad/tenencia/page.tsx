@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { ShareholdingRecord, ShareholdingDetail } from '@/types/accounting';
@@ -136,7 +137,7 @@ export default function TenenciaPage() {
               <div className="relative h-64 flex items-center justify-center">
                 {/* Simple SVG Pie Chart */}
                 <svg viewBox="0 0 100 100" className="w-48 h-48">
-                  {tenencia?.details?.reduce((acc: { offset: number; elements: JSX.Element[] }, detail, index) => {
+                  {tenencia?.details?.reduce((acc: { offset: number; elements: React.ReactElement[] }, detail, index) => {
                     const percentage = detail.porcentaje;
                     const circumference = 2 * Math.PI * 15.9155;
                     const strokeDasharray = `${(percentage / 100) * circumference} ${circumference}`;

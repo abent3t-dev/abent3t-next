@@ -305,14 +305,14 @@ export default function MisCursosPage() {
 
   // Estadísticas cursos externos (plataformas)
   const activePlatformCourses = platformCourses.filter((c) =>
-    ['enrolled', 'in_progress'].includes(c.status)
+    ['not_started', 'in_progress'].includes(c.status)
   ).length;
 
   const completedPlatformCourses = platformCourses.filter((c) => c.status === 'completed').length;
 
   const totalPlatformHours = platformCourses
     .filter((c) => c.status === 'completed')
-    .reduce((acc, c) => acc + (c.platform_courses?.duration_hours || 0), 0);
+    .reduce((acc, c) => acc + (c.platform_courses?.total_hours || 0), 0);
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('es-MX', {
@@ -459,16 +459,16 @@ export default function MisCursosPage() {
             {platformCourses.map((enrollment) => {
               const course = enrollment.platform_courses;
               const statusColors: Record<string, string> = {
-                enrolled: 'bg-blue-50 text-blue-700 border-blue-200',
+                not_started: 'bg-blue-50 text-blue-700 border-blue-200',
                 in_progress: 'bg-amber-50 text-amber-700 border-amber-200',
                 completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                dropped: 'bg-red-50 text-red-700 border-red-200',
+                expired: 'bg-red-50 text-red-700 border-red-200',
               };
               const statusLabels: Record<string, string> = {
-                enrolled: 'Inscrito',
+                not_started: 'No iniciado',
                 in_progress: 'En Progreso',
                 completed: 'Completado',
-                dropped: 'Abandonado',
+                expired: 'Expirado',
               };
 
               return (
@@ -482,7 +482,7 @@ export default function MisCursosPage() {
                       <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${statusColors[enrollment.status] || 'bg-gray-100 text-gray-700'}`}>
                         {enrollment.status === 'completed' && Icons.check}
                         {enrollment.status === 'in_progress' && Icons.play}
-                        {enrollment.status === 'enrolled' && Icons.calendar}
+                        {enrollment.status === 'not_started' && Icons.calendar}
                         {statusLabels[enrollment.status] || enrollment.status}
                       </span>
                       {course?.platform_integrations?.platform_type && (
@@ -509,36 +509,27 @@ export default function MisCursosPage() {
                   {/* Contenido */}
                   <div className="p-6">
                     <h3 className="font-bold text-xl text-gray-900 mb-3">
-                      {course?.title || 'Curso sin nombre'}
+                      {course?.name || 'Curso sin nombre'}
                     </h3>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                      {course?.category && (
-                        <div className="bg-gray-50 rounded-lg p-3">
-                          <div className="flex items-center gap-1 text-gray-500 mb-1">
-                            <span className="text-xs">Categoría</span>
-                          </div>
-                          <p className="font-medium text-gray-900 text-sm">{course.category}</p>
-                        </div>
-                      )}
-
-                      {course?.duration_hours && (
+                      {course?.total_hours ? (
                         <div className="bg-purple-50 rounded-lg p-3">
                           <div className="flex items-center gap-1 text-purple-600 mb-1">
                             {Icons.clock}
                             <span className="text-xs">Duración</span>
                           </div>
-                          <p className="font-bold text-purple-700">{course.duration_hours} horas</p>
+                          <p className="font-bold text-purple-700">{course.total_hours} horas</p>
                         </div>
-                      )}
+                      ) : null}
 
-                      {enrollment.score !== null && enrollment.score !== undefined && (
+                      {enrollment.progress_percentage !== undefined && (
                         <div className="bg-emerald-50 rounded-lg p-3">
                           <div className="flex items-center gap-1 text-emerald-600 mb-1">
                             {Icons.check}
-                            <span className="text-xs">Calificación</span>
+                            <span className="text-xs">Progreso</span>
                           </div>
-                          <p className="font-bold text-emerald-700">{enrollment.score}</p>
+                          <p className="font-bold text-emerald-700">{enrollment.progress_percentage}%</p>
                         </div>
                       )}
 
