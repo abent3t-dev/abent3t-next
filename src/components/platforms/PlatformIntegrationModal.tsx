@@ -5,7 +5,6 @@ import {
   PlatformIntegration,
   CreateIntegrationDto,
   PlatformType,
-  PLATFORM_LABELS,
 } from '@/types/platforms';
 import { Institution } from '@/types/catalogs';
 

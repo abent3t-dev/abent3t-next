@@ -127,7 +127,7 @@ export default function PlatformsPage() {
       } else {
         notify.error(result.message);
       }
-    } catch (error) {
+    } catch {
       notify.error('Error al probar conexión');
     } finally {
       setTestingConnection(null);
