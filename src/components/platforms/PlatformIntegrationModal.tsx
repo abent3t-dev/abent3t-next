@@ -26,6 +26,17 @@ const PLATFORM_OPTIONS: { value: PlatformType; label: string }[] = [
   { value: 'other', label: 'Otra' },
 ];
 
+const CREHANA_API_URL = 'https://www.crehana.com/api/v5/rest';
+
+// Por plataforma: cómo se llaman las credenciales y qué URL base usan.
+const CREDENTIAL_LABELS: Record<PlatformType, { publicKey: string; privateKey: string; requiresSlug: boolean; defaultUrl?: string }> = {
+  crehana: { publicKey: 'API Key', privateKey: 'Secret Key', requiresSlug: true, defaultUrl: CREHANA_API_URL },
+  udemy_business: { publicKey: 'Client ID', privateKey: 'Client Secret', requiresSlug: false },
+  linkedin_learning: { publicKey: 'Client ID', privateKey: 'Client Secret', requiresSlug: false },
+  coursera: { publicKey: 'Client ID', privateKey: 'Client Secret', requiresSlug: false },
+  other: { publicKey: 'Clave Pública', privateKey: 'Clave Privada', requiresSlug: false },
+};
+
 export default function PlatformIntegrationModal({
   open,
   onClose,
@@ -39,7 +50,8 @@ export default function PlatformIntegrationModal({
   const [form, setForm] = useState<CreateIntegrationDto>({
     institution_id: '',
     platform_type: 'crehana',
-    api_url: '',
+    api_url: CREHANA_API_URL,
+    organization_slug: '',
     public_key: '',
     private_key: '',
     sync_enabled: true,
@@ -55,6 +67,7 @@ export default function PlatformIntegrationModal({
         institution_id: integration.institution_id,
         platform_type: integration.platform_type,
         api_url: integration.api_url || '',
+        organization_slug: integration.organization_slug || '',
         public_key: integration.public_key || '',
         private_key: '', // Nunca se devuelve del backend
         sync_enabled: integration.sync_enabled,
@@ -66,7 +79,8 @@ export default function PlatformIntegrationModal({
       setForm({
         institution_id: institutions[0]?.id || '',
         platform_type: 'crehana',
-        api_url: '',
+        api_url: CREHANA_API_URL,
+        organization_slug: '',
         public_key: '',
         private_key: '',
         sync_enabled: true,
@@ -77,12 +91,33 @@ export default function PlatformIntegrationModal({
     }
   }, [integration, institutions]);
 
+  // Al cambiar de plataforma, ajustar la URL base default si está vacía
+  // o si coincide con la URL default de otra plataforma.
+  const handlePlatformChange = (newType: PlatformType) => {
+    setForm((prev) => {
+      const newDefault = CREDENTIAL_LABELS[newType].defaultUrl;
+      const prevDefault = CREDENTIAL_LABELS[prev.platform_type].defaultUrl;
+      const apiUrlIsDefault = !prev.api_url || prev.api_url === prevDefault;
+      return {
+        ...prev,
+        platform_type: newType,
+        api_url: apiUrlIsDefault ? (newDefault ?? '') : prev.api_url,
+        organization_slug: CREDENTIAL_LABELS[newType].requiresSlug ? prev.organization_slug : '',
+      };
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validaciones
     if (!form.institution_id) {
       alert('Selecciona una institución');
+      return;
+    }
+
+    if (CREDENTIAL_LABELS[form.platform_type].requiresSlug && !form.organization_slug?.trim()) {
+      alert('El slug de la organización es requerido para esta plataforma');
       return;
     }
 
@@ -156,7 +191,7 @@ export default function PlatformIntegrationModal({
                   Tipo de Plataforma
                   <select
                     value={form.platform_type}
-                    onChange={(e) => updateField('platform_type', e.target.value as PlatformType)}
+                    onChange={(e) => handlePlatformChange(e.target.value as PlatformType)}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
                   >
                     {PLATFORM_OPTIONS.map((opt) => (
@@ -178,13 +213,30 @@ export default function PlatformIntegrationModal({
                         type="url"
                         value={form.api_url}
                         onChange={(e) => updateField('api_url', e.target.value)}
-                        placeholder="https://api.crehana.com/v1"
+                        placeholder={CREDENTIAL_LABELS[form.platform_type].defaultUrl ?? 'https://...'}
                         className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
                       />
                     </label>
 
+                    {CREDENTIAL_LABELS[form.platform_type].requiresSlug && (
+                      <label className="block text-sm font-medium text-gray-700">
+                        Slug de la Organización
+                        <input
+                          type="text"
+                          required
+                          value={form.organization_slug}
+                          onChange={(e) => updateField('organization_slug', e.target.value)}
+                          placeholder="abent-3t"
+                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          Identificador de tu organización en la URL de la plataforma.
+                        </p>
+                      </label>
+                    )}
+
                     <label className="block text-sm font-medium text-gray-700">
-                      Clave Pública (Public Key)
+                      {CREDENTIAL_LABELS[form.platform_type].publicKey}
                       <input
                         type="text"
                         value={form.public_key}
@@ -194,7 +246,7 @@ export default function PlatformIntegrationModal({
                     </label>
 
                     <label className="block text-sm font-medium text-gray-700">
-                      Clave Privada (Private Key)
+                      {CREDENTIAL_LABELS[form.platform_type].privateKey}
                       <input
                         type="password"
                         value={form.private_key}

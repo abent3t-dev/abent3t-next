@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
@@ -10,7 +10,6 @@ import {
   PlatformIntegration,
   CreateIntegrationDto,
   ConnectionTestResult,
-  SyncResult,
   PLATFORM_LABELS,
   SYNC_STATUS_LABELS,
   SYNC_STATUS_COLORS,
@@ -29,13 +28,41 @@ export default function PlatformsPage() {
   const [logsModalOpen, setLogsModalOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<PlatformIntegration | null>(null);
   const [testingConnection, setTestingConnection] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState<string | null>(null);
+  const [startingSync, setStartingSync] = useState<string | null>(null);
 
-  // Obtener integraciones
+  // Obtener integraciones. Auto-refetch cada 5s mientras alguna esté sincronizando,
+  // para que la UI refleje cuando termine el sync en background.
   const { data: integrations = [], isLoading } = useQuery({
     queryKey: ['platform-integrations'],
     queryFn: () => api.get<PlatformIntegration[]>('/platforms'),
+    refetchInterval: (query) => {
+      const data = query.state.data as PlatformIntegration[] | undefined;
+      return data?.some((i) => i.last_sync_status === 'in_progress') ? 5000 : false;
+    },
   });
+
+  // Detectar transición in_progress → completed/failed para mostrar notificación final.
+  const prevStatusRef = useRef<Record<string, string>>({});
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    const next: Record<string, string> = {};
+
+    for (const integration of integrations) {
+      const previous = prev[integration.id];
+      const current = integration.last_sync_status;
+      next[integration.id] = current;
+
+      if (previous === 'in_progress' && current === 'completed') {
+        notify.success(`Sincronización con ${integration.institutions?.name ?? 'la plataforma'} completada`);
+      } else if (previous === 'in_progress' && current === 'failed') {
+        notify.error(
+          `Sincronización con ${integration.institutions?.name ?? 'la plataforma'} falló: ${integration.last_sync_error ?? 'error desconocido'}`,
+        );
+      }
+    }
+
+    prevStatusRef.current = next;
+  }, [integrations]);
 
   // Obtener instituciones tipo "platform" para crear nuevas integraciones
   const { data: institutions = [] } = useQuery({
@@ -107,23 +134,22 @@ export default function PlatformsPage() {
     }
   };
 
-  // Sincronizar
+  // Iniciar sincronización (fire-and-forget). El backend procesa en background
+  // y la UI detecta el fin del sync vía polling automático cada 5s.
   const handleSync = async (id: string) => {
-    setSyncing(id);
+    setStartingSync(id);
     try {
-      const result = await api.post<SyncResult>(`/platforms/${id}/sync`, { sync_type: 'full' });
-      if (result.success) {
-        notify.success(
-          `Sincronización completada: ${result.courses_synced} cursos, ${result.enrollments_synced} inscripciones`
-        );
-        queryClient.invalidateQueries({ queryKey: ['platform-integrations'] });
-      } else {
-        notify.error('La sincronización falló');
-      }
+      await api.post<{ status: string; sync_log_id: string; message: string }>(
+        `/platforms/${id}/sync`,
+        { sync_type: 'full' },
+      );
+      notify.info('Sincronización iniciada en segundo plano. Esto puede tardar varios minutos.');
+      queryClient.invalidateQueries({ queryKey: ['platform-integrations'] });
     } catch (error) {
-      notify.error('Error al sincronizar');
+      const msg = error instanceof Error ? error.message : 'Error al iniciar sincronización';
+      notify.error(msg);
     } finally {
-      setSyncing(null);
+      setStartingSync(null);
     }
   };
 
@@ -211,7 +237,9 @@ export default function PlatformsPage() {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {integrations.map((integration) => (
+          {integrations.map((integration) => {
+            const isSyncing = integration.last_sync_status === 'in_progress';
+            return (
             <div
               key={integration.id}
               className="bg-white rounded-lg border shadow-sm hover:shadow-md transition-shadow"
@@ -229,10 +257,13 @@ export default function PlatformsPage() {
                   </div>
                   {/* Estado de sincronización */}
                   <span
-                    className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${
                       SYNC_STATUS_COLORS[integration.last_sync_status]
                     }`}
                   >
+                    {isSyncing && (
+                      <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                    )}
                     {SYNC_STATUS_LABELS[integration.last_sync_status]}
                   </span>
                 </div>
@@ -274,17 +305,28 @@ export default function PlatformsPage() {
                 <div className="flex items-center gap-2 mt-4 pt-4 border-t">
                   <button
                     onClick={() => handleTestConnection(integration.id)}
-                    disabled={testingConnection === integration.id}
+                    disabled={testingConnection === integration.id || isSyncing}
                     className="flex-1 px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
                   >
                     {testingConnection === integration.id ? 'Probando...' : 'Probar'}
                   </button>
                   <button
                     onClick={() => handleSync(integration.id)}
-                    disabled={syncing === integration.id || !integration.has_private_key}
-                    className="flex-1 px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                    disabled={
+                      startingSync === integration.id ||
+                      isSyncing ||
+                      !integration.has_private_key
+                    }
+                    className="flex-1 px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-1.5"
                   >
-                    {syncing === integration.id ? 'Sincronizando...' : 'Sincronizar'}
+                    {(startingSync === integration.id || isSyncing) && (
+                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    )}
+                    {startingSync === integration.id
+                      ? 'Iniciando...'
+                      : isSyncing
+                        ? 'Sincronizando...'
+                        : 'Sincronizar'}
                   </button>
                   <button
                     onClick={() => handleViewLogs(integration)}
@@ -320,7 +362,8 @@ export default function PlatformsPage() {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

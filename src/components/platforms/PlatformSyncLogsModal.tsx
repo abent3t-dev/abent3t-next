@@ -20,11 +20,17 @@ export default function PlatformSyncLogsModal({
   onClose,
   integration,
 }: PlatformSyncLogsModalProps) {
-  // Obtener logs de sincronización
+  // Obtener logs de sincronización. Refetch al abrir (sin caché) y polling
+  // cada 5s mientras haya algún sync en progreso para reflejar el resultado en vivo.
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ['platform-sync-logs', integration?.id],
     queryFn: () => api.get<PlatformSyncLog[]>(`/platforms/${integration?.id}/sync-logs`),
     enabled: open && !!integration?.id,
+    refetchOnMount: 'always',
+    refetchInterval: (query) => {
+      const data = query.state.data as PlatformSyncLog[] | undefined;
+      return data?.some((l) => l.status === 'in_progress') ? 5000 : false;
+    },
   });
 
   if (!open || !integration) return null;

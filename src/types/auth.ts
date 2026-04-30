@@ -128,6 +128,7 @@ export const SIDEBAR_NAV: NavItem[] = [
       { label: 'Evidencias', href: '/capacitacion/evidencias', icon: 'file-check', roles: HR_ADMIN_ROLES },
       { label: 'Propuestas', href: '/capacitacion/propuestas', icon: 'lightbulb', roles: HR_ADMIN_ROLES },
       { label: 'Solicitudes', href: '/capacitacion/solicitudes', icon: 'file-text', roles: [...HR_ADMIN_ROLES, ...EMPLOYEE_ROLES, 'jefe_area', 'director'] },
+      { label: 'Crehana', href: '/capacitacion/crehana', icon: 'link', roles: [...HR_ADMIN_ROLES, ...EXEC_ROLES] },
     ],
   },
   // ==========================================

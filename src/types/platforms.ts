@@ -28,6 +28,7 @@ export interface PlatformIntegration {
   institution_id: string;
   platform_type: PlatformType;
   api_url: string | null;
+  organization_slug: string | null;
   public_key: string | null;
   has_private_key: boolean; // El backend no devuelve la clave, solo indica si existe
   sync_enabled: boolean;
@@ -56,6 +57,7 @@ export interface CreateIntegrationDto {
   institution_id: string;
   platform_type: PlatformType;
   api_url?: string;
+  organization_slug?: string;
   public_key?: string;
   private_key?: string;
   sync_enabled?: boolean;
@@ -108,9 +110,9 @@ export interface PlatformCourse {
 export interface PlatformEnrollment {
   id: string;
   platform_course_id: string;
-  profile_id: string;
+  profile_id: string | null;
   external_enrollment_id: string | null;
-  external_user_id: string | null;
+  external_user_id: string;
   progress_percentage: number;
   status: PlatformEnrollmentStatus;
   enrolled_at: string | null;
@@ -265,3 +267,100 @@ export const PLATFORM_ENROLLMENT_STATUS_COLORS: Record<PlatformEnrollmentStatus,
   completed: 'bg-green-100 text-green-800',
   expired: 'bg-red-100 text-red-800',
 };
+
+// =====================================================
+// CREHANA — RESPUESTAS PARA EL FRONTEND
+// (alimentan /capacitacion/crehana)
+// =====================================================
+
+export interface CrehanaDashboard {
+  integration_active: boolean;
+  total_users: number;
+  users_linked_to_abent: number;
+  total_courses: number;
+  total_enrollments: number;
+  completed_enrollments: number;
+  in_progress_enrollments: number;
+  not_started_enrollments: number;
+  total_hours_completed: number;
+  total_certificates: number;
+  average_progress: number;
+  last_sync_at: string | null;
+  last_sync_status: SyncStatus | null;
+}
+
+export interface CrehanaCourseRow {
+  id: string;
+  external_course_id: string;
+  name: string;
+  total_hours: number;
+  course_url: string | null;
+  thumbnail_url: string | null;
+  last_synced_at: string;
+  total_enrollments: number;
+  completed_enrollments: number;
+  in_progress_enrollments: number;
+  average_progress: number;
+}
+
+export interface CrehanaUserRow {
+  external_user_id: string;
+  external_email: string | null;
+  external_username: string | null;
+  is_linked: boolean;
+  profile: {
+    id: string;
+    full_name: string;
+    email: string;
+    departments: { id: string; name: string } | null;
+  } | null;
+  last_synced_at: string;
+  total_enrollments: number;
+  completed_enrollments: number;
+  in_progress_enrollments: number;
+  total_hours_completed: number;
+  total_certificates: number;
+  average_progress: number;
+  last_activity_at: string | null;
+}
+
+export interface CrehanaUserDetailEnrollment {
+  id: string;
+  platform_course_id: string;
+  external_user_id: string;
+  status: PlatformEnrollmentStatus;
+  progress_percentage: number;
+  hours_completed: number;
+  enrolled_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  last_activity_at: string | null;
+  certificate_url: string | null;
+  certificate_issued_at: string | null;
+  course: {
+    id: string;
+    external_course_id: string;
+    name: string;
+    total_hours: number;
+    course_url: string | null;
+    thumbnail_url: string | null;
+  } | null;
+}
+
+export interface CrehanaUserDetail {
+  user: {
+    external_user_id: string;
+    external_email: string | null;
+    external_username: string | null;
+    profile_id: string | null;
+    last_synced_at: string;
+    profiles: {
+      id: string;
+      full_name: string;
+      email: string;
+      position: string | null;
+      departments: { id: string; name: string } | null;
+    } | null;
+  };
+  enrollments: CrehanaUserDetailEnrollment[];
+}
