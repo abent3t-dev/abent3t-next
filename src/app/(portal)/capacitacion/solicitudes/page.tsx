@@ -209,9 +209,11 @@ export default function SolicitudesPage() {
   }, [isAdmin, page, limit, filter]);
 
   // Cargar cursos para el modal de crear
+  // Solo se muestran cursos activos que tengan al menos una edicion activa,
+  // ya que sin edicion no es posible inscribir al colaborador.
   const loadCourses = async () => {
     const data = await api.get<Course[]>('/courses');
-    setCourses(data.filter((c) => c.is_active));
+    setCourses(data.filter((c) => c.is_active && (c.active_editions_count ?? 0) > 0));
   };
 
   // Cargar ediciones de un curso
@@ -886,6 +888,11 @@ export default function SolicitudesPage() {
                       </option>
                     ))}
                   </select>
+                  {courses.length === 0 && (
+                    <p className="mt-2 text-xs text-[#DFA922]">
+                      No hay cursos con ediciones disponibles para solicitar. Contacta a RRHH para que registren una edicion.
+                    </p>
+                  )}
                 </label>
 
                 <label className="block">

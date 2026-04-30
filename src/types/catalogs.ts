@@ -64,6 +64,7 @@ export interface Course {
   institutions: { id: string; name: string } | null;
   course_types: { id: string; name: string } | null;
   modalities: { id: string; name: string } | null;
+  active_editions_count?: number;
 }
 
 export interface CourseEdition {

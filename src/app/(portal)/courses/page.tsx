@@ -76,6 +76,11 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
     </svg>
   ),
+  warning: (
+    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    </svg>
+  ),
 };
 
 const paymentLabels: Record<PaymentStatus, string> = {
@@ -313,9 +318,10 @@ export default function CoursesPage() {
 
     // Reload editions for this course
     const editions = await api.get<CourseEdition[]>(`/courses/${editionCourseId}/editions`);
+    const activeCount = editions.filter(e => e.is_active).length;
     setCourses(prev => prev.map(c =>
       c.id === editionCourseId
-        ? { ...c, _editions: editions, _editionsLoaded: true }
+        ? { ...c, _editions: editions, _editionsLoaded: true, active_editions_count: activeCount }
         : c
     ));
   };
@@ -328,9 +334,10 @@ export default function CoursesPage() {
 
     // Reload editions
     const editions = await api.get<CourseEdition[]>(`/courses/${courseId}/editions`);
+    const activeCount = editions.filter(e => e.is_active).length;
     setCourses(prev => prev.map(c =>
       c.id === courseId
-        ? { ...c, _editions: editions, _editionsLoaded: true }
+        ? { ...c, _editions: editions, _editionsLoaded: true, active_editions_count: activeCount }
         : c
     ));
   };
@@ -466,14 +473,25 @@ export default function CoursesPage() {
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <h3 className="font-semibold text-[#424846] truncate">{course.name}</h3>
                           {!course.is_active && (
                             <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-[#424846]/10 text-[#424846] border border-[#424846]/30">
                               Inactivo
                             </span>
                           )}
+                          {course.is_active && (course.active_editions_count ?? 0) === 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-[#DFA922]/10 text-[#DFA922] border border-[#DFA922]/30">
+                              {Icons.warning}
+                              Sin ediciones
+                            </span>
+                          )}
                         </div>
+                        {course.is_active && (course.active_editions_count ?? 0) === 0 && (
+                          <p className="text-xs text-[#DFA922] mb-1 flex items-center gap-1">
+                            No aparecera al jefe de area en solicitudes ni propuestas hasta agregar una edicion activa.
+                          </p>
+                        )}
 
                         {/* Meta info */}
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
