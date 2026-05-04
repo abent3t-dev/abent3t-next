@@ -190,6 +190,7 @@ export interface TrainingRequest {
     end_date: string | null;
     location: string | null;
     instructor: string | null;
+    cost_override: number | null;
     courses: {
       id: string;
       name: string;

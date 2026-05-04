@@ -144,6 +144,11 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
     </svg>
   ),
+  chevronDown: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  ),
 };
 
 export default function PropuestasPage() {
@@ -155,6 +160,16 @@ export default function PropuestasPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [approvingProposal, setApprovingProposal] = useState<Proposal | null>(null);
   const [confirmingApproval, setConfirmingApproval] = useState<Proposal | null>(null);
+  const [expandedProposals, setExpandedProposals] = useState<Set<string>>(new Set());
+
+  const toggleProposal = (id: string) => {
+    setExpandedProposals((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // Form state for approval
   const [approvalForm, setApprovalForm] = useState({
@@ -438,212 +453,230 @@ export default function PropuestasPage() {
           </div>
         ) : (
           <>
-            <div className="space-y-4">
+            <div className="space-y-2">
               {filteredProposals.map((proposal) => {
                 const status = statusConfig[proposal.status];
+                const isExpanded = expandedProposals.has(proposal.id);
+                const hasActions = ['pendiente', 'en_investigacion'].includes(proposal.status);
 
                 return (
                   <div
                     key={proposal.id}
                     className={`bg-white rounded-xl shadow-sm border overflow-hidden transition-all hover:shadow-md ${status.border}`}
                   >
-                  {/* Header con estado */}
-                  <div className={`px-6 py-3 ${status.bg} border-b ${status.border} flex items-center justify-between`}>
-                    <div className="flex items-center gap-3">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${status.bg} ${status.text}`}>
-                        {status.icon === 'clock' && Icons.clock}
-                        {status.icon === 'search' && Icons.search}
-                        {status.icon === 'check' && Icons.check}
-                        {status.icon === 'x' && Icons.x}
+                    {/* Fila compacta - clickeable para expandir */}
+                    <button
+                      onClick={() => toggleProposal(proposal.id)}
+                      className="w-full px-4 py-3 flex items-center gap-4 text-left hover:bg-gray-50/50 transition-colors"
+                    >
+                      <span className={`text-[#424846]/50 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}>
+                        {Icons.chevronDown}
+                      </span>
+
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${status.bg} ${status.text} border ${status.border} flex-shrink-0`}>
+                        <span className="w-3.5 h-3.5">
+                          {status.icon === 'clock' && Icons.clock}
+                          {status.icon === 'search' && Icons.search}
+                          {status.icon === 'check' && Icons.check}
+                          {status.icon === 'x' && Icons.x}
+                        </span>
                         {status.label}
                       </span>
-                      <span className="text-sm text-gray-500 flex items-center gap-1">
-                        {Icons.calendar}
-                        Propuesto el {formatDate(proposal.created_at)}
-                      </span>
-                    </div>
 
-                    {/* Acciones */}
-                    {['pendiente', 'en_investigacion'].includes(proposal.status) && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-[#424846] truncate">{proposal.course_name}</p>
+                        <p className="text-xs text-[#424846]/60 truncate">
+                          {proposal.proposer?.full_name || '—'} · {proposal.profile?.departments?.name || 'Sin área'}
+                        </p>
+                      </div>
+
+                      <div className="hidden md:flex items-center gap-1 text-xs text-[#424846]/70 flex-shrink-0">
+                        {Icons.calendar}
+                        <span>{formatDate(proposal.created_at)}</span>
+                      </div>
+
+                      <div className="text-right flex-shrink-0">
+                        <p className="font-bold text-[#424846] text-sm">{formatCurrency(proposal.estimated_cost)}</p>
+                      </div>
+                    </button>
+
+                    {/* Acciones (siempre visibles para pendientes/en investigación) */}
+                    {hasActions && (
+                      <div className={`px-4 pb-3 flex items-center justify-end gap-2 ${isExpanded ? '' : 'border-t border-gray-100 pt-3'}`}>
                         {proposal.status === 'pendiente' && (
                           <button
                             onClick={() => handleInvestigate(proposal.id)}
                             disabled={investigateMutation.isPending}
-                            className="flex items-center gap-2 px-4 py-2 bg-[#222D59] text-white rounded-lg hover:bg-[#222D59]/90 transition-colors text-sm font-medium disabled:opacity-50"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#222D59] text-white rounded-lg hover:bg-[#222D59]/90 transition-colors text-xs font-medium disabled:opacity-50"
                           >
-                            {Icons.search}
+                            <span className="w-3.5 h-3.5">{Icons.search}</span>
                             Investigar
                           </button>
                         )}
                         <button
                           onClick={() => handleOpenApproval(proposal)}
-                          className="flex items-center gap-2 px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] transition-colors text-sm font-medium"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] transition-colors text-xs font-medium"
                         >
-                          {Icons.check}
+                          <span className="w-3.5 h-3.5">{Icons.check}</span>
                           Aprobar
                         </button>
                         <button
                           onClick={() => openRejectModal(proposal)}
-                          className="flex items-center gap-2 px-4 py-2 border border-red-500 text-red-500 rounded-lg hover:bg-red-50 transition-colors text-sm font-medium"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-red-600 border border-red-500 rounded-lg hover:bg-red-50 transition-colors text-xs font-medium"
                         >
-                          {Icons.x}
+                          <span className="w-3.5 h-3.5">{Icons.x}</span>
                           Rechazar
                         </button>
                       </div>
                     )}
-                  </div>
 
-                  {/* Contenido principal */}
-                  <div className="p-6">
-                    <div className="grid md:grid-cols-3 gap-6">
-                      {/* Columna 1: Información de personas */}
-                      <div className="space-y-4">
-                        {/* Quién propone */}
-                        <div className="bg-[#222D59]/5 rounded-xl p-4">
-                          <div className="flex items-center gap-2 text-[#222D59] mb-2">
-                            {Icons.user}
-                            <span className="text-xs font-semibold uppercase tracking-wide">Propuesto por</span>
-                          </div>
-                          <p className="font-semibold text-[#424846]">{proposal.proposer?.full_name || '—'}</p>
-                          <p className="text-sm text-gray-500">{proposal.proposer?.email}</p>
+                    {/* Contenido expandido */}
+                    {isExpanded && (
+                      <div className="border-t border-gray-100 p-6 bg-gray-50/30">
+                        <div className="flex items-center gap-2 text-xs text-[#424846]/70 mb-4">
+                          {Icons.calendar}
+                          <span>Propuesto el {formatDate(proposal.created_at)}</span>
                         </div>
 
-                        {/* Flecha */}
-                        <div className="flex justify-center text-gray-300">
-                          <svg className="w-6 h-6 transform rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                          </svg>
-                        </div>
-
-                        {/* Para quién es */}
-                        <div className="bg-[#52AF32]/5 rounded-xl p-4">
-                          <div className="flex items-center gap-2 text-[#52AF32] mb-2">
-                            {Icons.userGroup}
-                            <span className="text-xs font-semibold uppercase tracking-wide">Beneficiario</span>
-                          </div>
-                          <p className="font-semibold text-[#424846]">{proposal.profile?.full_name || '—'}</p>
-                          <p className="text-sm text-gray-500">{proposal.profile?.position || 'Sin puesto'}</p>
-                          {proposal.profile?.departments?.name && (
-                            <span className="inline-flex items-center gap-1 mt-2 text-xs text-gray-500 bg-white px-2 py-1 rounded">
-                              {Icons.office}
-                              {proposal.profile.departments.name}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Columna 2: Información del curso */}
-                      <div className="md:col-span-2">
-                        <div className="bg-gray-50 rounded-xl p-5 h-full">
-                          <div className="flex items-center gap-2 text-[#424846] mb-3">
-                            {Icons.book}
-                            <span className="text-xs font-semibold uppercase tracking-wide">Curso Propuesto</span>
-                          </div>
-
-                          <h3 className="font-bold text-xl text-[#424846] mb-4">{proposal.course_name}</h3>
-
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                            {/* Institución */}
-                            {proposal.institution_name && (
-                              <div className="bg-white rounded-lg p-3">
-                                <p className="text-xs text-gray-500 mb-1">Institución</p>
-                                <p className="font-medium text-gray-900 text-sm">{proposal.institution_name}</p>
+                        <div className="grid md:grid-cols-3 gap-6">
+                          {/* Columna 1: Información de personas */}
+                          <div className="space-y-4">
+                            <div className="bg-[#222D59]/5 rounded-xl p-4">
+                              <div className="flex items-center gap-2 text-[#222D59] mb-2">
+                                {Icons.user}
+                                <span className="text-xs font-semibold uppercase tracking-wide">Propuesto por</span>
                               </div>
-                            )}
-
-                            {/* Modalidad */}
-                            {proposal.modality && (
-                              <div className="bg-white rounded-lg p-3">
-                                <p className="text-xs text-gray-500 mb-1">Modalidad</p>
-                                <p className="font-medium text-gray-900 text-sm capitalize">{proposal.modality}</p>
-                              </div>
-                            )}
-
-                            {/* Costo */}
-                            <div className="bg-white rounded-lg p-3">
-                              <p className="text-xs text-gray-500 mb-1">Costo Estimado</p>
-                              <p className="font-bold text-gray-900">{formatCurrency(proposal.estimated_cost)}</p>
+                              <p className="font-semibold text-[#424846]">{proposal.proposer?.full_name || '—'}</p>
+                              <p className="text-sm text-gray-500">{proposal.proposer?.email}</p>
                             </div>
 
-                            {/* Horas */}
-                            <div className="bg-white rounded-lg p-3">
-                              <p className="text-xs text-gray-500 mb-1">Duración</p>
-                              <p className="font-medium text-gray-900">{proposal.estimated_hours} horas</p>
+                            <div className="flex justify-center text-gray-300">
+                              <svg className="w-6 h-6 transform rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                              </svg>
                             </div>
-                          </div>
 
-                          {/* Fechas si existen */}
-                          {(proposal.start_date || proposal.end_date) && (
-                            <div className="flex items-center gap-4 mb-4 text-sm text-gray-600">
-                              {proposal.start_date && (
-                                <span className="flex items-center gap-1">
-                                  {Icons.calendar}
-                                  Inicio: {formatDate(proposal.start_date)}
-                                </span>
-                              )}
-                              {proposal.end_date && (
-                                <span className="flex items-center gap-1">
-                                  {Icons.calendar}
-                                  Fin: {formatDate(proposal.end_date)}
+                            <div className="bg-[#52AF32]/5 rounded-xl p-4">
+                              <div className="flex items-center gap-2 text-[#52AF32] mb-2">
+                                {Icons.userGroup}
+                                <span className="text-xs font-semibold uppercase tracking-wide">Beneficiario</span>
+                              </div>
+                              <p className="font-semibold text-[#424846]">{proposal.profile?.full_name || '—'}</p>
+                              <p className="text-sm text-gray-500">{proposal.profile?.position || 'Sin puesto'}</p>
+                              {proposal.profile?.departments?.name && (
+                                <span className="inline-flex items-center gap-1 mt-2 text-xs text-gray-500 bg-white px-2 py-1 rounded">
+                                  {Icons.office}
+                                  {proposal.profile.departments.name}
                                 </span>
                               )}
                             </div>
-                          )}
+                          </div>
 
-                          {/* URL del curso */}
-                          {proposal.course_url && (
-                            <a
-                              href={proposal.course_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 text-[#52AF32] hover:underline text-sm font-medium"
-                            >
-                              {Icons.link}
-                              Ver pagina del curso
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                          {/* Columna 2: Información del curso */}
+                          <div className="md:col-span-2">
+                            <div className="bg-white rounded-xl p-5 h-full border border-gray-200">
+                              <div className="flex items-center gap-2 text-[#424846] mb-3">
+                                {Icons.book}
+                                <span className="text-xs font-semibold uppercase tracking-wide">Curso Propuesto</span>
+                              </div>
 
-                    {/* Justificación */}
-                    {proposal.justification && (
-                      <div className="mt-6 pt-4 border-t border-gray-100">
-                        <div className="flex items-start gap-3">
-                          <div className="text-gray-400 mt-0.5">{Icons.chat}</div>
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Justificación del colaborador</p>
-                            <p className="text-gray-700 italic">&quot;{proposal.justification}&quot;</p>
+                              <h3 className="font-bold text-xl text-[#424846] mb-4">{proposal.course_name}</h3>
+
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                {proposal.institution_name && (
+                                  <div className="bg-gray-50 rounded-lg p-3">
+                                    <p className="text-xs text-gray-500 mb-1">Institución</p>
+                                    <p className="font-medium text-gray-900 text-sm">{proposal.institution_name}</p>
+                                  </div>
+                                )}
+
+                                {proposal.modality && (
+                                  <div className="bg-gray-50 rounded-lg p-3">
+                                    <p className="text-xs text-gray-500 mb-1">Modalidad</p>
+                                    <p className="font-medium text-gray-900 text-sm capitalize">{proposal.modality}</p>
+                                  </div>
+                                )}
+
+                                <div className="bg-gray-50 rounded-lg p-3">
+                                  <p className="text-xs text-gray-500 mb-1">Costo Estimado</p>
+                                  <p className="font-bold text-gray-900">{formatCurrency(proposal.estimated_cost)}</p>
+                                </div>
+
+                                <div className="bg-gray-50 rounded-lg p-3">
+                                  <p className="text-xs text-gray-500 mb-1">Duración</p>
+                                  <p className="font-medium text-gray-900">{proposal.estimated_hours} horas</p>
+                                </div>
+                              </div>
+
+                              {(proposal.start_date || proposal.end_date) && (
+                                <div className="flex items-center gap-4 mb-4 text-sm text-gray-600">
+                                  {proposal.start_date && (
+                                    <span className="flex items-center gap-1">
+                                      {Icons.calendar}
+                                      Inicio: {formatDate(proposal.start_date)}
+                                    </span>
+                                  )}
+                                  {proposal.end_date && (
+                                    <span className="flex items-center gap-1">
+                                      {Icons.calendar}
+                                      Fin: {formatDate(proposal.end_date)}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {proposal.course_url && (
+                                <a
+                                  href={proposal.course_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-2 text-[#52AF32] hover:underline text-sm font-medium"
+                                >
+                                  {Icons.link}
+                                  Ver pagina del curso
+                                </a>
+                              )}
+                            </div>
                           </div>
                         </div>
+
+                        {/* Justificación */}
+                        {proposal.justification && (
+                          <div className="mt-6 pt-4 border-t border-gray-100">
+                            <div className="flex items-start gap-3">
+                              <div className="text-gray-400 mt-0.5">{Icons.chat}</div>
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Justificación del colaborador</p>
+                                <p className="text-gray-700 italic">&quot;{proposal.justification}&quot;</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Notas de revisión */}
+                        {proposal.review_notes && (
+                          <div className="mt-4 pt-4 border-t border-blue-100">
+                            <div className="bg-blue-50 rounded-lg p-4">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-blue-600 mb-1">Notas de revisión</p>
+                              <p className="text-blue-700">{proposal.review_notes}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Motivo de rechazo */}
+                        {proposal.status === 'rechazada' && proposal.rejection_reason && (
+                          <div className="mt-4 pt-4 border-t border-red-100">
+                            <div className="bg-red-50 rounded-lg p-4">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-red-600 mb-1">Motivo del rechazo</p>
+                              <p className="text-red-700">{proposal.rejection_reason}</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
-
-                    {/* Notas de revisión */}
-                    {proposal.review_notes && (
-                      <div className="mt-4 pt-4 border-t border-blue-100">
-                        <div className="bg-blue-50 rounded-lg p-4">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-blue-600 mb-1">Notas de revisión</p>
-                          <p className="text-blue-700">{proposal.review_notes}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Motivo de rechazo */}
-                    {proposal.status === 'rechazada' && proposal.rejection_reason && (
-                      <div className="mt-4 pt-4 border-t border-red-100">
-                        <div className="bg-red-50 rounded-lg p-4">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-red-600 mb-1">Motivo del rechazo</p>
-                          <p className="text-red-700">{proposal.rejection_reason}</p>
-                        </div>
-                      </div>
-                    )}
-
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
             </div>
 
             {/* Pagination */}
