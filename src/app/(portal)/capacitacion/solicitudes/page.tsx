@@ -29,6 +29,10 @@ interface CourseProposal {
   review_notes: string | null;
   rejection_reason: string | null;
   created_at: string;
+  proposed_by?: string;
+  profile_id?: string;
+  proposer?: { id: string; full_name: string; email: string } | null;
+  profile?: { id: string; full_name: string; position: string | null } | null;
 }
 
 const Icons = {
@@ -256,18 +260,19 @@ export default function SolicitudesPage() {
     setCollaborators(data);
   };
 
-  // Cargar mis propuestas
+  // Cargar propuestas: jefe_area ve las de su equipo, colaborador solo las suyas
   const loadProposals = useCallback(async () => {
     setLoadingProposals(true);
     try {
-      const data = await api.get<CourseProposal[]>('/proposals/my-proposals');
+      const endpoint = isManager ? '/proposals/my-team' : '/proposals/my-proposals';
+      const data = await api.get<CourseProposal[]>(endpoint);
       setProposals(data);
     } catch {
       notify.error('Error al cargar propuestas');
     } finally {
       setLoadingProposals(false);
     }
-  }, []);
+  }, [isManager]);
 
   // Cargar estadísticas
   const loadStats = useCallback(async () => {
@@ -536,7 +541,7 @@ export default function SolicitudesPage() {
                   : 'text-gray-500 hover:text-[#424846]'
               }`}
             >
-              Mis Propuestas
+              {isManager ? 'Propuestas de Equipo' : 'Mis Propuestas'}
               {proposals.filter(p => ['pendiente', 'en_investigacion'].includes(p.status)).length > 0 && (
                 <span className="px-2 py-0.5 text-xs bg-[#222D59]/10 text-[#222D59] rounded-full">
                   {proposals.filter(p => ['pendiente', 'en_investigacion'].includes(p.status)).length}
@@ -856,16 +861,22 @@ export default function SolicitudesPage() {
                 <div className="w-16 h-16 bg-[#222D59]/10 rounded-full flex items-center justify-center mx-auto mb-4 text-[#222D59]">
                   {Icons.lightbulb}
                 </div>
-                <p className="text-[#424846] font-medium">No tienes propuestas de cursos</p>
+                <p className="text-[#424846] font-medium">
+                  {isManager ? 'No hay propuestas de tu equipo' : 'No tienes propuestas de cursos'}
+                </p>
                 <p className="text-gray-400 text-sm mt-1">
-                  Encontraste un curso interesante? Haz clic en &quot;Proponer Curso&quot; para enviarlo a revision.
+                  {isManager
+                    ? 'Cuando tú o algún colaborador de tu área proponga un curso, aparecerá aquí.'
+                    : 'Encontraste un curso interesante? Haz clic en "Proponer Curso" para enviarlo a revisión.'}
                 </p>
               </div>
             ) : (
               <div className="divide-y divide-[#424846]/10">
                 {proposals.map((proposal) => {
                   const isExpanded = expandedProposals.has(proposal.id);
-                  const canCancel = ['pendiente', 'en_investigacion'].includes(proposal.status);
+                  const isOwn = proposal.proposed_by === user?.id;
+                  // Solo se puede cancelar propuestas propias y en estado activo
+                  const canCancel = isOwn && ['pendiente', 'en_investigacion'].includes(proposal.status);
 
                   return (
                     <div key={proposal.id} className="transition-colors">
@@ -883,9 +894,19 @@ export default function SolicitudesPage() {
                         </span>
 
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-[#424846] truncate">{proposal.course_name}</p>
+                          <p className="font-semibold text-[#424846] truncate">
+                            {proposal.course_name}
+                            {isManager && !isOwn && (
+                              <span className="ml-2 px-2 py-0.5 text-[10px] font-medium bg-[#52AF32]/10 text-[#52AF32] rounded-full uppercase tracking-wide align-middle">
+                                Equipo
+                              </span>
+                            )}
+                          </p>
                           <p className="text-xs text-[#424846]/60 truncate">
-                            {proposal.institution_name || 'Sin institución'} · {formatDate(proposal.created_at)}
+                            {isManager && proposal.proposer
+                              ? `Propuesta por ${proposal.proposer.full_name}`
+                              : proposal.institution_name || 'Sin institución'}
+                            {' · '}{formatDate(proposal.created_at)}
                           </p>
                         </div>
 
