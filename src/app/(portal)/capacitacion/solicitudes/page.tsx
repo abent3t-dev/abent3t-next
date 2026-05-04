@@ -14,6 +14,15 @@ import type {
 } from '@/types/catalogs';
 import type { PaginatedResponse, PaginationMeta } from '@/types/pagination';
 
+interface ProposalAttachment {
+  id: string;
+  file_name: string;
+  file_size: number;
+  file_type: string;
+  uploaded_at: string;
+  is_active: boolean;
+}
+
 interface CourseProposal {
   id: string;
   course_name: string;
@@ -33,6 +42,31 @@ interface CourseProposal {
   profile_id?: string;
   proposer?: { id: string; full_name: string; email: string } | null;
   profile?: { id: string; full_name: string; position: string | null } | null;
+  attachments?: ProposalAttachment[] | null;
+}
+
+const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+const ATTACHMENT_ALLOWED_MIME = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function getApiToken(): Promise<string> {
+  const { createClient } = await import('@/lib/supabase/client');
+  const supabase = createClient();
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token || '';
 }
 
 const Icons = {
@@ -104,6 +138,16 @@ const Icons = {
   chevronDown: (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  ),
+  paperclip: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+    </svg>
+  ),
+  download: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
     </svg>
   ),
 };
@@ -182,6 +226,8 @@ export default function SolicitudesPage() {
     end_date: '',
     justification: '',
   });
+  const [proposalFiles, setProposalFiles] = useState<File[]>([]);
+  const [proposalUrlError, setProposalUrlError] = useState('');
 
   // Estado para estadísticas
   const [stats, setStats] = useState({
@@ -416,7 +462,94 @@ export default function SolicitudesPage() {
       end_date: '',
       justification: '',
     });
+    setProposalFiles([]);
+    setProposalUrlError('');
     setProposalModalOpen(true);
+  };
+
+  const isValidUrl = (value: string): boolean => {
+    try {
+      const url = new URL(value);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
+  const handleProposalUrlChange = (value: string) => {
+    setProposalForm({ ...proposalForm, course_url: value });
+    if (!value.trim()) {
+      setProposalUrlError('');
+      return;
+    }
+    setProposalUrlError(
+      isValidUrl(value.trim())
+        ? ''
+        : 'Ingresa una URL válida (debe iniciar con http:// o https://)',
+    );
+  };
+
+  const handleAddProposalFiles = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const accepted: File[] = [];
+    for (const f of Array.from(files)) {
+      if (!ATTACHMENT_ALLOWED_MIME.includes(f.type)) {
+        notify.error(`"${f.name}": tipo de archivo no permitido`);
+        continue;
+      }
+      if (f.size > ATTACHMENT_MAX_BYTES) {
+        notify.error(`"${f.name}": excede el tamaño máximo de 10MB`);
+        continue;
+      }
+      accepted.push(f);
+    }
+    if (accepted.length > 0) {
+      setProposalFiles((prev) => [...prev, ...accepted]);
+    }
+  };
+
+  const removeProposalFile = (index: number) => {
+    setProposalFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadProposalAttachments = async (
+    proposalId: string,
+    files: File[],
+  ) => {
+    if (files.length === 0) return;
+    const token = await getApiToken();
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`${apiUrl}/proposals/${proposalId}/attachments`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `Error al subir "${file.name}"`);
+      }
+    }
+  };
+
+  const handleDownloadAttachment = async (attachmentId: string) => {
+    try {
+      const { url, fileName } = await api.get<{ url: string; fileName: string }>(
+        `/proposals/attachments/${attachmentId}/download`,
+      );
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      notify.error('Error al descargar archivo');
+    }
   };
 
   // Crear propuesta
@@ -435,11 +568,38 @@ export default function SolicitudesPage() {
       return;
     }
 
+    const trimmedUrl = proposalForm.course_url.trim();
+    if (trimmedUrl && !isValidUrl(trimmedUrl)) {
+      setProposalUrlError(
+        'Ingresa una URL válida (debe iniciar con http:// o https://)',
+      );
+      notify.error('La URL del curso no es válida');
+      return;
+    }
+
     setCreatingProposal(true);
     try {
-      await api.post('/proposals', proposalForm);
+      const payload = {
+        ...proposalForm,
+        course_url: trimmedUrl || undefined,
+      };
+      const created = await api.post<CourseProposal>('/proposals', payload);
+
+      if (proposalFiles.length > 0) {
+        try {
+          await uploadProposalAttachments(created.id, proposalFiles);
+        } catch (uploadErr: unknown) {
+          const error = uploadErr as { message?: string };
+          notify.error(
+            error.message ||
+              'La propuesta se creó pero hubo un error al subir algún archivo',
+          );
+        }
+      }
+
       notify.success('Propuesta enviada exitosamente');
       setProposalModalOpen(false);
+      setProposalFiles([]);
       loadProposals();
     } catch (err: unknown) {
       const error = err as { message?: string };
@@ -973,6 +1133,40 @@ export default function SolicitudesPage() {
                           {proposal.justification && (
                             <p className="text-sm text-[#424846]/80 mt-3 italic bg-white p-3 rounded-xl border border-[#424846]/10">&quot;{proposal.justification}&quot;</p>
                           )}
+                          {proposal.attachments && proposal.attachments.filter(a => a.is_active).length > 0 && (
+                            <div className="mt-3">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-[#424846]/70 mb-2 flex items-center gap-1">
+                                {Icons.paperclip}
+                                Archivos adjuntos ({proposal.attachments.filter(a => a.is_active).length})
+                              </p>
+                              <ul className="space-y-2">
+                                {proposal.attachments.filter(a => a.is_active).map((att) => (
+                                  <li
+                                    key={att.id}
+                                    className="flex items-center gap-3 px-3 py-2 bg-white rounded-lg border border-[#424846]/10"
+                                  >
+                                    <span className="text-[#222D59]">{Icons.paperclip}</span>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium text-[#424846] truncate">
+                                        {att.file_name}
+                                      </p>
+                                      <p className="text-xs text-[#424846]/60">
+                                        {formatFileSize(att.file_size)}
+                                      </p>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDownloadAttachment(att.id)}
+                                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-[#222D59] bg-[#222D59]/10 hover:bg-[#222D59]/20 rounded-lg transition-colors"
+                                    >
+                                      {Icons.download}
+                                      Descargar
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
                           {proposal.review_notes && (
                             <p className="text-sm text-[#52AF32] mt-3 font-medium">Notas de revision: {proposal.review_notes}</p>
                           )}
@@ -1226,14 +1420,24 @@ export default function SolicitudesPage() {
                 </label>
 
                 <label className="block">
-                  <span className="text-sm font-medium text-[#424846]">URL del Curso</span>
+                  <span className="text-sm font-medium text-[#424846]">
+                    URL del Curso{' '}
+                    <span className="text-xs font-normal text-[#424846]/50">(opcional)</span>
+                  </span>
                   <input
-                    type="url"
+                    type="text"
                     value={proposalForm.course_url}
-                    onChange={(e) => setProposalForm({ ...proposalForm, course_url: e.target.value })}
+                    onChange={(e) => handleProposalUrlChange(e.target.value)}
                     placeholder="https://..."
-                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#222D59] focus:border-transparent"
+                    className={`mt-1 block w-full px-4 py-3 border rounded-xl text-sm focus:ring-2 focus:border-transparent ${
+                      proposalUrlError
+                        ? 'border-red-300 focus:ring-red-500'
+                        : 'border-gray-200 focus:ring-[#222D59]'
+                    }`}
                   />
+                  {proposalUrlError && (
+                    <p className="text-xs text-red-600 mt-1">{proposalUrlError}</p>
+                  )}
                 </label>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -1317,6 +1521,71 @@ export default function SolicitudesPage() {
                     className="mt-2 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#222D59] focus:border-transparent resize-none"
                   />
                 </label>
+
+                {/* Archivos adjuntos */}
+                <div>
+                  <span className="text-sm font-medium text-[#424846]">
+                    Archivos Adjuntos{' '}
+                    <span className="text-xs font-normal text-[#424846]/50">(opcional)</span>
+                  </span>
+                  <p className="text-xs text-[#424846]/60 mt-1 mb-2">
+                    Si tienes el temario, brochure, ficha técnica o cualquier documento del curso, adjúntalo aquí para que admin RH lo pueda revisar.
+                  </p>
+                  <label
+                    htmlFor="proposal-files-input"
+                    className="block cursor-pointer"
+                  >
+                    <div className="border-2 border-dashed border-[#222D59]/30 rounded-xl p-4 text-center hover:bg-[#222D59]/5 transition-colors">
+                      <div className="flex flex-col items-center gap-1 text-[#222D59]">
+                        {Icons.paperclip}
+                        <span className="text-sm font-medium">Adjuntar archivos</span>
+                        <span className="text-xs text-[#424846]/60">
+                          PDF, JPG, PNG, Word, Excel · máximo 10MB c/u
+                        </span>
+                      </div>
+                    </div>
+                    <input
+                      id="proposal-files-input"
+                      type="file"
+                      multiple
+                      accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.doc,.docx,application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      onChange={(e) => {
+                        handleAddProposalFiles(e.target.files);
+                        e.target.value = '';
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {proposalFiles.length > 0 && (
+                    <ul className="mt-3 space-y-2">
+                      {proposalFiles.map((file, index) => (
+                        <li
+                          key={`${file.name}-${index}`}
+                          className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200"
+                        >
+                          <span className="text-[#222D59]">{Icons.paperclip}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-[#424846] truncate">
+                              {file.name}
+                            </p>
+                            <p className="text-xs text-[#424846]/60">
+                              {formatFileSize(file.size)}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeProposalFile(index)}
+                            className="p-1 text-[#424846]/50 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            aria-label={`Quitar ${file.name}`}
+                          >
+                            {Icons.x}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
 
                 <div className="flex justify-end gap-3 pt-4">
                   <button

@@ -7,6 +7,15 @@ import { notify } from '@/lib/notifications';
 import Pagination from '@/components/ui/Pagination';
 import type { PaginatedResponse } from '@/types/pagination';
 
+interface ProposalAttachment {
+  id: string;
+  file_name: string;
+  file_size: number;
+  file_type: string;
+  uploaded_at: string;
+  is_active: boolean;
+}
+
 interface Proposal {
   id: string;
   course_name: string;
@@ -36,6 +45,13 @@ interface Proposal {
     departments: { name: string } | null;
   };
   courses?: { id: string; name: string } | null;
+  attachments?: ProposalAttachment[] | null;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 interface Catalog {
@@ -147,6 +163,16 @@ const Icons = {
   chevronDown: (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  ),
+  paperclip: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+    </svg>
+  ),
+  download: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
     </svg>
   ),
 };
@@ -344,6 +370,23 @@ export default function PropuestasPage() {
       month: 'short',
       year: 'numeric',
     });
+  };
+
+  const handleDownloadAttachment = async (attachmentId: string) => {
+    try {
+      const { url, fileName } = await api.get<{ url: string; fileName: string }>(
+        `/proposals/attachments/${attachmentId}/download`,
+      );
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      notify.error('Error al descargar archivo');
+    }
   };
 
   return (
@@ -650,6 +693,42 @@ export default function PropuestasPage() {
                                 <p className="text-gray-700 italic">&quot;{proposal.justification}&quot;</p>
                               </div>
                             </div>
+                          </div>
+                        )}
+
+                        {/* Archivos adjuntos */}
+                        {proposal.attachments && proposal.attachments.filter(a => a.is_active).length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-gray-100">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2 flex items-center gap-1">
+                              {Icons.paperclip}
+                              Archivos adjuntos ({proposal.attachments.filter(a => a.is_active).length})
+                            </p>
+                            <ul className="space-y-2">
+                              {proposal.attachments.filter(a => a.is_active).map((att) => (
+                                <li
+                                  key={att.id}
+                                  className="flex items-center gap-3 px-3 py-2 bg-white rounded-lg border border-gray-200"
+                                >
+                                  <span className="text-[#222D59]">{Icons.paperclip}</span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-[#424846] truncate">
+                                      {att.file_name}
+                                    </p>
+                                    <p className="text-xs text-[#424846]/60">
+                                      {formatFileSize(att.file_size)}
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadAttachment(att.id)}
+                                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-[#222D59] bg-[#222D59]/10 hover:bg-[#222D59]/20 rounded-lg transition-colors"
+                                  >
+                                    {Icons.download}
+                                    Descargar
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
                           </div>
                         )}
 
