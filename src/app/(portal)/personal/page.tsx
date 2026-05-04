@@ -27,8 +27,26 @@ interface PersonnelStats {
   total: number;
   active: number;
   inactive: number;
+  collaborators?: number;
+  managers?: number;
   by_department: Record<string, number>;
 }
+
+type PersonnelRole = 'colaborador' | 'jefe_area';
+
+const roleLabels: Record<string, string> = {
+  colaborador: 'Colaborador',
+  collaborator: 'Colaborador',
+  jefe_area: 'Jefe de Área',
+  director: 'Director',
+};
+
+const roleStyles: Record<string, string> = {
+  colaborador: 'bg-[#222D59]/10 text-[#222D59]',
+  collaborator: 'bg-[#222D59]/10 text-[#222D59]',
+  jefe_area: 'bg-[#DFA922]/10 text-[#DFA922]',
+  director: 'bg-[#DFA922]/10 text-[#DFA922]',
+};
 
 const Icons = {
   plus: (
@@ -81,6 +99,7 @@ export default function PersonalPage() {
   const [search, setSearch] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | PersonnelRole>('all');
 
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -88,12 +107,20 @@ export default function PersonalPage() {
   const [editingPerson, setEditingPerson] = useState<Personnel | null>(null);
 
   // Form data
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    email: string;
+    password: string;
+    full_name: string;
+    position: string;
+    department_id: string;
+    role: PersonnelRole;
+  }>({
     email: '',
     password: '',
     full_name: '',
     position: '',
     department_id: '',
+    role: 'colaborador',
   });
 
   // Build query params
@@ -101,9 +128,10 @@ export default function PersonalPage() {
   if (search) queryParams.set('search', search);
   if (departmentFilter) queryParams.set('department_id', departmentFilter);
   if (statusFilter !== 'all') queryParams.set('is_active', statusFilter === 'active' ? 'true' : 'false');
+  if (roleFilter !== 'all') queryParams.set('role', roleFilter);
 
   const personnelQuery = useQuery({
-    queryKey: ['personnel', search, departmentFilter, statusFilter],
+    queryKey: ['personnel', search, departmentFilter, statusFilter, roleFilter],
     queryFn: () => api.get<Personnel[]>(`/personnel?${queryParams.toString()}`),
   });
 
@@ -122,6 +150,11 @@ export default function PersonalPage() {
   const departments = deptsQuery.data ?? [];
   const loading = personnelQuery.isLoading;
 
+  const normalizeRole = (role: string): PersonnelRole => {
+    if (role === 'jefe_area') return 'jefe_area';
+    return 'colaborador';
+  };
+
   const openCreateModal = () => {
     setModalMode('create');
     setEditingPerson(null);
@@ -131,6 +164,7 @@ export default function PersonalPage() {
       full_name: '',
       position: '',
       department_id: '',
+      role: 'colaborador',
     });
     setError('');
     setShowModal(true);
@@ -145,6 +179,7 @@ export default function PersonalPage() {
       full_name: person.full_name,
       position: person.position || '',
       department_id: person.department_id || '',
+      role: normalizeRole(person.role),
     });
     setError('');
     setShowModal(true);
@@ -168,14 +203,15 @@ export default function PersonalPage() {
         full_name: data.full_name,
         position: data.position || undefined,
         department_id: data.department_id || undefined,
+        role: data.role,
       }),
     onSuccess: () => {
       invalidatePersonnel();
       closeModal();
-      notify.success('Colaborador creado correctamente');
+      notify.success('Personal creado correctamente');
     },
     onError: (err: Error) => {
-      const message = err.message || 'Error al crear colaborador';
+      const message = err.message || 'Error al crear personal';
       setError(message);
       notify.error(message);
     },
@@ -187,10 +223,10 @@ export default function PersonalPage() {
     onSuccess: () => {
       invalidatePersonnel();
       closeModal();
-      notify.success('Colaborador actualizado correctamente');
+      notify.success('Personal actualizado correctamente');
     },
     onError: (err: Error) => {
-      const message = err.message || 'Error al actualizar colaborador';
+      const message = err.message || 'Error al actualizar personal';
       setError(message);
       notify.error(message);
     },
@@ -230,6 +266,7 @@ export default function PersonalPage() {
         full_name: formData.full_name,
         position: formData.position || undefined,
         department_id: formData.department_id || undefined,
+        role: formData.role,
       },
     });
   };
@@ -254,14 +291,14 @@ export default function PersonalPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-[#424846]">Gestión de Personal</h1>
-          <p className="text-gray-500">Administra los colaboradores de la organización</p>
+          <p className="text-gray-500">Administra colaboradores y jefes de área de la organización</p>
         </div>
         <button
           onClick={openCreateModal}
           className="flex items-center gap-2 px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] transition-colors"
         >
           {Icons.plus}
-          <span>Nuevo Colaborador</span>
+          <span>Nuevo Personal</span>
         </button>
       </div>
 
@@ -314,6 +351,17 @@ export default function PersonalPage() {
             ))}
           </select>
 
+          {/* Role Filter */}
+          <select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value as 'all' | PersonnelRole)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+          >
+            <option value="all">Todos los roles</option>
+            <option value="colaborador">Colaboradores</option>
+            <option value="jefe_area">Jefes de Área</option>
+          </select>
+
           {/* Status Filter */}
           <select
             value={statusFilter}
@@ -336,7 +384,10 @@ export default function PersonalPage() {
             <thead className="bg-[#424846]">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                  Colaborador
+                  Personal
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                  Rol
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                   Puesto
@@ -367,6 +418,11 @@ export default function PersonalPage() {
                         <div className="text-sm text-gray-500">{person.email}</div>
                       </div>
                     </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${roleStyles[person.role] || 'bg-gray-100 text-gray-600'}`}>
+                      {roleLabels[person.role] || person.role}
+                    </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">
                     {person.position || <span className="text-gray-400">—</span>}
@@ -419,8 +475,8 @@ export default function PersonalPage() {
               ))}
               {personnel.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                    No hay colaboradores que coincidan con los filtros
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                    No hay personal que coincida con los filtros
                   </td>
                 </tr>
               )}
@@ -436,7 +492,7 @@ export default function PersonalPage() {
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <h2 className="text-lg font-bold text-[#424846]">
-                {modalMode === 'create' ? 'Nuevo Colaborador' : 'Editar Colaborador'}
+                {modalMode === 'create' ? 'Nuevo Personal' : 'Editar Personal'}
               </h2>
               <button
                 onClick={closeModal}
@@ -539,6 +595,23 @@ export default function PersonalPage() {
                   ))}
                 </select>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Rol *
+                </label>
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as PersonnelRole })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+                >
+                  <option value="colaborador">Colaborador</option>
+                  <option value="jefe_area">Jefe de Área</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Los Jefes de Área pueden solicitar capacitación para colaboradores de su área.
+                </p>
+              </div>
             </div>
 
             {/* Modal Footer */}
@@ -558,7 +631,7 @@ export default function PersonalPage() {
                 {saving && (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 )}
-                {modalMode === 'create' ? 'Crear Colaborador' : 'Guardar Cambios'}
+                {modalMode === 'create' ? 'Crear Personal' : 'Guardar Cambios'}
               </button>
             </div>
           </div>
