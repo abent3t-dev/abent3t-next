@@ -58,7 +58,39 @@ function formatFileSize(bytes: number): string {
 interface Catalog {
   id: string;
   name: string;
+  key?: string;
 }
+
+type InstitutionType = 'external' | 'platform' | 'internal';
+
+const normalize = (s: string | null | undefined) =>
+  (s || '')
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+
+const findCatalogIdByName = (
+  catalog: Catalog[],
+  value: string | null | undefined,
+): string => {
+  const v = normalize(value);
+  if (!v) return '';
+  const match = catalog.find(
+    (c) => normalize(c.name) === v || (c.key && normalize(c.key) === v),
+  );
+  return match?.id || '';
+};
+
+const slugify = (s: string): string =>
+  s
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 50) || 'item';
 
 const statusConfig: Record<string, { label: string; bg: string; text: string; border: string; borderColor: string; icon: string }> = {
   pendiente: {
@@ -194,6 +226,21 @@ export default function PropuestasPage() {
   const [confirmingApproval, setConfirmingApproval] = useState<Proposal | null>(null);
   const [expandedProposals, setExpandedProposals] = useState<Set<string>>(new Set());
 
+  // Estado para creación inline de institución
+  const [creatingInstitution, setCreatingInstitution] = useState(false);
+  const [newInstitutionName, setNewInstitutionName] = useState('');
+  const [newInstitutionType, setNewInstitutionType] = useState<InstitutionType>('external');
+
+  // Estado para creación inline de tipo de curso
+  const [creatingCourseType, setCreatingCourseType] = useState(false);
+  const [newCourseTypeName, setNewCourseTypeName] = useState('');
+  const [newCourseTypeDescription, setNewCourseTypeDescription] = useState('');
+
+  // Estado para creación inline de modalidad
+  const [creatingModality, setCreatingModality] = useState(false);
+  const [newModalityName, setNewModalityName] = useState('');
+  const [newModalityDescription, setNewModalityDescription] = useState('');
+
   const toggleProposal = (id: string) => {
     setExpandedProposals((prev) => {
       const next = new Set(prev);
@@ -288,6 +335,48 @@ export default function PropuestasPage() {
     onError: () => notify.error('Error al aprobar propuesta'),
   });
 
+  const createInstitutionMutation = useMutation({
+    mutationFn: (data: { name: string; type: InstitutionType }) =>
+      api.post<Catalog>('/institutions', data),
+    onSuccess: (created) => {
+      qc.invalidateQueries({ queryKey: ['institutions'] });
+      setApprovalForm((prev) => ({ ...prev, institution_id: created.id }));
+      setCreatingInstitution(false);
+      setNewInstitutionName('');
+      setNewInstitutionType('external');
+      notify.success('Institución creada y seleccionada');
+    },
+    onError: () => notify.error('Error al crear institución'),
+  });
+
+  const createCourseTypeMutation = useMutation({
+    mutationFn: (data: { name: string; key: string; description?: string }) =>
+      api.post<Catalog>('/course-types', data),
+    onSuccess: (created) => {
+      qc.invalidateQueries({ queryKey: ['course-types'] });
+      setApprovalForm((prev) => ({ ...prev, course_type_id: created.id }));
+      setCreatingCourseType(false);
+      setNewCourseTypeName('');
+      setNewCourseTypeDescription('');
+      notify.success('Tipo de curso creado y seleccionado');
+    },
+    onError: () => notify.error('Error al crear tipo de curso'),
+  });
+
+  const createModalityMutation = useMutation({
+    mutationFn: (data: { name: string; key: string; description?: string }) =>
+      api.post<Catalog>('/modalities', data),
+    onSuccess: (created) => {
+      qc.invalidateQueries({ queryKey: ['modalities'] });
+      setApprovalForm((prev) => ({ ...prev, modality_id: created.id }));
+      setCreatingModality(false);
+      setNewModalityName('');
+      setNewModalityDescription('');
+      notify.success('Modalidad creada y seleccionada');
+    },
+    onError: () => notify.error('Error al crear modalidad'),
+  });
+
   const handleInvestigate = (id: string) => {
     investigateMutation.mutate(id);
   };
@@ -317,11 +406,14 @@ export default function PropuestasPage() {
   const handleConfirmApproval = () => {
     if (!confirmingApproval) return;
     setApprovingProposal(confirmingApproval);
+    // Preseleccionar institución y modalidad por coincidencia (case-insensitive y sin acentos)
+    const matchedInstitutionId = findCatalogIdByName(institutions, confirmingApproval.institution_name);
+    const matchedModalityId = findCatalogIdByName(modalities, confirmingApproval.modality);
     setApprovalForm({
       course_name: confirmingApproval.course_name,
-      institution_id: '',
+      institution_id: matchedInstitutionId,
       course_type_id: '',
-      modality_id: '',
+      modality_id: matchedModalityId,
       cost: confirmingApproval.estimated_cost,
       total_hours: confirmingApproval.estimated_hours,
       description: '',
@@ -331,7 +423,57 @@ export default function PropuestasPage() {
       instructor: '',
       review_notes: '',
     });
+    resetInlineCreators();
+    setNewInstitutionName(confirmingApproval.institution_name || '');
+    setNewModalityName(confirmingApproval.modality || '');
     setConfirmingApproval(null);
+  };
+
+  const handleCreateInstitution = () => {
+    const trimmed = newInstitutionName.trim();
+    if (trimmed.length < 2) {
+      notify.error('El nombre debe tener al menos 2 caracteres');
+      return;
+    }
+    createInstitutionMutation.mutate({ name: trimmed, type: newInstitutionType });
+  };
+
+  const handleCreateCourseType = () => {
+    const trimmed = newCourseTypeName.trim();
+    if (trimmed.length < 2) {
+      notify.error('El nombre debe tener al menos 2 caracteres');
+      return;
+    }
+    createCourseTypeMutation.mutate({
+      name: trimmed,
+      key: slugify(trimmed),
+      description: newCourseTypeDescription.trim() || undefined,
+    });
+  };
+
+  const handleCreateModality = () => {
+    const trimmed = newModalityName.trim();
+    if (trimmed.length < 2) {
+      notify.error('El nombre debe tener al menos 2 caracteres');
+      return;
+    }
+    createModalityMutation.mutate({
+      name: trimmed,
+      key: slugify(trimmed),
+      description: newModalityDescription.trim() || undefined,
+    });
+  };
+
+  const resetInlineCreators = () => {
+    setCreatingInstitution(false);
+    setNewInstitutionName('');
+    setNewInstitutionType('external');
+    setCreatingCourseType(false);
+    setNewCourseTypeName('');
+    setNewCourseTypeDescription('');
+    setCreatingModality(false);
+    setNewModalityName('');
+    setNewModalityDescription('');
   };
 
   const handleApprove = () => {
@@ -794,24 +936,24 @@ export default function PropuestasPage() {
 
               <div className="p-6 space-y-4">
                 <p className="text-sm text-[#424846]">
-                  <strong>Importante:</strong> Antes de aprobar esta propuesta, asegurate de:
+                  <strong>Importante:</strong> Antes de aprobar esta propuesta, asegúrate de:
                 </p>
                 <ul className="text-sm text-gray-600 space-y-3">
                   <li className="flex items-start gap-3 bg-gray-50 p-3 rounded-lg">
                     <span className="text-[#DFA922] mt-0.5">{Icons.search}</span>
-                    <span>Investigar el curso propuesto (revisar URL, contenido, calidad)</span>
-                  </li>
-                  <li className="flex items-start gap-3 bg-gray-50 p-3 rounded-lg">
-                    <span className="text-[#DFA922] mt-0.5">{Icons.office}</span>
-                    <span>Verificar que la <strong>institucion</strong> exista en el catalogo</span>
+                    <span>Investigar el curso propuesto (revisar URL, contenido y calidad)</span>
                   </li>
                   <li className="flex items-start gap-3 bg-gray-50 p-3 rounded-lg">
                     <span className="text-[#DFA922] mt-0.5">{Icons.book}</span>
-                    <span>Verificar <strong>tipo de curso</strong> y <strong>modalidad</strong> en catalogos</span>
+                    <span>Validar el <strong>nombre del curso</strong>, <strong>costo</strong> y <strong>duración</strong> con la información oficial de la institución</span>
+                  </li>
+                  <li className="flex items-start gap-3 bg-gray-50 p-3 rounded-lg">
+                    <span className="text-[#DFA922] mt-0.5">{Icons.calendar}</span>
+                    <span>Confirmar las <strong>fechas</strong> de inicio y fin del curso</span>
                   </li>
                 </ul>
-                <p className="text-xs text-gray-500 italic bg-[#222D59]/5 p-3 rounded-lg">
-                  Los catalogos se pueden administrar desde el menu &quot;Catalogos&quot; en la barra lateral.
+                <p className="text-xs text-[#424846] bg-[#52AF32]/10 border border-[#52AF32]/30 p-3 rounded-lg">
+                  <strong className="text-[#52AF32]">Tip:</strong> Si la <strong>institución</strong>, <strong>tipo de curso</strong> o <strong>modalidad</strong> aún no existen en el catálogo, podrás crearlos directamente en el siguiente paso sin salir de esta pantalla.
                 </p>
               </div>
 
@@ -884,51 +1026,231 @@ export default function PropuestasPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Institución *
-                    </label>
-                    <select
-                      value={approvalForm.institution_id}
-                      onChange={(e) => setApprovalForm({ ...approvalForm, institution_id: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
-                    >
-                      <option value="">Seleccionar...</option>
-                      {institutions.map((inst) => (
-                        <option key={inst.id} value={inst.id}>{inst.name}</option>
-                      ))}
-                    </select>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Institución *
+                      </label>
+                      {!creatingInstitution && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCreatingInstitution(true);
+                            if (!newInstitutionName) {
+                              setNewInstitutionName(approvingProposal?.institution_name || '');
+                            }
+                          }}
+                          className="text-xs font-medium text-[#52AF32] hover:text-[#67B52E] hover:underline"
+                        >
+                          + Crear nueva
+                        </button>
+                      )}
+                    </div>
+                    {!creatingInstitution ? (
+                      <select
+                        value={approvalForm.institution_id}
+                        onChange={(e) => setApprovalForm({ ...approvalForm, institution_id: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
+                      >
+                        <option value="">Seleccionar...</option>
+                        {institutions.map((inst) => (
+                          <option key={inst.id} value={inst.id}>{inst.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="border border-[#52AF32]/30 bg-[#52AF32]/5 rounded-xl p-3 space-y-2">
+                        <p className="text-xs text-[#424846]/70">
+                          Crea la institución en el catálogo. Puedes ajustar el nombre antes de guardar.
+                        </p>
+                        <input
+                          type="text"
+                          value={newInstitutionName}
+                          onChange={(e) => setNewInstitutionName(e.target.value)}
+                          placeholder="Ej: Coursera, LinkedIn Learning, ITESM"
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-transparent bg-white"
+                          autoFocus
+                        />
+                        <select
+                          value={newInstitutionType}
+                          onChange={(e) => setNewInstitutionType(e.target.value as InstitutionType)}
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-transparent bg-white"
+                        >
+                          <option value="external">Externa</option>
+                          <option value="platform">Plataforma</option>
+                          <option value="internal">Interna</option>
+                        </select>
+                        <div className="flex justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCreatingInstitution(false);
+                              setNewInstitutionName('');
+                              setNewInstitutionType('external');
+                            }}
+                            disabled={createInstitutionMutation.isPending}
+                            className="px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCreateInstitution}
+                            disabled={createInstitutionMutation.isPending}
+                            className="px-3 py-1.5 text-xs font-medium bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] disabled:opacity-50"
+                          >
+                            {createInstitutionMutation.isPending ? 'Creando...' : 'Crear y seleccionar'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tipo de Curso *
-                    </label>
-                    <select
-                      value={approvalForm.course_type_id}
-                      onChange={(e) => setApprovalForm({ ...approvalForm, course_type_id: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
-                    >
-                      <option value="">Seleccionar...</option>
-                      {courseTypes.map((ct) => (
-                        <option key={ct.id} value={ct.id}>{ct.name}</option>
-                      ))}
-                    </select>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Tipo de Curso *
+                      </label>
+                      {!creatingCourseType && (
+                        <button
+                          type="button"
+                          onClick={() => setCreatingCourseType(true)}
+                          className="text-xs font-medium text-[#52AF32] hover:text-[#67B52E] hover:underline"
+                        >
+                          + Crear nuevo
+                        </button>
+                      )}
+                    </div>
+                    {!creatingCourseType ? (
+                      <select
+                        value={approvalForm.course_type_id}
+                        onChange={(e) => setApprovalForm({ ...approvalForm, course_type_id: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
+                      >
+                        <option value="">Seleccionar...</option>
+                        {courseTypes.map((ct) => (
+                          <option key={ct.id} value={ct.id}>{ct.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="border border-[#52AF32]/30 bg-[#52AF32]/5 rounded-xl p-3 space-y-2">
+                        <p className="text-xs text-[#424846]/70">
+                          Define un nuevo tipo de curso para el catálogo (ej: clasificación pedagógica).
+                        </p>
+                        <input
+                          type="text"
+                          value={newCourseTypeName}
+                          onChange={(e) => setNewCourseTypeName(e.target.value)}
+                          placeholder="Ej: Diplomado, Curso, Taller, Certificación"
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-transparent bg-white"
+                          autoFocus
+                        />
+                        <input
+                          type="text"
+                          value={newCourseTypeDescription}
+                          onChange={(e) => setNewCourseTypeDescription(e.target.value)}
+                          placeholder="Descripción opcional (ej: Programa de 80+ horas con evaluación final)"
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-transparent bg-white"
+                        />
+                        <div className="flex justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCreatingCourseType(false);
+                              setNewCourseTypeName('');
+                              setNewCourseTypeDescription('');
+                            }}
+                            disabled={createCourseTypeMutation.isPending}
+                            className="px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCreateCourseType}
+                            disabled={createCourseTypeMutation.isPending}
+                            className="px-3 py-1.5 text-xs font-medium bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] disabled:opacity-50"
+                          >
+                            {createCourseTypeMutation.isPending ? 'Creando...' : 'Crear y seleccionar'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Modalidad *
-                    </label>
-                    <select
-                      value={approvalForm.modality_id}
-                      onChange={(e) => setApprovalForm({ ...approvalForm, modality_id: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
-                    >
-                      <option value="">Seleccionar...</option>
-                      {modalities.map((mod) => (
-                        <option key={mod.id} value={mod.id}>{mod.name}</option>
-                      ))}
-                    </select>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Modalidad *
+                      </label>
+                      {!creatingModality && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCreatingModality(true);
+                            if (!newModalityName) {
+                              setNewModalityName(approvingProposal?.modality || '');
+                            }
+                          }}
+                          className="text-xs font-medium text-[#52AF32] hover:text-[#67B52E] hover:underline"
+                        >
+                          + Crear nueva
+                        </button>
+                      )}
+                    </div>
+                    {!creatingModality ? (
+                      <select
+                        value={approvalForm.modality_id}
+                        onChange={(e) => setApprovalForm({ ...approvalForm, modality_id: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
+                      >
+                        <option value="">Seleccionar...</option>
+                        {modalities.map((mod) => (
+                          <option key={mod.id} value={mod.id}>{mod.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="border border-[#52AF32]/30 bg-[#52AF32]/5 rounded-xl p-3 space-y-2">
+                        <p className="text-xs text-[#424846]/70">
+                          Crea una nueva modalidad de impartición para el catálogo.
+                        </p>
+                        <input
+                          type="text"
+                          value={newModalityName}
+                          onChange={(e) => setNewModalityName(e.target.value)}
+                          placeholder="Ej: Presencial, Virtual, Híbrida, En vivo"
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-transparent bg-white"
+                          autoFocus
+                        />
+                        <input
+                          type="text"
+                          value={newModalityDescription}
+                          onChange={(e) => setNewModalityDescription(e.target.value)}
+                          placeholder="Descripción opcional (ej: Sesiones sincrónicas vía videoconferencia)"
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-transparent bg-white"
+                        />
+                        <div className="flex justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCreatingModality(false);
+                              setNewModalityName('');
+                              setNewModalityDescription('');
+                            }}
+                            disabled={createModalityMutation.isPending}
+                            className="px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCreateModality}
+                            disabled={createModalityMutation.isPending}
+                            className="px-3 py-1.5 text-xs font-medium bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] disabled:opacity-50"
+                          >
+                            {createModalityMutation.isPending ? 'Creando...' : 'Crear y seleccionar'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -1046,7 +1368,10 @@ export default function PropuestasPage() {
 
               <div className="px-6 py-4 border-t bg-gray-50 flex justify-end gap-3 sticky bottom-0">
                 <button
-                  onClick={() => setApprovingProposal(null)}
+                  onClick={() => {
+                    setApprovingProposal(null);
+                    resetInlineCreators();
+                  }}
                   className="px-5 py-2.5 text-sm text-gray-700 hover:text-gray-900 font-medium"
                 >
                   Cancelar
