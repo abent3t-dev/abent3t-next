@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
 import Pagination from '@/components/ui/Pagination';
+import { markSectionAsSeen } from '@/hooks/useSidebarBadges';
 import type {
   TrainingRequest,
   RequestStatus,
@@ -334,8 +335,10 @@ export default function SolicitudesPage() {
     if (activeTab === 'solicitudes') {
       loadRequests();
       loadStats();
+      markSectionAsSeen('solicitudes');
     } else {
       loadProposals();
+      markSectionAsSeen('propuestas');
     }
   }, [loadRequests, loadProposals, loadStats, activeTab]);
 

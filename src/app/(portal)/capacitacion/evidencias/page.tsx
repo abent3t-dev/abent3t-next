@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
 import Pagination from '@/components/ui/Pagination';
 import type { PaginatedResponse } from '@/types/pagination';
+import { markSectionAsSeen } from '@/hooks/useSidebarBadges';
 
 interface Evidence {
   id: string;
@@ -129,6 +130,11 @@ const Icons = {
 
 export default function EvidenciasPage() {
   const qc = useQueryClient();
+
+  useEffect(() => {
+    markSectionAsSeen('evidencias');
+  }, []);
+
   const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');

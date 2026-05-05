@@ -7,6 +7,26 @@ import { useSocket } from '@/contexts/SocketContext';
 import { SIDEBAR_NAV, ROLE_LABELS, type NavItem } from '@/types/auth';
 import { useState } from 'react';
 import { Logo } from '@/components/ui/Logo';
+import { useSidebarBadges } from '@/hooks/useSidebarBadges';
+
+/**
+ * Mapea cada ruta del sidebar al nombre de sección que usamos para badges.
+ * Si una ruta no tiene entrada aquí, no muestra badge.
+ */
+const BADGE_HREF_MAP: Record<string, 'solicitudes' | 'propuestas' | 'evidencias'> = {
+  '/capacitacion/solicitudes': 'solicitudes',
+  '/capacitacion/propuestas': 'propuestas',
+  '/capacitacion/evidencias': 'evidencias',
+};
+
+function SidebarBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[10px] font-bold leading-none bg-[#DFA922] text-[#424846] rounded-full shadow-sm shadow-[#DFA922]/30">
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
 
 const Icons: Record<string, React.FC<{ className?: string }>> = {
   settings: ({ className }) => (
@@ -140,7 +160,33 @@ const Icons: Record<string, React.FC<{ className?: string }>> = {
   ),
 };
 
-function NavItemComponent({ item, level = 0 }: { item: NavItem; level?: number }) {
+interface NavBadges {
+  solicitudes: number;
+  propuestas: number;
+  evidencias: number;
+}
+
+function getBadgeForItem(item: NavItem, badges: NavBadges): number {
+  const section = BADGE_HREF_MAP[item.href];
+  if (section) return badges[section];
+
+  // Para items con hijos, suma los badges de los hijos relevantes.
+  if (item.children && item.children.length > 0) {
+    return item.children.reduce((sum, child) => sum + getBadgeForItem(child, badges), 0);
+  }
+
+  return 0;
+}
+
+function NavItemComponent({
+  item,
+  level = 0,
+  badges,
+}: {
+  item: NavItem;
+  level?: number;
+  badges: NavBadges;
+}) {
   const pathname = usePathname();
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(pathname.startsWith(item.href));
@@ -161,6 +207,11 @@ function NavItemComponent({ item, level = 0 }: { item: NavItem; level?: number }
     return null;
   }
 
+  const badgeCount = getBadgeForItem(item, badges);
+  // En el item padre sólo mostramos el badge cuando está colapsado, para evitar
+  // duplicar el conteo cuando los hijos ya muestran el suyo.
+  const showParentBadge = hasChildren && !isOpen && badgeCount > 0;
+
   return (
     <div>
       {hasChildren ? (
@@ -174,6 +225,7 @@ function NavItemComponent({ item, level = 0 }: { item: NavItem; level?: number }
         >
           <Icon className="w-5 h-5 flex-shrink-0" />
           <span className="flex-1 text-left">{item.label}</span>
+          {showParentBadge && <SidebarBadge count={badgeCount} />}
           <Icons.chevron
             className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
           />
@@ -188,14 +240,15 @@ function NavItemComponent({ item, level = 0 }: { item: NavItem; level?: number }
           } ${level > 0 ? 'pl-12 ml-2' : ''}`}
         >
           <Icon className="w-5 h-5 flex-shrink-0" />
-          <span>{item.label}</span>
+          <span className="flex-1">{item.label}</span>
+          {badgeCount > 0 && <SidebarBadge count={badgeCount} />}
         </Link>
       )}
 
       {hasChildren && isOpen && (
         <div className="mt-1 ml-2 space-y-1 border-l-2 border-gray-600 pl-2">
           {visibleChildren.map((child) => (
-            <NavItemComponent key={child.href} item={child} level={level + 1} />
+            <NavItemComponent key={child.href} item={child} level={level + 1} badges={badges} />
           ))}
         </div>
       )}
@@ -206,6 +259,7 @@ function NavItemComponent({ item, level = 0 }: { item: NavItem; level?: number }
 export function Sidebar() {
   const { user, signOut } = useAuth();
   const { isConnected } = useSocket();
+  const badges = useSidebarBadges();
 
   return (
     <aside className="w-64 bg-[#424846] flex flex-col h-screen sticky top-0 shadow-2xl">
@@ -238,7 +292,7 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-dark">
         {SIDEBAR_NAV.map((item) => (
-          <NavItemComponent key={item.href} item={item} />
+          <NavItemComponent key={item.href} item={item} badges={badges} />
         ))}
       </nav>
 
