@@ -264,25 +264,41 @@ export function Sidebar() {
   return (
     <aside className="w-64 bg-[#424846] flex flex-col h-screen sticky top-0 shadow-2xl">
       {/* Logo / Header */}
-      <div className="h-20 px-6 py-4 bg-[#222D59]/60 border-b border-gray-600/50 flex items-center justify-center">
-        <Logo variant="white" size="md" showSubtitle />
+      <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-center overflow-hidden">
+        <Logo variant="default" size="md" showSubtitle />
       </div>
 
       {/* User Info */}
       {user && (
-        <div className="px-4 py-4 bg-[#222D59]/40 border-b border-gray-600/50">
-          <div className="flex items-center gap-3">
-            {/* Avatar placeholder */}
-            <div className="w-10 h-10 rounded-full bg-[#52AF32]/25 border-2 border-[#52AF32] flex items-center justify-center flex-shrink-0">
-              <span className="text-[#52AF32] font-bold text-sm">
-                {user.full_name?.charAt(0).toUpperCase() || 'U'}
-              </span>
+        <div className="px-3 py-3 border-b border-gray-600/50">
+          <div className="bg-[#222D59]/40 hover:bg-[#222D59]/60 transition-colors rounded-xl p-3 border border-white/5">
+            <div className="flex items-center gap-3">
+              {/* Avatar */}
+              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#52AF32] to-[#67B52E] flex items-center justify-center flex-shrink-0 shadow-lg shadow-[#52AF32]/30 ring-2 ring-[#52AF32]/20">
+                <span className="text-white font-bold text-base">
+                  {user.full_name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-white truncate text-sm leading-tight">
+                  {user.full_name || user.email?.split('@')[0] || 'Usuario'}
+                </p>
+                {user.email && (
+                  <p className="text-[11px] text-gray-400 truncate mt-0.5">{user.email}</p>
+                )}
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-white truncate text-sm">{user.full_name}</p>
-              <p className="text-xs text-[#52AF32] font-medium">{ROLE_LABELS[user.role]}</p>
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/10">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#52AF32]/20 text-[#52AF32] border border-[#52AF32]/30 whitespace-nowrap">
+                {ROLE_LABELS[user.role]}
+              </span>
               {user.departments && (
-                <p className="text-xs text-gray-300 truncate mt-0.5">{user.departments.name}</p>
+                <span className="text-[11px] text-gray-300 truncate flex items-center gap-1 min-w-0">
+                  <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  <span className="truncate">{user.departments.name}</span>
+                </span>
               )}
             </div>
           </div>
@@ -311,10 +327,10 @@ export function Sidebar() {
       </div>
 
       {/* Logout */}
-      <div className="p-4 bg-[#222D59]/60 border-t border-gray-600/50">
+      <div className="p-4 bg-gray-50 border-t border-gray-200">
         <button
           onClick={signOut}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/15 hover:text-red-300 transition-all duration-200 border border-red-500/30 hover:border-red-500/50"
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-200 border border-red-300 hover:border-red-400"
         >
           <Icons.logout className="w-5 h-5 flex-shrink-0" />
           <span>Cerrar Sesión</span>
