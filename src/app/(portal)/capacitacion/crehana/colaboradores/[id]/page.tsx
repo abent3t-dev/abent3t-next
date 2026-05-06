@@ -9,7 +9,7 @@ import {
   PLATFORM_ENROLLMENT_STATUS_LABELS,
   PLATFORM_ENROLLMENT_STATUS_COLORS,
 } from '@/types/platforms';
-import { Avatar, ProgressBar } from '@/components/platforms/CrehanaUI';
+import { Avatar, ProgressBar, normalizeExternalUrl } from '@/components/platforms/CrehanaUI';
 
 export default function CrehanaUserDetailPage() {
   const params = useParams<{ id: string }>();
@@ -157,14 +157,14 @@ export default function CrehanaUserDetailPage() {
                   {enrollments.map((e) => (
                     <tr key={e.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 text-sm text-gray-900 max-w-md">
-                        {e.course?.course_url ? (
+                        {normalizeExternalUrl(e.course?.course_url) ? (
                           <a
-                            href={e.course.course_url}
+                            href={normalizeExternalUrl(e.course?.course_url)!}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="font-medium hover:underline inline-flex items-center gap-1"
                           >
-                            {e.course.name}
+                            {e.course?.name}
                             <IconExternal />
                           </a>
                         ) : (
@@ -199,9 +199,9 @@ export default function CrehanaUserDetailPage() {
                           : <span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        {e.certificate_url ? (
+                        {normalizeExternalUrl(e.certificate_url) ? (
                           <a
-                            href={e.certificate_url}
+                            href={normalizeExternalUrl(e.certificate_url)!}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-amber-700 hover:underline font-medium"

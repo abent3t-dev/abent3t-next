@@ -61,6 +61,20 @@ export function Avatar({
   );
 }
 
+/**
+ * Normaliza una URL externa que puede venir sin protocolo desde Crehana
+ * (p.ej. "crehana.com/diplomas/abc"). Si ya viene con http(s) la deja igual.
+ * Devuelve null si la URL es vacía o inválida.
+ */
+export function normalizeExternalUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith('//')) return `https:${trimmed}`;
+  return `https://${trimmed.replace(/^\/+/, '')}`;
+}
+
 export function ProgressBar({ value }: { value: number }) {
   const v = Math.max(0, Math.min(100, Math.round(value)));
   const color =

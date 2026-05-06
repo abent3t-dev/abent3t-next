@@ -364,3 +364,54 @@ export interface CrehanaUserDetail {
   };
   enrollments: CrehanaUserDetailEnrollment[];
 }
+
+export interface CrehanaCourseDetailEnrollment {
+  id: string;
+  status: PlatformEnrollmentStatus;
+  progress_percentage: number;
+  hours_completed: number;
+  enrolled_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  last_activity_at: string | null;
+  certificate_url: string | null;
+  certificate_issued_at: string | null;
+  user: {
+    external_user_id: string | null;
+    external_email: string | null;
+    external_username: string | null;
+    is_linked: boolean;
+    profile: {
+      id: string;
+      full_name: string;
+      email: string;
+      departments: { id: string; name: string } | null;
+    } | null;
+  };
+}
+
+export interface CrehanaCourseDetail {
+  course: {
+    id: string;
+    external_course_id: string;
+    name: string;
+    total_hours: number;
+    course_url: string | null;
+    thumbnail_url: string | null;
+    last_synced_at: string;
+    description: string | null;
+    instructor: string | null;
+    total_modules: number;
+    total_lessons: number;
+  };
+  stats: {
+    total_enrollments: number;
+    completed: number;
+    in_progress: number;
+    not_started: number;
+    average_progress: number;
+    total_hours_studied: number;
+    certificates_issued: number;
+  };
+  enrollments: CrehanaCourseDetailEnrollment[];
+}

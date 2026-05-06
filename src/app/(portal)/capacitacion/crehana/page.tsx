@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import {
@@ -9,7 +10,7 @@ import {
   CrehanaCourseRow,
   CrehanaUserRow,
 } from '@/types/platforms';
-import { Avatar, ProgressBar } from '@/components/platforms/CrehanaUI';
+import { Avatar, ProgressBar, normalizeExternalUrl } from '@/components/platforms/CrehanaUI';
 
 type Tab = 'resumen' | 'cursos' | 'colaboradores';
 
@@ -408,6 +409,7 @@ function CircularProgress({ value }: { value: number }) {
 // =====================================================
 
 function CursosTab() {
+  const router = useRouter();
   const [search, setSearch] = useState('');
   const { data: courses = [], isLoading, error, refetch } = useQuery({
     queryKey: ['crehana-courses'],
@@ -461,7 +463,13 @@ function CursosTab() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-100">
               {filtered.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                <tr
+                  key={c.id}
+                  onClick={() =>
+                    router.push(`/capacitacion/crehana/cursos/${c.external_course_id}`)
+                  }
+                  className="hover:bg-[#52AF32]/5 transition-colors cursor-pointer"
+                >
                   <td className="px-4 py-3 text-sm text-gray-900 max-w-md">
                     <div className="font-medium leading-snug">{c.name}</div>
                   </td>
@@ -479,11 +487,12 @@ function CursosTab() {
                     <ProgressBar value={c.average_progress} />
                   </td>
                   <td className="px-4 py-3 text-sm">
-                    {c.course_url ? (
+                    {normalizeExternalUrl(c.course_url) ? (
                       <a
-                        href={c.course_url}
+                        href={normalizeExternalUrl(c.course_url)!}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
                         className="inline-flex items-center gap-1 text-[#52AF32] hover:underline font-medium"
                       >
                         Abrir <IconExternal className="w-3 h-3" />
@@ -507,6 +516,7 @@ function CursosTab() {
 // =====================================================
 
 function ColaboradoresTab() {
+  const router = useRouter();
   const [search, setSearch] = useState('');
   const [showOnlyLinked, setShowOnlyLinked] = useState(false);
 
@@ -584,7 +594,13 @@ function ColaboradoresTab() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-100">
               {filtered.map((u) => (
-                <tr key={u.external_user_id} className="hover:bg-gray-50 transition-colors">
+                <tr
+                  key={u.external_user_id}
+                  onClick={() =>
+                    router.push(`/capacitacion/crehana/colaboradores/${u.external_user_id}`)
+                  }
+                  className="hover:bg-[#52AF32]/5 transition-colors cursor-pointer"
+                >
                   <td className="px-4 py-3 text-sm">
                     <div className="flex items-center gap-3">
                       <Avatar
@@ -630,12 +646,9 @@ function ColaboradoresTab() {
                       : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3 text-sm text-right">
-                    <Link
-                      href={`/capacitacion/crehana/colaboradores/${u.external_user_id}`}
-                      className="inline-flex items-center gap-1 text-[#52AF32] hover:underline font-medium"
-                    >
+                    <span className="inline-flex items-center gap-1 text-[#52AF32] font-medium">
                       Ver <IconArrowRight className="w-3 h-3" />
-                    </Link>
+                    </span>
                   </td>
                 </tr>
               ))}
