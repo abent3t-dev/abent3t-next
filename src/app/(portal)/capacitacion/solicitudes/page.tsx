@@ -5,12 +5,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
 import Pagination from '@/components/ui/Pagination';
+import CourseCombobox from '@/components/capacitacion/CourseCombobox';
+import CollaboratorCombobox from '@/components/capacitacion/CollaboratorCombobox';
 import { markSectionAsSeen } from '@/hooks/useSidebarBadges';
 import type {
   TrainingRequest,
   RequestStatus,
   Course,
-  CourseEdition,
   UserProfile,
 } from '@/types/catalogs';
 import type { PaginatedResponse, PaginationMeta } from '@/types/pagination';
@@ -195,7 +196,6 @@ export default function SolicitudesPage() {
   // Modal para crear solicitud
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
-  const [editions, setEditions] = useState<CourseEdition[]>([]);
   const [collaborators, setCollaborators] = useState<UserProfile[]>([]);
   const [selectedCourse, setSelectedCourse] = useState('');
   const [selectedEdition, setSelectedEdition] = useState('');
@@ -294,12 +294,6 @@ export default function SolicitudesPage() {
     setCourses(data.filter((c) => c.is_active && (c.active_editions_count ?? 0) > 0));
   };
 
-  // Cargar ediciones de un curso
-  const loadEditions = async (courseId: string) => {
-    const data = await api.get<CourseEdition[]>(`/courses/${courseId}/editions`);
-    setEditions(data.filter((e) => e.is_active));
-  };
-
   // Cargar colaboradores del departamento del jefe
   const loadCollaborators = async () => {
     if (!user?.department_id) return;
@@ -354,19 +348,13 @@ export default function SolicitudesPage() {
     setSelectedEdition('');
     setSelectedCollaborator('');
     setRequestReason('');
-    setEditions([]);
     setCreateModalOpen(true);
   };
 
-  // Cuando cambia el curso, cargar ediciones
-  const handleCourseChange = async (courseId: string) => {
+  // Cuando se selecciona curso + edición desde el picker
+  const handleCourseAndEditionChange = (courseId: string, editionId: string) => {
     setSelectedCourse(courseId);
-    setSelectedEdition('');
-    if (courseId) {
-      await loadEditions(courseId);
-    } else {
-      setEditions([]);
-    }
+    setSelectedEdition(editionId);
   };
 
   // Crear solicitud
@@ -1197,62 +1185,40 @@ export default function SolicitudesPage() {
                 <p className="text-white/80 text-sm">Solicita un curso para un colaborador de tu equipo</p>
               </div>
               <form onSubmit={handleCreate} className="p-6 space-y-4">
-                <label className="block">
-                  <span className="text-sm font-medium text-[#424846]">Curso *</span>
-                  <select
-                    value={selectedCourse}
-                    onChange={(e) => handleCourseChange(e.target.value)}
-                    required
-                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
-                  >
-                    <option value="">— Seleccionar curso —</option>
-                    {courses.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} (${c.cost.toLocaleString()})
-                      </option>
-                    ))}
-                  </select>
+                <div className="block">
+                  <span className="text-sm font-medium text-[#424846]">Curso y edición *</span>
+                  <div className="mt-1">
+                    <CourseCombobox
+                      courses={courses}
+                      value={selectedCourse}
+                      editionValue={selectedEdition}
+                      onChange={handleCourseAndEditionChange}
+                      emptyHint="Prueba con otro nombre, institución o modalidad."
+                    />
+                  </div>
                   {courses.length === 0 && (
                     <p className="mt-2 text-xs text-[#DFA922]">
                       No hay cursos con ediciones disponibles para solicitar. Contacta a RRHH para que registren una edicion.
                     </p>
                   )}
-                </label>
+                </div>
 
-                <label className="block">
-                  <span className="text-sm font-medium text-[#424846]">Edicion *</span>
-                  <select
-                    value={selectedEdition}
-                    onChange={(e) => setSelectedEdition(e.target.value)}
-                    required
-                    disabled={!selectedCourse}
-                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm disabled:bg-gray-50 disabled:text-gray-400 focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
-                  >
-                    <option value="">— Seleccionar edicion —</option>
-                    {editions.map((ed) => (
-                      <option key={ed.id} value={ed.id}>
-                        {ed.start_date} {ed.instructor ? `- ${ed.instructor}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block">
+                <div className="block">
                   <span className="text-sm font-medium text-[#424846]">Colaborador *</span>
-                  <select
-                    value={selectedCollaborator}
-                    onChange={(e) => setSelectedCollaborator(e.target.value)}
-                    required
-                    className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
-                  >
-                    <option value="">— Seleccionar colaborador —</option>
-                    {collaborators.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.full_name} ({c.position || 'Sin puesto'})
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <div className="mt-1">
+                    <CollaboratorCombobox
+                      collaborators={collaborators}
+                      value={selectedCollaborator}
+                      onChange={setSelectedCollaborator}
+                      emptyHint="Solo aparecen colaboradores activos de tu área."
+                    />
+                  </div>
+                  {collaborators.length === 0 && (
+                    <p className="mt-2 text-xs text-[#DFA922]">
+                      No hay colaboradores disponibles en tu área.
+                    </p>
+                  )}
+                </div>
 
                 <label className="block">
                   <span className="text-sm font-medium text-[#424846]">Motivo de la solicitud</span>
