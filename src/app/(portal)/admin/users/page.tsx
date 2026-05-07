@@ -7,7 +7,21 @@ import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
 import { queryKeys } from '@/lib/queryKeys';
-import { ROLE_LABELS, type UserRole, type UserProfile } from '@/types/auth';
+import { ROLE_LABELS, MODULE_ROLES, type UserRole, type UserModule, type UserProfile } from '@/types/auth';
+import UserRolesModal from '@/components/auth/UserRolesModal';
+import ExistingUserBanner from '@/components/auth/ExistingUserBanner';
+import { useEmailLookup } from '@/hooks/useEmailLookup';
+
+/** Mapa rápido rol → módulo para inferir destino del rol seleccionado. */
+const ROLE_MODULE_MAP = (() => {
+  const map: Partial<Record<UserRole, UserModule>> = {};
+  (Object.keys(MODULE_ROLES) as UserModule[]).forEach((mod) => {
+    MODULE_ROLES[mod].forEach((role) => {
+      map[role] = mod;
+    });
+  });
+  return map;
+})();
 
 interface Department {
   id: string;
@@ -46,10 +60,15 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
     </svg>
   ),
+  shield: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M12 3l8 4v5c0 5-3.5 9-8 10-4.5-1-8-5-8-10V7l8-4z" />
+    </svg>
+  ),
 };
 
 export default function UsersPage() {
-  const { user: currentUser, loading: authLoading } = useAuth();
+  const { user: currentUser, loading: authLoading, refreshUser } = useAuth();
   const router = useRouter();
   const qc = useQueryClient();
   const [error, setError] = useState('');
@@ -58,6 +77,9 @@ export default function UsersPage() {
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+
+  // Modal de gestión de roles por módulo
+  const [rolesModalUser, setRolesModalUser] = useState<UserProfile | null>(null);
 
   // Form data
   const [formData, setFormData] = useState({
@@ -68,6 +90,13 @@ export default function UsersPage() {
     role: 'colaborador' as UserRole,
     department_id: '',
   });
+
+  // Lookup de email: detecta si ya existe un usuario en el sistema antes de
+  // hacer submit. Si existe, el banner explica que solo se le agregará el rol.
+  const emailLookup = useEmailLookup();
+  const existingUser =
+    emailLookup.result?.exists ? emailLookup.result : null;
+  const targetModule = ROLE_MODULE_MAP[formData.role] ?? 'capacitacion';
 
   useEffect(() => {
     if (!authLoading && currentUser?.role !== 'super_admin') {
@@ -106,6 +135,7 @@ export default function UsersPage() {
       department_id: '',
     });
     setError('');
+    emailLookup.reset();
     setShowModal(true);
   };
 
@@ -133,19 +163,35 @@ export default function UsersPage() {
   const invalidateUsers = () => qc.invalidateQueries({ queryKey: queryKeys.users.all });
 
   const createMutation = useMutation({
-    mutationFn: (data: typeof formData) =>
-      api.post('/auth/users', {
+    mutationFn: (data: typeof formData) => {
+      // Si el usuario ya existe, solo enviamos email + role. El backend
+      // ignora los demás campos y class-validator rechaza strings vacíos.
+      const payload: Record<string, unknown> = {
         email: data.email,
-        password: data.password,
-        full_name: data.full_name,
-        position: data.position || undefined,
         role: data.role,
-        department_id: data.department_id || undefined,
-      }),
-    onSuccess: () => {
+      };
+      if (!existingUser) {
+        payload.password = data.password;
+        payload.full_name = data.full_name;
+        if (data.position) payload.position = data.position;
+        if (data.department_id) payload.department_id = data.department_id;
+      }
+      return api.post<UserProfile & {
+        existing_user_added_role?: boolean;
+        added_role?: UserRole;
+        added_module?: string;
+      }>('/auth/users', payload);
+    },
+    onSuccess: (result) => {
       invalidateUsers();
       closeModal();
-      notify.success('Usuario creado correctamente');
+      if (result.existing_user_added_role) {
+        notify.success(
+          `Este email ya estaba registrado como "${result.full_name}". Se le agregó el rol como acceso adicional.`,
+        );
+      } else {
+        notify.success('Usuario creado correctamente');
+      }
     },
     onError: (err: Error) => {
       const message = err.message || 'Error al crear usuario';
@@ -163,8 +209,11 @@ export default function UsersPage() {
         await api.put(`/auth/users/${data.userId}/department`, { department_id: data.department_id || null });
       }
     },
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       invalidateUsers();
+      // Si el super_admin se editó a sí mismo, refrescar AuthContext
+      // para que el sidebar y los permisos reflejen los nuevos datos.
+      if (vars.userId === currentUser?.id) refreshUser();
       closeModal();
       notify.success('Usuario actualizado correctamente');
     },
@@ -188,13 +237,20 @@ export default function UsersPage() {
   });
 
   const handleCreate = async () => {
-    if (!formData.email || !formData.password || !formData.full_name) {
-      setError('Email, contraseña y nombre son requeridos');
+    if (!formData.email) {
+      setError('El correo es requerido');
       return;
     }
-    if (formData.password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
-      return;
+    // Si el usuario ya existe, password/nombre no se usan en el backend.
+    if (!existingUser) {
+      if (!formData.password || !formData.full_name) {
+        setError('Contraseña y nombre son requeridos');
+        return;
+      }
+      if (formData.password.length < 6) {
+        setError('La contraseña debe tener al menos 6 caracteres');
+        return;
+      }
     }
     setError('');
     createMutation.mutate(formData);
@@ -365,6 +421,13 @@ export default function UsersPage() {
                     >
                       {Icons.edit}
                     </button>
+                    <button
+                      onClick={() => setRolesModalUser(user)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Gestionar roles por módulo"
+                    >
+                      {Icons.shield}
+                    </button>
                     {user.is_active && user.id !== currentUser?.id && (
                       <button
                         onClick={() => handleDeactivate(user.id)}
@@ -432,34 +495,51 @@ export default function UsersPage() {
                     <input
                       type="email"
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, email: e.target.value });
+                        emailLookup.reset();
+                      }}
+                      onBlur={(e) => emailLookup.check(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
                       placeholder="usuario@empresa.com"
                     />
+                    {emailLookup.checking && (
+                      <p className="mt-1 text-xs text-gray-500">Verificando email…</p>
+                    )}
                   </div>
+
+                  {existingUser && (
+                    <ExistingUserBanner
+                      result={existingUser}
+                      newRole={formData.role}
+                      newModule={targetModule}
+                    />
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Contraseña *
+                      Contraseña {existingUser ? '' : '*'}
                     </label>
                     <input
                       type="password"
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
-                      placeholder="Mínimo 6 caracteres"
+                      disabled={!!existingUser}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                      placeholder={existingUser ? 'No aplica — usuario existente' : 'Mínimo 6 caracteres'}
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nombre Completo *
+                      Nombre Completo {existingUser ? '' : '*'}
                     </label>
                     <input
                       type="text"
-                      value={formData.full_name}
+                      value={existingUser ? existingUser.profile?.full_name ?? '' : formData.full_name}
                       onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
+                      disabled={!!existingUser}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 disabled:text-gray-700 disabled:cursor-not-allowed"
                       placeholder="Nombre y apellidos"
                     />
                   </div>
@@ -470,9 +550,10 @@ export default function UsersPage() {
                     </label>
                     <input
                       type="text"
-                      value={formData.position}
+                      value={existingUser ? existingUser.profile?.position ?? '' : formData.position}
                       onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
+                      disabled={!!existingUser}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 disabled:text-gray-700 disabled:cursor-not-allowed"
                       placeholder="Ej: Analista, Gerente, etc."
                     />
                   </div>
@@ -545,12 +626,23 @@ export default function UsersPage() {
                 {saving && (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 )}
-                {modalMode === 'create' ? 'Crear Usuario' : 'Guardar Cambios'}
+                {modalMode === 'edit'
+                  ? 'Guardar Cambios'
+                  : existingUser
+                    ? 'Agregar rol al usuario existente'
+                    : 'Crear Usuario'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Modal de gestión de roles por módulo */}
+      <UserRolesModal
+        open={!!rolesModalUser}
+        user={rolesModalUser}
+        onClose={() => setRolesModalUser(null)}
+      />
     </div>
   );
 }

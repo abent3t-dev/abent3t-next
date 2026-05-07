@@ -20,7 +20,10 @@ export default function RoleGate({ children }: RoleGateProps) {
   const pathname = usePathname();
 
   const allowedRoles = getAllowedRoles(pathname);
-  const isAllowed = !allowedRoles || (user && allowedRoles.includes(user.role));
+  // Verifica contra la lista de roles efectivos (multi-módulo) además del rol primario.
+  const userRoles = user ? (user.roles ?? [user.role]) : [];
+  const isAllowed =
+    !allowedRoles || userRoles.some((r) => allowedRoles.includes(r));
 
   useEffect(() => {
     if (loading) return;

@@ -5,6 +5,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
 import { queryKeys } from '@/lib/queryKeys';
+import { useEmailLookup } from '@/hooks/useEmailLookup';
+import ExistingUserBanner from '@/components/auth/ExistingUserBanner';
+import type { UserRole } from '@/types/auth';
 
 interface Department {
   id: string;
@@ -16,7 +19,13 @@ interface Personnel {
   email: string;
   full_name: string;
   position: string | null;
+  /** Rol "efectivo" en el módulo de Capacitación. Si es shared, este es
+   *  el rol del user_roles (no el primario de otro módulo). */
   role: string;
+  /** Rol primario crudo (puede estar fuera de PERSONNEL_ROLES_FILTER si es shared). */
+  primary_role?: string;
+  /** True si el usuario tiene rol primario en otro módulo. */
+  is_shared_user?: boolean;
   department_id: string | null;
   is_active: boolean;
   deactivated_at: string | null;
@@ -106,6 +115,12 @@ export default function PersonalPage() {
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [editingPerson, setEditingPerson] = useState<Personnel | null>(null);
 
+  // Lookup de email: detecta si ya existe un usuario con ese correo en el
+  // sistema y le avisa al admin antes de hacer submit (evita confusión).
+  const emailLookup = useEmailLookup();
+  const existingUser =
+    emailLookup.result?.exists ? emailLookup.result : null;
+
   // Form data
   const [formData, setFormData] = useState<{
     email: string;
@@ -167,6 +182,7 @@ export default function PersonalPage() {
       role: 'colaborador',
     });
     setError('');
+    emailLookup.reset();
     setShowModal(true);
   };
 
@@ -196,19 +212,37 @@ export default function PersonalPage() {
   };
 
   const createMutation = useMutation({
-    mutationFn: (data: typeof formData) =>
-      api.post('/personnel', {
+    mutationFn: (data: typeof formData) => {
+      // Si el usuario ya existe, NO mandamos password/full_name/position/department_id
+      // — el backend los ignora y class-validator rechaza strings vacíos.
+      // Solo email + role son necesarios para "agregar rol al existente".
+      const payload: Record<string, unknown> = {
         email: data.email,
-        password: data.password,
-        full_name: data.full_name,
-        position: data.position || undefined,
-        department_id: data.department_id || undefined,
         role: data.role,
-      }),
-    onSuccess: () => {
+      };
+      if (!existingUser) {
+        payload.password = data.password;
+        payload.full_name = data.full_name;
+        if (data.position) payload.position = data.position;
+        if (data.department_id) payload.department_id = data.department_id;
+      }
+      return api.post<{
+        full_name: string;
+        existing_user_added_role?: boolean;
+        added_role?: string;
+        added_module?: string;
+      }>('/personnel', payload);
+    },
+    onSuccess: (result) => {
       invalidatePersonnel();
       closeModal();
-      notify.success('Personal creado correctamente');
+      if (result.existing_user_added_role) {
+        notify.success(
+          `Este email ya estaba registrado como "${result.full_name}". Se le agregó el rol de capacitación como acceso adicional.`,
+        );
+      } else {
+        notify.success('Personal creado correctamente');
+      }
     },
     onError: (err: Error) => {
       const message = err.message || 'Error al crear personal';
@@ -245,13 +279,20 @@ export default function PersonalPage() {
   });
 
   const handleCreate = async () => {
-    if (!formData.email || !formData.password || !formData.full_name) {
-      setError('Email, contraseña y nombre son requeridos');
+    if (!formData.email) {
+      setError('El correo es requerido');
       return;
     }
-    if (formData.password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
-      return;
+    // Si el usuario ya existe, password/nombre no se usan en el backend.
+    if (!existingUser) {
+      if (!formData.password || !formData.full_name) {
+        setError('Contraseña y nombre son requeridos');
+        return;
+      }
+      if (formData.password.length < 6) {
+        setError('La contraseña debe tener al menos 6 caracteres');
+        return;
+      }
     }
     setError('');
     createMutation.mutate(formData);
@@ -420,9 +461,22 @@ export default function PersonalPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${roleStyles[person.role] || 'bg-gray-100 text-gray-600'}`}>
-                      {roleLabels[person.role] || person.role}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${roleStyles[person.role] || 'bg-gray-100 text-gray-600'}`}>
+                        {roleLabels[person.role] || person.role}
+                      </span>
+                      {person.is_shared_user && (
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-blue-50 text-blue-700 border border-blue-200"
+                          title="Este usuario también tiene rol primario en otro módulo (Compras o Contabilidad). Solo puedes editar su rol de capacitación."
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                          </svg>
+                          Compartido
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">
                     {person.position || <span className="text-gray-400">—</span>}
@@ -451,7 +505,7 @@ export default function PersonalPage() {
                       >
                         {Icons.edit}
                       </button>
-                      {person.is_active && (
+                      {person.is_active && !person.is_shared_user && (
                         <button
                           onClick={() => handleDeactivate(person.id)}
                           className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
@@ -460,7 +514,7 @@ export default function PersonalPage() {
                           {Icons.ban}
                         </button>
                       )}
-                      {!person.is_active && (
+                      {!person.is_active && !person.is_shared_user && (
                         <button
                           onClick={() => handleReactivate(person.id)}
                           className="p-2 text-[#52AF32] hover:bg-[#52AF32]/10 rounded-lg transition-colors"
@@ -519,22 +573,39 @@ export default function PersonalPage() {
                     <input
                       type="email"
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, email: e.target.value });
+                        // Si el email cambió, invalidar el resultado anterior
+                        emailLookup.reset();
+                      }}
+                      onBlur={(e) => emailLookup.check(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
                       placeholder="colaborador@empresa.com"
                     />
+                    {emailLookup.checking && (
+                      <p className="mt-1 text-xs text-gray-500">Verificando email…</p>
+                    )}
                   </div>
+
+                  {existingUser && (
+                    <ExistingUserBanner
+                      result={existingUser}
+                      newRole={formData.role as UserRole}
+                      newModule="capacitacion"
+                    />
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Contraseña *
+                      Contraseña {existingUser ? '' : '*'}
                     </label>
                     <input
                       type="password"
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
-                      placeholder="Mínimo 6 caracteres"
+                      disabled={!!existingUser}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                      placeholder={existingUser ? 'No aplica — usuario existente' : 'Mínimo 6 caracteres'}
                     />
                   </div>
                 </>
@@ -554,13 +625,14 @@ export default function PersonalPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre Completo *
+                  Nombre Completo {existingUser ? '' : '*'}
                 </label>
                 <input
                   type="text"
-                  value={formData.full_name}
+                  value={existingUser ? existingUser.profile?.full_name ?? '' : formData.full_name}
                   onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
+                  disabled={!!existingUser}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 disabled:text-gray-700 disabled:cursor-not-allowed"
                   placeholder="Nombre y apellidos"
                 />
               </div>
@@ -571,9 +643,10 @@ export default function PersonalPage() {
                 </label>
                 <input
                   type="text"
-                  value={formData.position}
+                  value={existingUser ? existingUser.profile?.position ?? '' : formData.position}
                   onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
+                  disabled={!!existingUser}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100 disabled:text-gray-700 disabled:cursor-not-allowed"
                   placeholder="Ej: Analista, Coordinador, etc."
                 />
               </div>
@@ -583,9 +656,10 @@ export default function PersonalPage() {
                   Área
                 </label>
                 <select
-                  value={formData.department_id}
+                  value={existingUser ? existingUser.profile?.departments?.id ?? '' : formData.department_id}
                   onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+                  disabled={!!existingUser}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white disabled:bg-gray-100 disabled:text-gray-700 disabled:cursor-not-allowed"
                 >
                   <option value="">Sin asignar</option>
                   {departments.map((dept) => (
@@ -631,7 +705,11 @@ export default function PersonalPage() {
                 {saving && (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 )}
-                {modalMode === 'create' ? 'Crear Personal' : 'Guardar Cambios'}
+                {modalMode === 'edit'
+                  ? 'Guardar Cambios'
+                  : existingUser
+                    ? 'Agregar rol al usuario existente'
+                    : 'Crear Personal'}
               </button>
             </div>
           </div>

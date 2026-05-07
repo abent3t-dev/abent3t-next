@@ -191,8 +191,12 @@ function NavItemComponent({
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(pathname.startsWith(item.href));
 
-  // Verificar si el usuario tiene permiso para ver este item
-  if (!user || !item.roles.includes(user.role)) {
+  // Verificar si el usuario tiene permiso para ver este item.
+  // Usamos la lista efectiva de roles (multi-módulo) en lugar del rol primario.
+  const userRoles = user ? (user.roles ?? [user.role]) : [];
+  const userHasItemAccess = (roles: string[]) => roles.some((r) => userRoles.includes(r as typeof userRoles[number]));
+
+  if (!user || !userHasItemAccess(item.roles)) {
     return null;
   }
 
@@ -201,7 +205,7 @@ function NavItemComponent({
   const hasChildren = item.children && item.children.length > 0;
 
   // Filtrar hijos que el usuario puede ver
-  const visibleChildren = item.children?.filter((child) => child.roles.includes(user.role)) || [];
+  const visibleChildren = item.children?.filter((child) => userHasItemAccess(child.roles)) || [];
 
   if (hasChildren && visibleChildren.length === 0) {
     return null;

@@ -22,11 +22,29 @@ export type UserRole =
   | 'director_financiero'   // Director financiero
   | 'accionista';           // Accionista (solo lectura)
 
+/** Módulos del sistema: agrupan los roles por área funcional. */
+export type UserModule = 'core' | 'capacitacion' | 'compras' | 'contabilidad';
+
+/** Asignación de un rol específico a un módulo (de la tabla user_roles). */
+export interface UserRoleAssignment {
+  module: UserModule;
+  role: UserRole;
+}
+
 export interface UserProfile {
   id: string;
   email: string;
   full_name: string;
+  /** Rol primario (legado, mantiene retrocompatibilidad). */
   role: UserRole;
+  /**
+   * Lista deduplicada de roles efectivos del usuario, combinando profiles.role
+   * con todas las asignaciones de user_roles. Una persona puede tener roles
+   * distintos en módulos distintos.
+   */
+  roles: UserRole[];
+  /** Asignaciones detalladas (módulo + rol) desde user_roles. */
+  role_assignments: UserRoleAssignment[];
   department_id: string | null;
   is_active: boolean;
   position: string | null;
@@ -41,6 +59,38 @@ export interface NavItem {
   roles: UserRole[];
   children?: NavItem[];
 }
+
+/**
+ * Roles válidos por módulo. Usado por la UI de gestión de roles
+ * (/admin/users) para construir el dropdown de "agregar rol al módulo X".
+ * El orden coincide con la migración 015_user_roles_multi_module.sql.
+ */
+export const MODULE_ROLES: Record<UserModule, UserRole[]> = {
+  core: ['super_admin', 'executive'],
+  capacitacion: ['admin_rh', 'jefe_area', 'director', 'colaborador', 'collaborator'],
+  compras: [
+    'comprador',
+    'coordinador_compras',
+    'lider_procura',
+    'aprobador_nivel_1',
+    'aprobador_nivel_2',
+    'aprobador_nivel_3',
+    'director_general',
+    'solicitante',
+  ],
+  contabilidad: ['contabilidad', 'fiscal', 'director_financiero', 'accionista'],
+};
+
+/** Etiquetas legibles de los módulos. */
+export const MODULE_LABELS: Record<UserModule, string> = {
+  core: 'Core (transversal)',
+  capacitacion: 'Capacitación',
+  compras: 'Compras',
+  contabilidad: 'Contabilidad',
+};
+
+/** Lista ordenada de módulos para iterar en UI. */
+export const ALL_MODULES: UserModule[] = ['core', 'capacitacion', 'compras', 'contabilidad'];
 
 // ==========================================
 // GRUPOS DE ROLES - CAPACITACION/RRHH

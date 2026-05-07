@@ -22,6 +22,9 @@ interface AuthContextValue {
   signInWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   hasRole: (...roles: UserRole[]) => boolean;
+  /** Refresca el perfil/roles del usuario actual desde el backend. Útil
+   *  después de cambiarse a uno mismo los roles desde /admin/users. */
+  refreshUser: () => Promise<void>;
   isSuperAdmin: boolean;
   isAdminRH: boolean;
   isManager: boolean;
@@ -152,18 +155,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.href = '/login';
   };
 
+  /**
+   * Refresca el perfil/roles del usuario actual.
+   * Se llama después de que un super_admin se modifique los roles a sí mismo
+   * desde /admin/users — sin esto, el sidebar quedaba desfasado hasta logout.
+   */
+  const refreshUser = useCallback(async () => {
+    try {
+      const profile = await api.get<UserProfile>('/auth/me');
+      setUser(profile);
+    } catch (err) {
+      console.error('Error refreshing user:', err);
+    }
+  }, []);
+
+  /**
+   * Devuelve true si el usuario tiene CUALQUIERA de los roles solicitados.
+   * Consulta la lista efectiva de roles (profiles.role + user_roles), no
+   * solo el rol primario.
+   */
   const hasRole = useCallback((...roles: UserRole[]) => {
     if (!user) return false;
-    return roles.includes(user.role);
+    const effective = user.roles ?? [user.role];
+    return roles.some((r) => effective.includes(r));
   }, [user]);
 
-  const isSuperAdmin = user?.role === 'super_admin';
-  const isAdminRH = user?.role === 'admin_rh' || user?.role === 'super_admin';
-  const isManager = ['super_admin', 'admin_rh', 'jefe_area', 'director'].includes(user?.role || '');
+  const effectiveRoles = user?.roles ?? (user ? [user.role] : []);
+  const isSuperAdmin = effectiveRoles.includes('super_admin');
+  const isAdminRH = isSuperAdmin || effectiveRoles.includes('admin_rh');
+  const isManager =
+    isSuperAdmin ||
+    effectiveRoles.some((r) => r === 'admin_rh' || r === 'jefe_area' || r === 'director');
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, signInWithMicrosoft, signInWithEmail, signOut, hasRole, isSuperAdmin, isAdminRH, isManager }}
+      value={{ user, loading, signInWithMicrosoft, signInWithEmail, signOut, hasRole, refreshUser, isSuperAdmin, isAdminRH, isManager }}
     >
       {children}
     </AuthContext.Provider>

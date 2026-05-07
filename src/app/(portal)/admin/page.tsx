@@ -5,18 +5,18 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function AdminPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, isSuperAdmin } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!loading) {
-      if (user?.role !== 'super_admin') {
+      if (!isSuperAdmin) {
         router.replace('/home');
       } else {
         router.replace('/admin/users');
       }
     }
-  }, [user, loading, router]);
+  }, [user, loading, isSuperAdmin, router]);
 
   return (
     <div className="p-6">

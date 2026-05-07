@@ -175,9 +175,9 @@ const proposalStatusColors: Record<string, string> = {
 };
 
 export default function SolicitudesPage() {
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin_rh' || user?.role === 'super_admin';
-  const isManager = user?.role === 'jefe_area' || user?.role === 'director';
+  const { user, hasRole } = useAuth();
+  const isAdmin = hasRole('admin_rh', 'super_admin');
+  const isManager = hasRole('jefe_area', 'director');
 
   const [requests, setRequests] = useState<TrainingRequest[]>([]);
   const [loading, setLoading] = useState(true);

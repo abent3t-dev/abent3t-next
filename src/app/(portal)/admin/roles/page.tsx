@@ -6,16 +6,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ROLE_LABELS, SIDEBAR_NAV, type UserRole } from '@/types/auth';
 
 export default function RolesPage() {
-  const { user, loading } = useAuth();
+  const { loading, isSuperAdmin } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && user?.role !== 'super_admin') {
+    if (!loading && !isSuperAdmin) {
       router.replace('/home');
     }
-  }, [user, loading, router]);
+  }, [loading, isSuperAdmin, router]);
 
-  if (loading || user?.role !== 'super_admin') {
+  if (loading || !isSuperAdmin) {
     return <div className="p-6 text-center text-gray-500">Cargando...</div>;
   }
 

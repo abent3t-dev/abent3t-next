@@ -95,13 +95,13 @@ const Icons = {
 };
 
 export default function MiEquipoPage() {
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
   const router = useRouter();
   const [filter, setFilter] = useState<'all' | 'en_curso' | 'completo' | 'pendiente'>('all');
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
 
-  // Redirect if not jefe_area or director
-  if (user && !['jefe_area', 'director', 'admin_rh', 'super_admin'].includes(user.role)) {
+  // Redirect if not jefe_area or director (acepta roles múltiples por módulo)
+  if (user && !hasRole('jefe_area', 'director', 'admin_rh', 'super_admin')) {
     router.replace('/capacitacion/mis-cursos');
     return null;
   }

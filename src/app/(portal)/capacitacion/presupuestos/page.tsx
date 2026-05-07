@@ -69,7 +69,7 @@ const Icons = {
 };
 
 export default function PresupuestosPage() {
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
   const router = useRouter();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -99,16 +99,19 @@ export default function PresupuestosPage() {
     total: number;
   } | null>(null);
 
-  const canManage = user?.role === 'super_admin' || user?.role === 'admin_rh';
+  const canManage = hasRole('super_admin', 'admin_rh');
+  const isOnlyEmployee =
+    !!user && !hasRole('super_admin', 'admin_rh', 'jefe_area', 'director', 'executive') &&
+    hasRole('colaborador', 'collaborator');
 
   useEffect(() => {
-    if (user?.role === 'colaborador' || user?.role === 'collaborator') {
+    if (isOnlyEmployee) {
       router.replace('/capacitacion/mis-cursos');
       return;
     }
 
     loadData();
-  }, [user, router]);
+  }, [user, router, isOnlyEmployee]);
 
   // Auto-close import modal on successful import (without errors)
   useEffect(() => {
