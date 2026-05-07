@@ -67,7 +67,9 @@ export interface NavItem {
  */
 export const MODULE_ROLES: Record<UserModule, UserRole[]> = {
   core: ['super_admin', 'executive'],
-  capacitacion: ['admin_rh', 'jefe_area', 'director', 'colaborador', 'collaborator'],
+  // 'collaborator' (alias legacy en inglés) NO se incluye en el dropdown.
+  // Se sigue reconociendo en datos existentes via PERSONNEL_ROLES_FILTER backend.
+  capacitacion: ['admin_rh', 'jefe_area', 'director', 'colaborador'],
   compras: [
     'comprador',
     'coordinador_compras',
@@ -91,6 +93,46 @@ export const MODULE_LABELS: Record<UserModule, string> = {
 
 /** Lista ordenada de módulos para iterar en UI. */
 export const ALL_MODULES: UserModule[] = ['core', 'capacitacion', 'compras', 'contabilidad'];
+
+/**
+ * Prioridad para elegir el rol "principal" cuando un usuario tiene varios.
+ * Usado para HOME_ROUTES post-login y para badges que muestran un solo rol.
+ * Debe coincidir con backend (user-roles.helper.ts).
+ */
+export const ROLE_PRIORITY: UserRole[] = [
+  'super_admin',
+  'director_general',
+  'director_financiero',
+  'lider_procura',
+  'admin_rh',
+  'director',
+  'coordinador_compras',
+  'accionista',
+  'fiscal',
+  'contabilidad',
+  'jefe_area',
+  'aprobador_nivel_3',
+  'aprobador_nivel_2',
+  'aprobador_nivel_1',
+  'comprador',
+  'solicitante',
+  'executive',
+  'colaborador',
+  'collaborator',
+];
+
+/**
+ * Devuelve el rol "principal" de un usuario para fines de display
+ * (badge, redirect post-login). null si no tiene roles conocidos.
+ */
+export function getDisplayRole(roles: UserRole[] | undefined | null): UserRole | null {
+  if (!roles || roles.length === 0) return null;
+  const set = new Set(roles);
+  for (const r of ROLE_PRIORITY) {
+    if (set.has(r)) return r;
+  }
+  return roles[0];
+}
 
 // ==========================================
 // GRUPOS DE ROLES - CAPACITACION/RRHH

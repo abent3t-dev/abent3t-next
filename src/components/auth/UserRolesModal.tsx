@@ -29,9 +29,26 @@ interface UserRolesModalProps {
   open: boolean;
   user: UserProfile | null;
   onClose: () => void;
+  /**
+   * Si se pasa, solo se muestran y permiten editar los módulos en esta lista.
+   * Útil para que admin_rh solo vea Capacitación.
+   */
+  allowedModules?: UserModule[];
+  /**
+   * Si se pasa, el dropdown de "agregar rol" y los botones de "revocar" solo
+   * actúan sobre estos roles. Útil para que admin_rh solo pueda asignar/revocar
+   * Colaborador o Jefe de Área (no admin_rh ni director).
+   */
+  allowedRoles?: UserRole[];
 }
 
-export default function UserRolesModal({ open, user, onClose }: UserRolesModalProps) {
+export default function UserRolesModal({
+  open,
+  user,
+  onClose,
+  allowedModules,
+  allowedRoles,
+}: UserRolesModalProps) {
   const qc = useQueryClient();
   const { user: currentUser, refreshUser } = useAuth();
   const isSelf = !!user && currentUser?.id === user.id;
@@ -94,10 +111,8 @@ export default function UserRolesModal({ open, user, onClose }: UserRolesModalPr
           {/* Body */}
           <div className="px-6 py-5 max-h-[70vh] overflow-y-auto space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-              Este usuario puede tener roles en distintos módulos. El{' '}
-              <strong>rol primario</strong> ({ROLE_LABELS[user.role] ?? user.role})
-              se controla desde el botón &quot;Editar usuario&quot;. Aquí puedes
-              <strong> asignar roles adicionales</strong> en otros módulos.
+              Asigna o revoca roles del usuario por módulo. Cada módulo puede
+              tener uno o varios roles activos al mismo tiempo.
             </div>
 
             {rolesQuery.isLoading ? (
@@ -106,7 +121,7 @@ export default function UserRolesModal({ open, user, onClose }: UserRolesModalPr
               </div>
             ) : (
               <div className="space-y-4">
-                {ALL_MODULES.map((mod) => (
+                {(allowedModules ?? ALL_MODULES).map((mod) => (
                   <ModuleSection
                     key={mod}
                     module={mod}
@@ -114,6 +129,7 @@ export default function UserRolesModal({ open, user, onClose }: UserRolesModalPr
                     onAssign={(role) => assignMutation.mutate({ module: mod, role })}
                     onRevoke={(roleId) => revokeMutation.mutate(roleId)}
                     isWorking={assignMutation.isPending || revokeMutation.isPending}
+                    allowedRoles={allowedRoles}
                   />
                 ))}
               </div>
@@ -146,17 +162,24 @@ function ModuleSection({
   onAssign,
   onRevoke,
   isWorking,
+  allowedRoles,
 }: {
   module: UserModule;
   assignments: UserRoleAssignmentRow[];
   onAssign: (role: UserRole) => void;
   onRevoke: (roleId: string) => void;
   isWorking: boolean;
+  /** Si se pasa, solo se permiten asignar/revocar roles dentro de esta lista. */
+  allowedRoles?: UserRole[];
 }) {
   const [selectedRole, setSelectedRole] = useState<UserRole | ''>('');
-  const validRoles = MODULE_ROLES[module];
+  // Roles válidos según el módulo, opcionalmente restringidos por allowedRoles
+  const validRoles = allowedRoles
+    ? MODULE_ROLES[module].filter((r) => allowedRoles.includes(r))
+    : MODULE_ROLES[module];
   const assignedRoles = new Set(assignments.map((a) => a.role));
   const availableRoles = validRoles.filter((r) => !assignedRoles.has(r));
+  const canRevoke = (role: UserRole) => !allowedRoles || allowedRoles.includes(role);
 
   const handleAssign = () => {
     if (!selectedRole) return;
@@ -194,14 +217,23 @@ function ModuleSection({
                   asignado {new Date(a.granted_at).toLocaleDateString('es-MX')}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => onRevoke(a.id)}
-                disabled={isWorking}
-                className="text-xs font-medium text-red-600 hover:text-red-800 hover:underline disabled:opacity-50"
-              >
-                Revocar
-              </button>
+              {canRevoke(a.role) ? (
+                <button
+                  type="button"
+                  onClick={() => onRevoke(a.id)}
+                  disabled={isWorking}
+                  className="text-xs font-medium text-red-600 hover:text-red-800 hover:underline disabled:opacity-50"
+                >
+                  Revocar
+                </button>
+              ) : (
+                <span
+                  className="text-xs text-gray-400"
+                  title="No tienes permiso para gestionar este rol"
+                >
+                  Solo lectura
+                </span>
+              )}
             </div>
           ))
         )}

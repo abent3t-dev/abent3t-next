@@ -7,7 +7,8 @@ import { notify } from '@/lib/notifications';
 import { queryKeys } from '@/lib/queryKeys';
 import { useEmailLookup } from '@/hooks/useEmailLookup';
 import ExistingUserBanner from '@/components/auth/ExistingUserBanner';
-import type { UserRole } from '@/types/auth';
+import UserRolesModal from '@/components/auth/UserRolesModal';
+import type { UserProfile, UserRole } from '@/types/auth';
 
 interface Department {
   id: string;
@@ -19,14 +20,10 @@ interface Personnel {
   email: string;
   full_name: string;
   position: string | null;
-  /** Rol "efectivo" en el módulo de Capacitación. Si es shared, este es
-   *  el rol del user_roles (no el primario de otro módulo). */
+  /** Rol efectivo del usuario en el módulo Capacitación (priorizado). */
   role: string;
-  /** Rol primario crudo (puede estar fuera de PERSONNEL_ROLES_FILTER si es shared). */
-  primary_role?: string;
-  /** True si el usuario tiene rol primario en otro módulo. */
-  is_shared_user?: boolean;
   department_id: string | null;
+  /** is_active combina la cuenta global y el rol activo en capacitación. */
   is_active: boolean;
   deactivated_at: string | null;
   departments: { id: string; name: string } | null;
@@ -88,6 +85,11 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
     </svg>
   ),
+  shield: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M12 3l8 4v5c0 5-3.5 9-8 10-4.5-1-8-5-8-10V7l8-4z" />
+    </svg>
+  ),
   search: (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -112,6 +114,8 @@ export default function PersonalPage() {
 
   // Modal states
   const [showModal, setShowModal] = useState(false);
+  // Modal de gestión de roles (solo módulo capacitación para admin_rh)
+  const [rolesPerson, setRolesPerson] = useState<Personnel | null>(null);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [editingPerson, setEditingPerson] = useState<Personnel | null>(null);
 
@@ -307,7 +311,6 @@ export default function PersonalPage() {
         full_name: formData.full_name,
         position: formData.position || undefined,
         department_id: formData.department_id || undefined,
-        role: formData.role,
       },
     });
   };
@@ -461,22 +464,9 @@ export default function PersonalPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${roleStyles[person.role] || 'bg-gray-100 text-gray-600'}`}>
-                        {roleLabels[person.role] || person.role}
-                      </span>
-                      {person.is_shared_user && (
-                        <span
-                          className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-blue-50 text-blue-700 border border-blue-200"
-                          title="Este usuario también tiene rol primario en otro módulo (Compras o Contabilidad). Solo puedes editar su rol de capacitación."
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                          </svg>
-                          Compartido
-                        </span>
-                      )}
-                    </div>
+                    <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${roleStyles[person.role] || 'bg-gray-100 text-gray-600'}`}>
+                      {roleLabels[person.role] || person.role}
+                    </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">
                     {person.position || <span className="text-gray-400">—</span>}
@@ -505,20 +495,27 @@ export default function PersonalPage() {
                       >
                         {Icons.edit}
                       </button>
-                      {person.is_active && !person.is_shared_user && (
+                      <button
+                        onClick={() => setRolesPerson(person)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Gestionar roles en Capacitación"
+                      >
+                        {Icons.shield}
+                      </button>
+                      {person.is_active && (
                         <button
                           onClick={() => handleDeactivate(person.id)}
                           className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Dar de baja"
+                          title="Dar de baja en Capacitación"
                         >
                           {Icons.ban}
                         </button>
                       )}
-                      {!person.is_active && !person.is_shared_user && (
+                      {!person.is_active && (
                         <button
                           onClick={() => handleReactivate(person.id)}
                           className="p-2 text-[#52AF32] hover:bg-[#52AF32]/10 rounded-lg transition-colors"
-                          title="Reactivar"
+                          title="Reactivar en Capacitación"
                         >
                           {Icons.check}
                         </button>
@@ -670,22 +667,29 @@ export default function PersonalPage() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Rol *
-                </label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as PersonnelRole })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
-                >
-                  <option value="colaborador">Colaborador</option>
-                  <option value="jefe_area">Jefe de Área</option>
-                </select>
-                <p className="mt-1 text-xs text-gray-500">
-                  Los Jefes de Área pueden solicitar capacitación para colaboradores de su área.
+              {modalMode === 'create' ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Rol inicial *
+                  </label>
+                  <select
+                    value={formData.role}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value as PersonnelRole })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+                  >
+                    <option value="colaborador">Colaborador</option>
+                    <option value="jefe_area">Jefe de Área</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Después puedes cambiarlo desde el botón &quot;Gestionar roles&quot; (escudo) en la fila.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded p-2">
+                  Para cambiar el rol del usuario en Capacitación usa el botón
+                  <span className="font-medium"> &quot;Gestionar roles&quot;</span> (escudo) en la fila.
                 </p>
-              </div>
+              )}
             </div>
 
             {/* Modal Footer */}
@@ -715,6 +719,16 @@ export default function PersonalPage() {
           </div>
         </div>
       )}
+
+      {/* Modal de gestión de roles (admin_rh solo gestiona Capacitación,
+          y dentro solo puede asignar Colaborador o Jefe de Área) */}
+      <UserRolesModal
+        open={!!rolesPerson}
+        user={rolesPerson as unknown as UserProfile | null}
+        onClose={() => setRolesPerson(null)}
+        allowedModules={['capacitacion']}
+        allowedRoles={['colaborador', 'jefe_area']}
+      />
     </div>
   );
 }

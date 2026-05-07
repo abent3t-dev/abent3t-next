@@ -201,10 +201,9 @@ export default function UsersPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { userId: string; role: UserRole; department_id: string; prevRole: UserRole; prevDeptId: string }) => {
-      if (data.role !== data.prevRole) {
-        await api.put(`/auth/users/${data.userId}/role`, { role: data.role });
-      }
+    mutationFn: async (data: { userId: string; department_id: string; prevDeptId: string }) => {
+      // Editar usuario solo cambia atributos del PERSONA (departamento por ahora).
+      // Los roles se gestionan desde el botón "Gestionar roles".
       if (data.department_id !== data.prevDeptId) {
         await api.put(`/auth/users/${data.userId}/department`, { department_id: data.department_id || null });
       }
@@ -261,9 +260,7 @@ export default function UsersPage() {
     setError('');
     updateMutation.mutate({
       userId: editingUser.id,
-      role: formData.role,
       department_id: formData.department_id,
-      prevRole: editingUser.role,
       prevDeptId: editingUser.department_id || '',
     });
   };
@@ -573,21 +570,33 @@ export default function UsersPage() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Rol
-                </label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
-                >
-                  <option value="super_admin" className="text-gray-900">Super Administrador</option>
-                  <option value="admin_rh" className="text-gray-900">Administrador RRHH</option>
-                  <option value="jefe_area" className="text-gray-900">Jefe de Área</option>
-                  <option value="director" className="text-gray-900">Director</option>
-                  <option value="executive" className="text-gray-900">Ejecutivo</option>
-                  <option value="colaborador" className="text-gray-900">Colaborador</option>
-                </select>
+                {modalMode === 'create' ? (
+                  <>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Rol inicial
+                    </label>
+                    <select
+                      value={formData.role}
+                      onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+                    >
+                      <option value="super_admin" className="text-gray-900">Super Administrador</option>
+                      <option value="admin_rh" className="text-gray-900">Administrador RRHH</option>
+                      <option value="jefe_area" className="text-gray-900">Jefe de Área</option>
+                      <option value="director" className="text-gray-900">Director</option>
+                      <option value="executive" className="text-gray-900">Ejecutivo</option>
+                      <option value="colaborador" className="text-gray-900">Colaborador</option>
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Después puedes asignarle más roles desde el botón &quot;Gestionar roles&quot;.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded p-2">
+                    Para cambiar los roles del usuario usa el botón
+                    <span className="font-medium"> &quot;Gestionar roles&quot;</span> (escudo) en la fila.
+                  </p>
+                )}
               </div>
 
               <div>
