@@ -12,7 +12,6 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { UserProfile, UserRole } from '@/types/auth';
-import { HOME_ROUTES } from '@/types/auth';
 import { api } from '@/lib/api';
 
 interface AuthContextValue {
@@ -137,13 +136,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const profile = await api.get<UserProfile>('/auth/me');
       setUser(profile);
-      // Redirigir a la página de inicio según el rol
-      const homeRoute = HOME_ROUTES[profile.role] || '/capacitacion/mis-cursos';
-      window.location.href = homeRoute;
     } catch {
-      // Profile might not exist yet, redirect to default
-      window.location.href = '/capacitacion/mis-cursos';
+      // Profile might not exist yet — el landing /home se encargará de orientar.
     }
+    // Página de inicio única: muestra tarjetas de los módulos accesibles.
+    window.location.href = '/home';
 
     return { error: null };
   };

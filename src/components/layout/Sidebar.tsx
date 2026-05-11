@@ -4,8 +4,16 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSocket } from '@/contexts/SocketContext';
-import { SIDEBAR_NAV, ROLE_LABELS, type NavItem } from '@/types/auth';
-import { useState } from 'react';
+import {
+  SIDEBAR_NAV,
+  ROLE_LABELS,
+  getDisplayRole,
+  type NavItem,
+  type UserModule,
+  type UserProfile,
+  type UserRole,
+} from '@/types/auth';
+import { useEffect, useState } from 'react';
 import { Logo } from '@/components/ui/Logo';
 import { useSidebarBadges } from '@/hooks/useSidebarBadges';
 
@@ -18,6 +26,60 @@ const BADGE_HREF_MAP: Record<string, 'solicitudes' | 'propuestas' | 'evidencias'
   '/capacitacion/propuestas': 'propuestas',
   '/capacitacion/evidencias': 'evidencias',
 };
+
+/**
+ * Devuelve el módulo "activo" según el pathname. Sirve tanto para escribir
+ * el subtítulo del logo como para elegir qué rol mostrar en el badge del
+ * usuario.
+ */
+function getCurrentModule(pathname: string): UserModule | null {
+  if (pathname.startsWith('/admin')) return 'core';
+  if (pathname.startsWith('/compras')) return 'compras';
+  if (pathname.startsWith('/contabilidad')) return 'contabilidad';
+  if (
+    pathname.startsWith('/capacitacion') ||
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/courses') ||
+    pathname.startsWith('/catalogs') ||
+    pathname.startsWith('/personal') ||
+    pathname.startsWith('/reportes') ||
+    pathname.startsWith('/auditoria')
+  ) {
+    return 'capacitacion';
+  }
+  return null;
+}
+
+const MODULE_SUBTITLE: Record<UserModule, string> = {
+  core: 'Administración',
+  capacitacion: 'Capacitación',
+  compras: 'Compras',
+  contabilidad: 'Contabilidad',
+};
+
+function getModuleSubtitle(pathname: string): string {
+  const module = getCurrentModule(pathname);
+  return module ? MODULE_SUBTITLE[module] : 'Plataforma Integral';
+}
+
+/**
+ * Elige qué rol mostrar en el badge del usuario:
+ *  - Si el pathname pertenece a un módulo concreto y el usuario tiene un rol
+ *    asignado en ese módulo, mostramos ese rol (el badge "se adapta" al
+ *    contexto: Fiscal en Contabilidad, Solicitante en Compras, etc.).
+ *  - Si no, caemos al rol "display" por prioridad (super_admin, director,
+ *    admin_rh, ...). Esto cubre /home y a super_admin viajando por módulos
+ *    donde no tiene una asignación explícita.
+ */
+function getRoleForBadge(user: UserProfile, pathname: string): UserRole {
+  const module = getCurrentModule(pathname);
+  if (module && user.role_assignments?.length) {
+    const assignment = user.role_assignments.find((a) => a.module === module);
+    if (assignment) return assignment.role;
+  }
+  const roles = user.roles ?? [user.role];
+  return getDisplayRole(roles) ?? user.role;
+}
 
 function SidebarBadge({ count }: { count: number }) {
   if (count <= 0) return null;
@@ -189,23 +251,44 @@ function NavItemComponent({
 }) {
   const pathname = usePathname();
   const { user } = useAuth();
-  const [isOpen, setIsOpen] = useState(pathname.startsWith(item.href));
 
   // Verificar si el usuario tiene permiso para ver este item.
   // Usamos la lista efectiva de roles (multi-módulo) en lugar del rol primario.
   const userRoles = user ? (user.roles ?? [user.role]) : [];
   const userHasItemAccess = (roles: string[]) => roles.some((r) => userRoles.includes(r as typeof userRoles[number]));
 
+  // Filtrar hijos que el usuario puede ver
+  const visibleChildren = item.children?.filter((child) => userHasItemAccess(child.roles)) || [];
+
+  // ¿La ruta actual cae dentro de este item o de alguno de sus hijos?
+  // El padre tiene un `href` distinto al prefijo de sus hijos (p.ej. el
+  // padre "Capacitacion" apunta a /dashboard mientras sus hijos viven en
+  // /capacitacion/*), por lo que hay que revisar también a los descendientes
+  // para auto-expandir la sección al navegar.
+  const matchesHref = (href: string) =>
+    pathname === href || pathname.startsWith(href + '/');
+  const pathMatches =
+    matchesHref(item.href) || visibleChildren.some((c) => matchesHref(c.href));
+
+  const [isOpen, setIsOpen] = useState(pathMatches);
+
+  // Cuando el usuario navega hacia esta sección (p.ej. clickea una tarjeta
+  // de módulo en /home), abrimos el grupo automáticamente. No la cerramos
+  // si el usuario navegó fuera, para respetar un toggle manual.
+  useEffect(() => {
+    if (pathMatches) setIsOpen(true);
+  }, [pathMatches]);
+
   if (!user || !userHasItemAccess(item.roles)) {
     return null;
   }
 
   const Icon = Icons[item.icon] || Icons.database;
-  const isActive = pathname === item.href || (item.children && pathname.startsWith(item.href));
   const hasChildren = item.children && item.children.length > 0;
-
-  // Filtrar hijos que el usuario puede ver
-  const visibleChildren = item.children?.filter((child) => userHasItemAccess(child.roles)) || [];
+  // Conservamos la lógica original de highlight: solo se pinta verde el
+  // ítem cuya ruta coincide exactamente (no el padre cuando un hijo está
+  // activo), para mantener la estética que el cliente ya validó.
+  const isActive = pathname === item.href || (hasChildren && pathname.startsWith(item.href));
 
   if (hasChildren && visibleChildren.length === 0) {
     return null;
@@ -264,13 +347,21 @@ export function Sidebar() {
   const { user, signOut } = useAuth();
   const { isConnected } = useSocket();
   const badges = useSidebarBadges();
+  const pathname = usePathname();
+  const moduleSubtitle = getModuleSubtitle(pathname);
+  const badgeRole = user ? getRoleForBadge(user, pathname) : null;
 
   return (
     <aside className="w-64 bg-[#424846] flex flex-col h-screen sticky top-0 shadow-2xl">
-      {/* Logo / Header */}
-      <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-center overflow-hidden">
-        <Logo variant="default" size="md" showSubtitle />
-      </div>
+      {/* Logo / Header — clickeable para volver al selector de módulos */}
+      <Link
+        href="/home"
+        title="Ir al inicio"
+        aria-label="Ir al inicio"
+        className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-center overflow-hidden hover:bg-gray-100 transition-colors"
+      >
+        <Logo variant="default" size="md" showSubtitle subtitle={moduleSubtitle} />
+      </Link>
 
       {/* User Info */}
       {user && (
@@ -294,7 +385,7 @@ export function Sidebar() {
             </div>
             <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/10">
               <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#52AF32]/20 text-[#52AF32] border border-[#52AF32]/30 whitespace-nowrap">
-                {ROLE_LABELS[user.role]}
+                {ROLE_LABELS[badgeRole ?? user.role]}
               </span>
               {user.departments && (
                 <span className="text-[11px] text-gray-300 truncate flex items-center gap-1 min-w-0">

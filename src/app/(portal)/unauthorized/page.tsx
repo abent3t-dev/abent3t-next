@@ -1,12 +1,11 @@
 'use client';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { HOME_ROUTES } from '@/types/auth';
 import Link from 'next/link';
 
 export default function UnauthorizedPage() {
   const { user } = useAuth();
-  const homeRoute = user ? HOME_ROUTES[user.role] || '/home' : '/login';
+  const homeRoute = user ? '/home' : '/login';
 
   return (
     <div className="flex items-center justify-center min-h-[60vh]">

@@ -7,7 +7,11 @@ export interface LogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
   showSubtitle?: boolean;
+  /** Texto del subtítulo. Si no se pasa, se usa el valor por defecto. */
+  subtitle?: string;
 }
+
+const DEFAULT_SUBTITLE = 'Plataforma Integral';
 
 const LOGO_PATHS = {
   default: '/logos/logo-a3t.png',
@@ -35,11 +39,13 @@ function LogoFallback({
   variant,
   className,
   showSubtitle,
+  subtitle,
 }: {
   size: 'sm' | 'md' | 'lg' | 'xl';
   variant: 'default' | 'white' | 'icon';
   className?: string;
   showSubtitle?: boolean;
+  subtitle?: string;
 }) {
   const isWhite = variant === 'white';
   const isIcon = variant === 'icon';
@@ -79,7 +85,7 @@ function LogoFallback({
       </h1>
       {showSubtitle && (
         <p className={`font-medium mt-0.5 ${subtitleSizes[size]} ${isWhite ? 'text-gray-300' : 'text-gray-500'}`}>
-          Sistema de Capacitacion
+          {subtitle ?? DEFAULT_SUBTITLE}
         </p>
       )}
     </div>
@@ -91,6 +97,7 @@ export function Logo({
   size = 'md',
   className,
   showSubtitle = false,
+  subtitle,
 }: LogoProps) {
   const [imageError, setImageError] = useState(false);
 
@@ -104,6 +111,7 @@ export function Logo({
         variant={variant}
         className={className}
         showSubtitle={showSubtitle}
+        subtitle={subtitle}
       />
     );
   }
@@ -123,7 +131,7 @@ export function Logo({
         <p className={`font-medium mt-1 ${
           size === 'sm' ? 'text-[8px]' : size === 'md' ? 'text-xs' : size === 'lg' ? 'text-sm' : 'text-base'
         } ${variant === 'white' ? 'text-gray-300' : 'text-gray-500'}`}>
-          Sistema de Capacitacion
+          {subtitle ?? DEFAULT_SUBTITLE}
         </p>
       )}
     </div>
