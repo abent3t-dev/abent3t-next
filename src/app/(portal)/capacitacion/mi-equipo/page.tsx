@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { BarChart } from '@/components/charts/BarChart';
 
 interface Enrollment {
   id: string;
@@ -55,7 +56,7 @@ interface TeamMember {
 
 const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
   inscrito: { label: 'Inscrito', color: 'text-blue-700', bgColor: 'bg-blue-100' },
-  en_curso: { label: 'En Curso', color: 'text-yellow-700', bgColor: 'bg-yellow-100' },
+  en_curso: { label: 'En Progreso', color: 'text-yellow-700', bgColor: 'bg-yellow-100' },
   completo: { label: 'Completado', color: 'text-green-700', bgColor: 'bg-green-100' },
   pendiente_evidencia: { label: 'Pendiente Evidencia', color: 'text-orange-700', bgColor: 'bg-orange-100' },
   cancelado: { label: 'Cancelado', color: 'text-red-700', bgColor: 'bg-red-100' },
@@ -112,6 +113,27 @@ export default function MiEquipoPage() {
     enabled: !!user?.department_id,
   });
 
+  // Estado efectivo basado en fechas: una inscripción con status='inscrito'
+  // ya entró en curso si hoy >= start_date, y queda pendiente de evidencia
+  // si ya pasó la fecha fin. Las stats deben contar por estado efectivo, no
+  // por el crudo de la DB (si no, el chip de la fila dice "En Progreso" pero
+  // el contador dice 0).
+  const getEffectiveStatus = (enrollment: Enrollment) => {
+    const today = new Date();
+    const startDate = new Date(enrollment.course_editions?.start_date);
+    const endDate = enrollment.course_editions?.end_date
+      ? new Date(enrollment.course_editions.end_date)
+      : null;
+
+    if (enrollment.status === 'inscrito' && today >= startDate) {
+      return 'en_curso';
+    }
+    if ((enrollment.status === 'inscrito' || enrollment.status === 'en_curso') && endDate && today > endDate) {
+      return 'pendiente_evidencia';
+    }
+    return enrollment.status;
+  };
+
   // Agrupar inscripciones por colaborador
   const teamMembers = useMemo(() => {
     const membersMap = new Map<string, TeamMember>();
@@ -148,12 +170,13 @@ export default function MiEquipoPage() {
       const hours = enrollment.course_editions?.courses?.total_hours || 0;
       member.stats.totalHours += hours;
 
-      if (enrollment.status === 'completo') {
+      const effective = getEffectiveStatus(enrollment);
+      if (effective === 'completo') {
         member.stats.completed++;
         member.stats.completedHours += hours;
-      } else if (enrollment.status === 'en_curso') {
+      } else if (effective === 'en_curso') {
         member.stats.inProgress++;
-      } else if (enrollment.status === 'pendiente_evidencia') {
+      } else if (effective === 'pendiente_evidencia') {
         member.stats.pending++;
       }
     });
@@ -175,15 +198,30 @@ export default function MiEquipoPage() {
     });
   }, [teamMembers, filter]);
 
-  // Estadísticas generales del equipo
+  // Datos para las gráficas: una entrada por colaborador con cursos
+  // completados (con evidencia / efectivamente 'completo') y horas
+  // completadas. Solo se incluyen colaboradores que tienen al menos
+  // una inscripción para evitar barras en cero.
+  const chartData = useMemo(() => {
+    return teamMembers
+      .filter((m) => m.stats.total > 0)
+      .map((m) => ({
+        name: m.full_name,
+        cursos: m.stats.completed,
+        horas: m.stats.completedHours,
+      }));
+  }, [teamMembers]);
+
+  // Estadísticas generales del equipo (también por estado efectivo).
   const teamStats = useMemo(() => {
+    const others = enrollments.filter((e) => e.profiles?.id !== user?.id);
     return {
       totalMembers: teamMembers.length,
-      totalEnrollments: enrollments.filter(e => e.profiles?.id !== user?.id).length,
-      completedCourses: enrollments.filter(e => e.status === 'completo' && e.profiles?.id !== user?.id).length,
-      inProgressCourses: enrollments.filter(e => e.status === 'en_curso' && e.profiles?.id !== user?.id).length,
-      totalHours: enrollments
-        .filter(e => e.status === 'completo' && e.profiles?.id !== user?.id)
+      totalEnrollments: others.length,
+      completedCourses: others.filter((e) => getEffectiveStatus(e) === 'completo').length,
+      inProgressCourses: others.filter((e) => getEffectiveStatus(e) === 'en_curso').length,
+      totalHours: others
+        .filter((e) => getEffectiveStatus(e) === 'completo')
         .reduce((acc, e) => acc + (e.course_editions?.courses?.total_hours || 0), 0),
     };
   }, [enrollments, teamMembers, user?.id]);
@@ -194,22 +232,6 @@ export default function MiEquipoPage() {
       month: 'short',
       year: 'numeric',
     });
-  };
-
-  const getEffectiveStatus = (enrollment: Enrollment) => {
-    const today = new Date();
-    const startDate = new Date(enrollment.course_editions?.start_date);
-    const endDate = enrollment.course_editions?.end_date
-      ? new Date(enrollment.course_editions.end_date)
-      : null;
-
-    if (enrollment.status === 'inscrito' && today >= startDate) {
-      return 'en_curso';
-    }
-    if ((enrollment.status === 'inscrito' || enrollment.status === 'en_curso') && endDate && today > endDate) {
-      return 'pendiente_evidencia';
-    }
-    return enrollment.status;
   };
 
   if (isLoading) {
@@ -299,13 +321,54 @@ export default function MiEquipoPage() {
           </div>
         </div>
 
+        {/* Gráficas por colaborador */}
+        {chartData.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+              <h3 className="text-sm font-semibold text-gray-700 mb-1">
+                Cursos completados por colaborador
+              </h3>
+              <p className="text-xs text-gray-400 mb-3">
+                Cantidad de cursos finalizados por cada miembro del equipo.
+              </p>
+              <BarChart
+                data={chartData}
+                dataKey="cursos"
+                xAxisKey="name"
+                color="#52AF32"
+                horizontal
+                height={Math.max(180, chartData.length * 48)}
+                formatValue={(v) => `${v}`}
+              />
+            </div>
+
+            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+              <h3 className="text-sm font-semibold text-gray-700 mb-1">
+                Horas completadas por colaborador
+              </h3>
+              <p className="text-xs text-gray-400 mb-3">
+                Horas acumuladas en cursos finalizados.
+              </p>
+              <BarChart
+                data={chartData}
+                dataKey="horas"
+                xAxisKey="name"
+                color="#8b5cf6"
+                horizontal
+                height={Math.max(180, chartData.length * 48)}
+                formatValue={(v) => `${v}h`}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Filters */}
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-500">Filtrar:</span>
           <div className="flex gap-2">
             {[
               { value: 'all', label: 'Todos' },
-              { value: 'en_curso', label: 'En Curso' },
+              { value: 'en_curso', label: 'En Progreso' },
               { value: 'completo', label: 'Completados' },
               { value: 'pendiente', label: 'Pendientes' },
             ].map((f) => (
@@ -372,7 +435,7 @@ export default function MiEquipoPage() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
-                        <span className="text-gray-600">{member.stats.inProgress} en curso</span>
+                        <span className="text-gray-600">{member.stats.inProgress} en progreso</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-purple-500"></span>
