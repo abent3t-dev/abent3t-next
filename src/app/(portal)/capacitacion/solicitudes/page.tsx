@@ -13,6 +13,7 @@ import type {
   RequestStatus,
   Course,
   UserProfile,
+  Modality,
 } from '@/types/catalogs';
 import type { PaginatedResponse, PaginationMeta } from '@/types/pagination';
 
@@ -209,6 +210,12 @@ export default function SolicitudesPage() {
   const [reviewAction, setReviewAction] = useState<'aprobada' | 'rechazada'>('aprobada');
   const [rejectionReason, setRejectionReason] = useState('');
   const [reviewing, setReviewing] = useState(false);
+
+  // Modalidades del catálogo (Autoestudio, Presencial, etc.) para el
+  // dropdown del modal de propuesta. Antes estaban hardcodeadas con tres
+  // opciones, dejando fuera modalidades como Autoestudio que sí existen
+  // en el catálogo y que admin_rh usa al aprobar.
+  const [modalities, setModalities] = useState<Modality[]>([]);
 
   // Estado para propuestas de cursos externos.
   // Para no-admin la pantalla ahora muestra UNA sola lista combinada
@@ -528,8 +535,19 @@ export default function SolicitudesPage() {
     }
   };
 
-  // Abrir modal de propuesta
-  const openProposalModal = () => {
+  // Abrir modal de propuesta. Carga las modalidades del catálogo si aún
+  // no se han traído, para llenar el dropdown con las mismas opciones que
+  // verá admin_rh al aprobar.
+  const openProposalModal = async () => {
+    if (modalities.length === 0) {
+      try {
+        const data = await api.get<Modality[]>('/modalities');
+        setModalities(data.filter((m) => m.is_active));
+      } catch {
+        // Si falla la carga, el dropdown se muestra vacío; el campo es
+        // opcional así que el usuario puede continuar sin elegir modalidad.
+      }
+    }
     setProposalForm({
       course_name: '',
       institution_name: '',
@@ -1715,9 +1733,11 @@ export default function SolicitudesPage() {
                     className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#222D59] focus:border-transparent"
                   >
                     <option value="">— Seleccionar —</option>
-                    <option value="presencial">Presencial</option>
-                    <option value="virtual">Virtual</option>
-                    <option value="hibrido">Hibrido</option>
+                    {modalities.map((mod) => (
+                      <option key={mod.id} value={mod.name}>
+                        {mod.name}
+                      </option>
+                    ))}
                   </select>
                 </label>
 
