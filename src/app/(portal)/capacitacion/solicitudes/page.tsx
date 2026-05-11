@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
@@ -210,8 +210,11 @@ export default function SolicitudesPage() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [reviewing, setReviewing] = useState(false);
 
-  // Estado para propuestas de cursos externos
-  const [activeTab, setActiveTab] = useState<'solicitudes' | 'propuestas'>('solicitudes');
+  // Estado para propuestas de cursos externos.
+  // Para no-admin la pantalla ahora muestra UNA sola lista combinada
+  // (solicitudes + propuestas) — el "activeTab" desapareció. Admin sigue
+  // viendo solo solicitudes aquí; sus propuestas se gestionan en
+  // /capacitacion/propuestas.
   const [proposals, setProposals] = useState<CourseProposal[]>([]);
   const [loadingProposals, setLoadingProposals] = useState(false);
   const [proposalModalOpen, setProposalModalOpen] = useState(false);
@@ -260,25 +263,30 @@ export default function SolicitudesPage() {
     });
   };
 
-  // Cargar solicitudes
+  // Cargar solicitudes. Admin pagina en backend; no-admin descarga su lista
+  // completa porque la combinaremos con propuestas y paginamos en frontend.
   const loadRequests = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      params.append('page', page.toString());
-      params.append('limit', limit.toString());
-      if (filter !== 'all') {
-        params.append('status', filter);
-      }
-
       let response: PaginatedResponse<TrainingRequest>;
       if (isAdmin) {
+        const params = new URLSearchParams();
+        params.append('page', page.toString());
+        params.append('limit', limit.toString());
+        if (filter !== 'all') {
+          params.append('status', filter);
+        }
         response = await api.get<PaginatedResponse<TrainingRequest>>(`/requests?${params.toString()}`);
+        setMeta(response.meta);
       } else {
+        // Una sola página grande: las solicitudes propias de un usuario son
+        // pocas y la paginación visible se calcula sobre la lista combinada.
+        const params = new URLSearchParams();
+        params.append('page', '1');
+        params.append('limit', '500');
         response = await api.get<PaginatedResponse<TrainingRequest>>(`/requests/my-requests?${params.toString()}`);
       }
       setRequests(response.data);
-      setMeta(response.meta);
     } catch {
       notify.error('Error al cargar solicitudes');
     } finally {
@@ -315,26 +323,106 @@ export default function SolicitudesPage() {
     }
   }, [isManager]);
 
-  // Cargar estadísticas
+  // Cargar estadísticas (admin: del backend; no-admin se calculan en el frontend
+  // a partir de la lista combinada — ver `unifiedStats`).
   const loadStats = useCallback(async () => {
+    if (!isAdmin) return;
     try {
       const data = await api.get<{ total: number; pendientes: number; aprobadas: number; rechazadas: number }>('/requests/stats');
       setStats(data);
     } catch {
       notify.error('Error al cargar estadísticas');
     }
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
-    if (activeTab === 'solicitudes') {
-      loadRequests();
-      loadStats();
-      markSectionAsSeen('solicitudes');
-    } else {
+    loadRequests();
+    loadStats();
+    markSectionAsSeen('solicitudes');
+    if (!isAdmin) {
+      // Para no-admin, las propuestas se cargan en paralelo y se mezclan con
+      // las solicitudes en la lista unificada.
       loadProposals();
       markSectionAsSeen('propuestas');
     }
-  }, [loadRequests, loadProposals, loadStats, activeTab]);
+  }, [loadRequests, loadProposals, loadStats, isAdmin]);
+
+  // Mapea el estado de una propuesta al universo simplificado de las stats
+  // (pendiente / aprobada / rechazada). "en_investigacion" se trata como
+  // "pendiente" porque desde el punto de vista del usuario sigue sin resolverse.
+  const normalizeProposalStatus = (
+    s: CourseProposal['status'],
+  ): RequestStatus => {
+    if (s === 'aprobada') return 'aprobada';
+    if (s === 'rechazada') return 'rechazada';
+    return 'pendiente'; // pendiente o en_investigacion
+  };
+
+  // Stats unificadas (solicitudes + propuestas) para no-admin.
+  const unifiedStats = useMemo(() => {
+    if (isAdmin) return stats;
+    const counts = { total: 0, pendientes: 0, aprobadas: 0, rechazadas: 0 };
+    for (const r of requests) {
+      counts.total += 1;
+      if (r.status === 'pendiente') counts.pendientes += 1;
+      else if (r.status === 'aprobada') counts.aprobadas += 1;
+      else if (r.status === 'rechazada') counts.rechazadas += 1;
+    }
+    for (const p of proposals) {
+      counts.total += 1;
+      const s = normalizeProposalStatus(p.status);
+      if (s === 'pendiente') counts.pendientes += 1;
+      else if (s === 'aprobada') counts.aprobadas += 1;
+      else if (s === 'rechazada') counts.rechazadas += 1;
+    }
+    return counts;
+  }, [isAdmin, stats, requests, proposals]);
+
+  // Lista combinada para no-admin: cada item lleva su tipo para que la fila
+  // sepa qué renderizar y qué acciones ofrecer. Ordenada por fecha (más reciente
+  // primero) y filtrada según el estado seleccionado en las tarjetas KPI.
+  type UnifiedItem =
+    | { type: 'request'; data: TrainingRequest; status: RequestStatus; createdAt: string }
+    | { type: 'proposal'; data: CourseProposal; status: RequestStatus; createdAt: string };
+
+  const unifiedItems = useMemo<UnifiedItem[]>(() => {
+    if (isAdmin) return [];
+    const items: UnifiedItem[] = [];
+    for (const r of requests) {
+      items.push({ type: 'request', data: r, status: r.status, createdAt: r.created_at });
+    }
+    for (const p of proposals) {
+      items.push({
+        type: 'proposal',
+        data: p,
+        status: normalizeProposalStatus(p.status),
+        createdAt: p.created_at,
+      });
+    }
+    const filtered = filter === 'all' ? items : items.filter((i) => i.status === filter);
+    filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return filtered;
+  }, [isAdmin, requests, proposals, filter]);
+
+  // Paginación frontend para la lista unificada de no-admin.
+  const unifiedPagedItems = useMemo(() => {
+    if (isAdmin) return [];
+    const start = (page - 1) * limit;
+    return unifiedItems.slice(start, start + limit);
+  }, [isAdmin, unifiedItems, page, limit]);
+
+  const unifiedMeta = useMemo<PaginationMeta>(() => {
+    const total = unifiedItems.length;
+    const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+    return {
+      total,
+      page,
+      limit,
+      totalPages,
+      hasNext: page < totalPages,
+      hasPrev: page > 1,
+    };
+  }, [unifiedItems.length, page, limit]);
 
   // Reset to page 1 when filter changes
   useEffect(() => {
@@ -654,105 +742,77 @@ export default function SolicitudesPage() {
               <button
                 onClick={openProposalModal}
                 className="flex items-center gap-2 px-4 py-2.5 bg-[#222D59] text-white rounded-xl hover:bg-[#222D59]/90 transition-all shadow-md"
+                title="Sugiere un curso externo (Coursera, Udemy, etc.) para que admin RH lo evalúe"
               >
                 {Icons.lightbulb}
-                <span>Proponer Curso</span>
+                <span>Proponer curso externo</span>
               </button>
             )}
             {isManager && (
               <button
                 onClick={openCreateModal}
                 className="flex items-center gap-2 px-4 py-2.5 bg-[#52AF32] text-white rounded-xl hover:bg-[#67B52E] transition-all shadow-md"
+                title="Solicita un curso que ya existe en el catálogo para un colaborador de tu área"
               >
                 {Icons.plus}
-                <span>Nueva Solicitud</span>
+                <span>Solicitar del catálogo</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* Tabs - Solo para no-admins */}
-        {!isAdmin && (
-          <div className="bg-white rounded-xl p-1 inline-flex gap-1 shadow-sm">
-            <button
-              onClick={() => setActiveTab('solicitudes')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === 'solicitudes'
-                  ? 'bg-[#52AF32]/10 text-[#52AF32] shadow-sm'
-                  : 'text-gray-500 hover:text-[#424846]'
-              }`}
-            >
-              {isManager ? 'Solicitudes de Equipo' : 'Solicitudes'}
-            </button>
-            <button
-              onClick={() => setActiveTab('propuestas')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                activeTab === 'propuestas'
-                  ? 'bg-[#222D59]/10 text-[#222D59] shadow-sm'
-                  : 'text-gray-500 hover:text-[#424846]'
-              }`}
-            >
-              {isManager ? 'Propuestas de Equipo' : 'Mis Propuestas'}
-              {proposals.filter(p => ['pendiente', 'en_investigacion'].includes(p.status)).length > 0 && (
-                <span className="px-2 py-0.5 text-xs bg-[#222D59]/10 text-[#222D59] rounded-full">
-                  {proposals.filter(p => ['pendiente', 'en_investigacion'].includes(p.status)).length}
-                </span>
-              )}
-            </button>
-          </div>
-        )}
+        {/* Stats Cards - KPIs unificados (solicitudes + propuestas para no-admin) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <button
+            onClick={() => setFilter('all')}
+            className={`p-4 rounded-xl transition-all ${
+              filter === 'all'
+                ? 'bg-white shadow-lg border-2 border-[#424846]'
+                : 'bg-white hover:shadow-md border border-gray-200'
+            }`}
+          >
+            <p className="text-2xl font-bold text-[#424846]">{unifiedStats.total}</p>
+            <p className="text-sm text-[#424846]/70">Total</p>
+          </button>
+          <button
+            onClick={() => setFilter('pendiente')}
+            className={`p-4 rounded-xl transition-all ${
+              filter === 'pendiente'
+                ? 'bg-[#DFA922]/10 shadow-lg border-2 border-[#DFA922]'
+                : 'bg-white hover:bg-[#DFA922]/5 hover:shadow-md border border-gray-200'
+            }`}
+          >
+            <p className="text-2xl font-bold text-[#DFA922]">{unifiedStats.pendientes}</p>
+            <p className="text-sm text-[#DFA922]/70">Pendientes</p>
+          </button>
+          <button
+            onClick={() => setFilter('aprobada')}
+            className={`p-4 rounded-xl transition-all ${
+              filter === 'aprobada'
+                ? 'bg-[#52AF32]/10 shadow-lg border-2 border-[#52AF32]'
+                : 'bg-white hover:bg-[#52AF32]/5 hover:shadow-md border border-gray-200'
+            }`}
+          >
+            <p className="text-2xl font-bold text-[#52AF32]">{unifiedStats.aprobadas}</p>
+            <p className="text-sm text-[#52AF32]/70">Aprobadas</p>
+          </button>
+          <button
+            onClick={() => setFilter('rechazada')}
+            className={`p-4 rounded-xl transition-all ${
+              filter === 'rechazada'
+                ? 'bg-red-50 shadow-lg border-2 border-red-500'
+                : 'bg-white hover:bg-red-50 hover:shadow-md border border-gray-200'
+            }`}
+          >
+            <p className="text-2xl font-bold text-red-600">{unifiedStats.rechazadas}</p>
+            <p className="text-sm text-red-600/70">Rechazadas</p>
+          </button>
+        </div>
 
-        {/* Contenido de Solicitudes */}
-        {activeTab === 'solicitudes' && (
+        {/* === Vista de ADMIN: lista de solicitudes paginadas por backend ===
+            La gestión de propuestas del admin vive en /capacitacion/propuestas. */}
+        {isAdmin && (
           <>
-            {/* Stats Cards - KPIs con colores A3T */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <button
-                onClick={() => setFilter('all')}
-                className={`p-4 rounded-xl transition-all ${
-                  filter === 'all'
-                    ? 'bg-white shadow-lg border-2 border-[#424846]'
-                    : 'bg-white hover:shadow-md border border-gray-200'
-                }`}
-              >
-                <p className="text-2xl font-bold text-[#424846]">{stats.total}</p>
-                <p className="text-sm text-[#424846]/70">Total</p>
-              </button>
-              <button
-                onClick={() => setFilter('pendiente')}
-                className={`p-4 rounded-xl transition-all ${
-                  filter === 'pendiente'
-                    ? 'bg-[#DFA922]/10 shadow-lg border-2 border-[#DFA922]'
-                    : 'bg-white hover:bg-[#DFA922]/5 hover:shadow-md border border-gray-200'
-                }`}
-              >
-                <p className="text-2xl font-bold text-[#DFA922]">{stats.pendientes}</p>
-                <p className="text-sm text-[#DFA922]/70">Pendientes</p>
-              </button>
-              <button
-                onClick={() => setFilter('aprobada')}
-                className={`p-4 rounded-xl transition-all ${
-                  filter === 'aprobada'
-                    ? 'bg-[#52AF32]/10 shadow-lg border-2 border-[#52AF32]'
-                    : 'bg-white hover:bg-[#52AF32]/5 hover:shadow-md border border-gray-200'
-                }`}
-              >
-                <p className="text-2xl font-bold text-[#52AF32]">{stats.aprobadas}</p>
-                <p className="text-sm text-[#52AF32]/70">Aprobadas</p>
-              </button>
-              <button
-                onClick={() => setFilter('rechazada')}
-                className={`p-4 rounded-xl transition-all ${
-                  filter === 'rechazada'
-                    ? 'bg-red-50 shadow-lg border-2 border-red-500'
-                    : 'bg-white hover:bg-red-50 hover:shadow-md border border-gray-200'
-                }`}
-              >
-                <p className="text-2xl font-bold text-red-600">{stats.rechazadas}</p>
-                <p className="text-sm text-red-600/70">Rechazadas</p>
-              </button>
-            </div>
-
             {/* Lista de solicitudes */}
             {loading ? (
               <div className="bg-white rounded-xl p-12 text-center shadow-sm">
@@ -999,181 +1059,387 @@ export default function SolicitudesPage() {
           </>
         )}
 
-        {/* Contenido de Propuestas - Solo para no-admins */}
-        {!isAdmin && activeTab === 'propuestas' && (
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            {loadingProposals ? (
-              <div className="p-12 text-center">
-                <div className="animate-spin w-8 h-8 border-4 border-[#222D59] border-t-transparent rounded-full mx-auto" />
-                <p className="text-gray-500 mt-4">Cargando propuestas...</p>
+        {/* === Vista UNIFICADA para no-admin: solicitudes + propuestas en una sola lista ===
+            Cada item lleva un pill que indica si es "Del catálogo" o "Curso externo".
+            Las stats arriba ya reflejan AMBOS tipos sumados. */}
+        {!isAdmin && (
+          <>
+            {loading || loadingProposals ? (
+              <div className="bg-white rounded-xl p-12 text-center shadow-sm">
+                <div className="animate-spin w-8 h-8 border-4 border-[#52AF32] border-t-transparent rounded-full mx-auto" />
+                <p className="text-gray-500 mt-4">Cargando capacitación...</p>
               </div>
-            ) : proposals.length === 0 ? (
-              <div className="p-12 text-center">
-                <div className="w-16 h-16 bg-[#222D59]/10 rounded-full flex items-center justify-center mx-auto mb-4 text-[#222D59]">
-                  {Icons.lightbulb}
+            ) : unifiedItems.length === 0 ? (
+              <div className="bg-white rounded-xl p-12 text-center shadow-sm">
+                <div className="w-16 h-16 bg-[#52AF32]/10 rounded-full flex items-center justify-center mx-auto mb-4 text-[#52AF32]">
+                  {Icons.book}
                 </div>
                 <p className="text-[#424846] font-medium">
-                  {isManager ? 'No hay propuestas de tu equipo' : 'No tienes propuestas de cursos'}
+                  {filter !== 'all'
+                    ? 'No hay capacitaciones con este estado'
+                    : 'Aún no tienes capacitaciones registradas'}
                 </p>
                 <p className="text-gray-400 text-sm mt-1">
                   {isManager
-                    ? 'Cuando tú o algún colaborador de tu área proponga un curso, aparecerá aquí.'
-                    : 'Encontraste un curso interesante? Haz clic en "Proponer Curso" para enviarlo a revisión.'}
+                    ? 'Solicita cursos del catálogo o propon cursos externos para tu equipo.'
+                    : 'Propon cursos externos o espera a que tu jefe registre solicitudes para ti.'}
                 </p>
               </div>
             ) : (
-              <div className="divide-y divide-[#424846]/10">
-                {proposals.map((proposal) => {
-                  const isExpanded = expandedProposals.has(proposal.id);
-                  const isOwn = proposal.proposed_by === user?.id;
-                  // Solo se puede cancelar propuestas propias y en estado activo
-                  const canCancel = isOwn && ['pendiente', 'en_investigacion'].includes(proposal.status);
+              <>
+                <div className="space-y-2">
+                  {unifiedPagedItems.map((item) => {
+                    if (item.type === 'request') {
+                      const req = item.data;
+                      const status = statusConfig[req.status];
+                      const course = req.course_editions?.courses;
+                      const edition = req.course_editions;
+                      const profile = req.profiles;
+                      const requester = req.requester;
+                      const isExpanded = expandedRequests.has(req.id);
+                      const effectiveCost = edition?.cost_override ?? course?.cost ?? 0;
 
-                  return (
-                    <div key={proposal.id} className="transition-colors">
-                      {/* Fila compacta */}
-                      <button
-                        onClick={() => toggleProposal(proposal.id)}
-                        className="w-full px-4 py-3 flex items-center gap-4 text-left hover:bg-gray-50 transition-colors"
-                      >
-                        <span className={`text-[#424846]/50 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}>
-                          {Icons.chevronDown}
-                        </span>
-
-                        <span className={`px-2.5 py-1 text-xs font-medium rounded-full flex-shrink-0 ${proposalStatusColors[proposal.status]}`}>
-                          {proposalStatusLabels[proposal.status]}
-                        </span>
-
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-[#424846] truncate">
-                            {proposal.course_name}
-                            {isManager && !isOwn && (
-                              <span className="ml-2 px-2 py-0.5 text-[10px] font-medium bg-[#52AF32]/10 text-[#52AF32] rounded-full uppercase tracking-wide align-middle">
-                                Equipo
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-xs text-[#424846]/60 truncate">
-                            {isManager && proposal.proposer
-                              ? `Propuesta por ${proposal.proposer.full_name}`
-                              : proposal.institution_name || 'Sin institución'}
-                            {' · '}{formatDate(proposal.created_at)}
-                          </p>
-                        </div>
-
-                        <div className="hidden md:flex items-center gap-1 text-xs text-[#424846]/70 flex-shrink-0">
-                          {Icons.clock}
-                          <span>{proposal.estimated_hours}h</span>
-                        </div>
-
-                        <div className="text-right flex-shrink-0">
-                          <p className="font-bold text-[#424846] text-sm">
-                            ${proposal.estimated_cost.toLocaleString()}
-                            <span className="text-xs font-normal text-[#424846]/60 ml-1">MXN</span>
-                          </p>
-                        </div>
-
-                        {canCancel && (
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCancelProposal(proposal.id);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleCancelProposal(proposal.id);
-                              }
-                            }}
-                            className="p-1.5 text-[#424846]/50 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0 cursor-pointer"
-                            title="Cancelar propuesta"
+                      return (
+                        <div
+                          key={`req-${req.id}`}
+                          className={`bg-white rounded-xl shadow-sm border overflow-hidden transition-all hover:shadow-md ${status.border}`}
+                        >
+                          <button
+                            onClick={() => toggleRequest(req.id)}
+                            className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-gray-50/50 transition-colors"
                           >
-                            {Icons.x}
-                          </span>
-                        )}
-                      </button>
+                            <span className={`text-[#424846]/50 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}>
+                              {Icons.chevronDown}
+                            </span>
 
-                      {/* Contenido expandido */}
-                      {isExpanded && (
-                        <div className="px-6 pb-6 bg-gray-50/30 border-t border-gray-100">
-                          <div className="pt-4 flex flex-wrap items-center gap-4 text-sm text-[#424846]/70">
-                            {proposal.institution_name && (
-                              <span className="flex items-center gap-1">{Icons.office} {proposal.institution_name}</span>
-                            )}
-                            {proposal.modality && (
-                              <span className="bg-[#424846]/10 px-2 py-0.5 rounded text-xs text-[#424846]">{proposal.modality}</span>
-                            )}
-                            <span className="flex items-center gap-1">{Icons.currency} ${proposal.estimated_cost.toLocaleString()}</span>
-                            <span className="flex items-center gap-1">{Icons.clock} {proposal.estimated_hours}h</span>
-                            <span className="flex items-center gap-1">{Icons.calendar} {formatDate(proposal.created_at)}</span>
+                            {/* Type pill: Del catálogo */}
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#52AF32]/10 text-[#52AF32] border border-[#52AF32]/30 whitespace-nowrap flex-shrink-0">
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                              </svg>
+                              Del catálogo
+                            </span>
+
+                            {/* Status pill */}
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${status.bg} ${status.text} border ${status.border} flex-shrink-0`}>
+                              <span className={status.iconColor}>
+                                {req.status === 'pendiente' && Icons.clock}
+                                {req.status === 'aprobada' && Icons.check}
+                                {req.status === 'rechazada' && Icons.x}
+                              </span>
+                              {status.label}
+                            </span>
+
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-[#424846] truncate">{course?.name || '—'}</p>
+                              <p className="text-xs text-[#424846]/60 truncate">
+                                {profile?.full_name || '—'} · {profile?.departments?.name || '—'}
+                              </p>
+                            </div>
+
+                            <div className="hidden md:flex items-center gap-1 text-xs text-[#424846]/70 flex-shrink-0">
+                              {Icons.calendar}
+                              <span>{edition?.start_date ? formatDate(edition.start_date) : '—'}</span>
+                            </div>
+
+                            <div className="text-right flex-shrink-0">
+                              <p className="font-bold text-[#424846] text-sm">
+                                ${effectiveCost.toLocaleString()}
+                                <span className="text-xs font-normal text-[#424846]/60 ml-1">MXN</span>
+                              </p>
+                            </div>
+                          </button>
+
+                          {req.status === 'pendiente' && isManager && (
+                            <div className={`px-4 pb-3 flex items-center justify-end gap-2 ${isExpanded ? '' : 'border-t border-gray-100 pt-3'}`}>
+                              <button
+                                onClick={() => handleCancel(req.id)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-[#424846] rounded-lg hover:bg-gray-200 transition-colors text-xs font-medium"
+                              >
+                                {Icons.x}
+                                Cancelar
+                              </button>
+                            </div>
+                          )}
+
+                          {isExpanded && (
+                            <div className="border-t border-gray-100 p-6 bg-gray-50/30">
+                              <div className="flex items-center gap-2 text-xs text-[#424846]/70 mb-4">
+                                {Icons.calendar}
+                                <span>Solicitado el {formatDate(req.created_at)}</span>
+                              </div>
+
+                              <div className="grid md:grid-cols-3 gap-6">
+                                <div className="md:col-span-1 space-y-4">
+                                  <div className="bg-[#222D59]/5 rounded-xl p-4 border border-[#222D59]/10">
+                                    <div className="flex items-center gap-2 text-[#222D59] mb-2">
+                                      {Icons.userGroup}
+                                      <span className="text-xs font-semibold uppercase tracking-wide">Solicitado por</span>
+                                    </div>
+                                    <p className="font-semibold text-[#424846]">{requester?.full_name || '—'}</p>
+                                    <p className="text-sm text-[#424846]/70">Jefe de Area</p>
+                                  </div>
+                                  <div className="flex justify-center text-[#52AF32]/50">
+                                    <svg className="w-6 h-6 transform rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                    </svg>
+                                  </div>
+                                  <div className="bg-[#52AF32]/5 rounded-xl p-4 border border-[#52AF32]/10">
+                                    <div className="flex items-center gap-2 text-[#52AF32] mb-2">
+                                      {Icons.user}
+                                      <span className="text-xs font-semibold uppercase tracking-wide">Beneficiario</span>
+                                    </div>
+                                    <p className="font-semibold text-[#424846]">{profile?.full_name || '—'}</p>
+                                    <p className="text-sm text-[#424846]/70">{profile?.position || 'Sin puesto'}</p>
+                                    <p className="text-xs text-[#424846]/50 mt-1">{profile?.email}</p>
+                                  </div>
+                                </div>
+
+                                <div className="md:col-span-1">
+                                  <div className="bg-[#424846]/5 rounded-xl p-4 h-full border border-[#424846]/10">
+                                    <div className="flex items-center gap-2 text-[#424846] mb-3">
+                                      {Icons.book}
+                                      <span className="text-xs font-semibold uppercase tracking-wide">Curso Solicitado</span>
+                                    </div>
+                                    <h3 className="font-bold text-lg text-[#424846] mb-3">{course?.name || '—'}</h3>
+                                    <div className="space-y-2 text-sm">
+                                      <div className="flex items-center gap-2 text-[#424846]/70">
+                                        {Icons.calendar}
+                                        <span>Inicio: {edition?.start_date ? formatDate(edition.start_date) : '—'}</span>
+                                      </div>
+                                      {edition?.end_date && (
+                                        <div className="flex items-center gap-2 text-[#424846]/70">
+                                          {Icons.calendar}
+                                          <span>Fin: {formatDate(edition.end_date)}</span>
+                                        </div>
+                                      )}
+                                      <div className="flex items-center gap-2 text-[#424846]/70">
+                                        {Icons.clock}
+                                        <span>{course?.total_hours || 0} horas</span>
+                                      </div>
+                                      {edition?.instructor && (
+                                        <div className="flex items-center gap-2 text-[#424846]/70">
+                                          {Icons.user}
+                                          <span>Instructor: {edition.instructor}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="md:col-span-1 space-y-4">
+                                  <div className="bg-[#222D59]/5 rounded-xl p-4 border border-[#222D59]/10">
+                                    <div className="flex items-center gap-2 text-[#222D59] mb-2">
+                                      {Icons.office}
+                                      <span className="text-xs font-semibold uppercase tracking-wide">Area</span>
+                                    </div>
+                                    <p className="font-semibold text-[#424846]">{profile?.departments?.name || '—'}</p>
+                                  </div>
+                                  <div className="bg-[#DFA922]/10 rounded-xl p-4 border border-[#DFA922]/20">
+                                    <div className="flex items-center gap-2 text-[#DFA922] mb-2">
+                                      {Icons.currency}
+                                      <span className="text-xs font-semibold uppercase tracking-wide">Inversion</span>
+                                    </div>
+                                    <p className="font-bold text-2xl text-[#424846]">
+                                      ${effectiveCost.toLocaleString()}
+                                      <span className="text-sm font-normal text-[#424846]/60 ml-1">MXN</span>
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {req.request_reason && (
+                                <div className="mt-6 pt-4 border-t border-[#424846]/10">
+                                  <div className="flex items-start gap-3">
+                                    <div className="text-[#424846]/50 mt-0.5">{Icons.chat}</div>
+                                    <div>
+                                      <p className="text-xs font-semibold uppercase tracking-wide text-[#424846]/70 mb-1">Motivo de la solicitud</p>
+                                      <p className="text-[#424846]">{req.request_reason}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {req.status === 'rechazada' && req.rejection_reason && (
+                                <div className="mt-6 pt-4 border-t border-red-100">
+                                  <div className="bg-red-50 rounded-xl p-4 border border-red-200">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-red-600 mb-1">Motivo del rechazo</p>
+                                    <p className="text-red-700">{req.rejection_reason}</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    // type === 'proposal'
+                    const proposal = item.data;
+                    const isExpanded = expandedProposals.has(proposal.id);
+                    const isOwn = proposal.proposed_by === user?.id;
+                    const canCancel = isOwn && ['pendiente', 'en_investigacion'].includes(proposal.status);
+                    const activeAttachments = proposal.attachments?.filter((a) => a.is_active) || [];
+
+                    return (
+                      <div
+                        key={`prop-${proposal.id}`}
+                        className="bg-white rounded-xl shadow-sm border border-[#222D59]/20 overflow-hidden transition-all hover:shadow-md"
+                      >
+                        <button
+                          onClick={() => toggleProposal(proposal.id)}
+                          className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-gray-50/50 transition-colors"
+                        >
+                          <span className={`text-[#424846]/50 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}>
+                            {Icons.chevronDown}
+                          </span>
+
+                          {/* Type pill: Curso externo */}
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#222D59]/10 text-[#222D59] border border-[#222D59]/30 whitespace-nowrap flex-shrink-0">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                            </svg>
+                            Curso externo
+                          </span>
+
+                          <span className={`px-2.5 py-1 text-xs font-medium rounded-full flex-shrink-0 ${proposalStatusColors[proposal.status]}`}>
+                            {proposalStatusLabels[proposal.status]}
+                          </span>
+
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-[#424846] truncate">
+                              {proposal.course_name}
+                              {isManager && !isOwn && (
+                                <span className="ml-2 px-2 py-0.5 text-[10px] font-medium bg-[#52AF32]/10 text-[#52AF32] rounded-full uppercase tracking-wide align-middle">
+                                  Equipo
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-xs text-[#424846]/60 truncate">
+                              {isManager && proposal.proposer
+                                ? `Propuesta por ${proposal.proposer.full_name}`
+                                : proposal.institution_name || 'Sin institución'}
+                              {' · '}{formatDate(proposal.created_at)}
+                            </p>
                           </div>
 
-                          {proposal.course_url && (
-                            <a
-                              href={proposal.course_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm text-[#52AF32] hover:text-[#67B52E] hover:underline mt-3 inline-block font-medium"
+                          <div className="hidden md:flex items-center gap-1 text-xs text-[#424846]/70 flex-shrink-0">
+                            {Icons.clock}
+                            <span>{proposal.estimated_hours}h</span>
+                          </div>
+
+                          <div className="text-right flex-shrink-0">
+                            <p className="font-bold text-[#424846] text-sm">
+                              ${proposal.estimated_cost.toLocaleString()}
+                              <span className="text-xs font-normal text-[#424846]/60 ml-1">MXN</span>
+                            </p>
+                          </div>
+
+                          {canCancel && (
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCancelProposal(proposal.id);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleCancelProposal(proposal.id);
+                                }
+                              }}
+                              className="p-1.5 text-[#424846]/50 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0 cursor-pointer"
+                              title="Cancelar propuesta"
                             >
-                              Ver curso externo →
-                            </a>
+                              {Icons.x}
+                            </span>
                           )}
-                          {proposal.justification && (
-                            <p className="text-sm text-[#424846]/80 mt-3 italic bg-white p-3 rounded-xl border border-[#424846]/10">&quot;{proposal.justification}&quot;</p>
-                          )}
-                          {proposal.attachments && proposal.attachments.filter(a => a.is_active).length > 0 && (
-                            <div className="mt-3">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-[#424846]/70 mb-2 flex items-center gap-1">
-                                {Icons.paperclip}
-                                Archivos adjuntos ({proposal.attachments.filter(a => a.is_active).length})
-                              </p>
-                              <ul className="space-y-2">
-                                {proposal.attachments.filter(a => a.is_active).map((att) => (
-                                  <li
-                                    key={att.id}
-                                    className="flex items-center gap-3 px-3 py-2 bg-white rounded-lg border border-[#424846]/10"
-                                  >
-                                    <span className="text-[#222D59]">{Icons.paperclip}</span>
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-medium text-[#424846] truncate">
-                                        {att.file_name}
-                                      </p>
-                                      <p className="text-xs text-[#424846]/60">
-                                        {formatFileSize(att.file_size)}
-                                      </p>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDownloadAttachment(att.id)}
-                                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-[#222D59] bg-[#222D59]/10 hover:bg-[#222D59]/20 rounded-lg transition-colors"
+                        </button>
+
+                        {isExpanded && (
+                          <div className="px-6 pb-6 bg-gray-50/30 border-t border-gray-100">
+                            <div className="pt-4 flex flex-wrap items-center gap-4 text-sm text-[#424846]/70">
+                              {proposal.institution_name && (
+                                <span className="flex items-center gap-1">{Icons.office} {proposal.institution_name}</span>
+                              )}
+                              {proposal.modality && (
+                                <span className="bg-[#424846]/10 px-2 py-0.5 rounded text-xs text-[#424846]">{proposal.modality}</span>
+                              )}
+                              <span className="flex items-center gap-1">{Icons.currency} ${proposal.estimated_cost.toLocaleString()}</span>
+                              <span className="flex items-center gap-1">{Icons.clock} {proposal.estimated_hours}h</span>
+                              <span className="flex items-center gap-1">{Icons.calendar} {formatDate(proposal.created_at)}</span>
+                            </div>
+
+                            {proposal.course_url && (
+                              <a
+                                href={proposal.course_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-[#52AF32] hover:text-[#67B52E] hover:underline mt-3 inline-block font-medium"
+                              >
+                                Ver curso externo →
+                              </a>
+                            )}
+                            {proposal.justification && (
+                              <p className="text-sm text-[#424846]/80 mt-3 italic bg-white p-3 rounded-xl border border-[#424846]/10">&quot;{proposal.justification}&quot;</p>
+                            )}
+                            {activeAttachments.length > 0 && (
+                              <div className="mt-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-[#424846]/70 mb-2 flex items-center gap-1">
+                                  {Icons.paperclip}
+                                  Archivos adjuntos ({activeAttachments.length})
+                                </p>
+                                <ul className="space-y-2">
+                                  {activeAttachments.map((att) => (
+                                    <li
+                                      key={att.id}
+                                      className="flex items-center gap-3 px-3 py-2 bg-white rounded-lg border border-[#424846]/10"
                                     >
-                                      {Icons.download}
-                                      Descargar
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                          {proposal.review_notes && (
-                            <p className="text-sm text-[#52AF32] mt-3 font-medium">Notas de revision: {proposal.review_notes}</p>
-                          )}
-                          {proposal.rejection_reason && (
-                            <div className="mt-3 bg-red-50 rounded-xl p-3 border border-red-200">
-                              <p className="text-sm text-red-600">Motivo de rechazo: {proposal.rejection_reason}</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                                      <span className="text-[#222D59]">{Icons.paperclip}</span>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-[#424846] truncate">{att.file_name}</p>
+                                        <p className="text-xs text-[#424846]/60">{formatFileSize(att.file_size)}</p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDownloadAttachment(att.id)}
+                                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-[#222D59] bg-[#222D59]/10 hover:bg-[#222D59]/20 rounded-lg transition-colors"
+                                      >
+                                        {Icons.download}
+                                        Descargar
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {proposal.review_notes && (
+                              <p className="text-sm text-[#52AF32] mt-3 font-medium">Notas de revision: {proposal.review_notes}</p>
+                            )}
+                            {proposal.rejection_reason && (
+                              <div className="mt-3 bg-red-50 rounded-xl p-3 border border-red-200">
+                                <p className="text-sm text-red-600">Motivo de rechazo: {proposal.rejection_reason}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                  <Pagination
+                    meta={unifiedMeta}
+                    onPageChange={handlePageChange}
+                    onLimitChange={handleLimitChange}
+                  />
+                </div>
+              </>
             )}
-          </div>
+          </>
         )}
 
         {/* Modal Crear Solicitud */}
