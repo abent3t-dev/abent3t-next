@@ -125,10 +125,17 @@ const CourseTimeline: React.FC<CourseTimelineProps> = ({ enrollments }) => {
     );
   }, [processedCourses, selectedYear]);
 
-  // Calculate statistics
+  // Calculate statistics.
+  // "Total Cursos" cuenta solo cursos ya cursados (completos, en curso o
+  // esperando evidencia). Los futuros (`inscrito`) se muestran aparte en
+  // "Próximos" para no inflar el total con cosas que aún no han pasado.
+  // Cancelados quedan fuera de cualquier conteo.
   const stats = useMemo(() => {
-    const total = yearCourses.length;
-    const totalHours = yearCourses.reduce((sum, c) => sum + c.hours, 0);
+    const counted = yearCourses.filter((c) =>
+      ['completo', 'en_curso', 'pendiente_evidencia'].includes(c.effectiveStatus),
+    );
+    const total = counted.length;
+    const totalHours = counted.reduce((sum, c) => sum + (c.hours || 0), 0);
     const active = yearCourses.filter((c) => c.effectiveStatus === 'en_curso').length;
     const future = yearCourses.filter((c) => c.effectiveStatus === 'inscrito').length;
     const conflicts = yearCourses.filter((c) => c.hasConflict).length;
@@ -340,13 +347,17 @@ const CourseTimeline: React.FC<CourseTimelineProps> = ({ enrollments }) => {
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
-            <div className="text-sm text-blue-600 font-medium mb-1">Total Cursos</div>
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200" title="Cursos completados, en curso o pendientes de evidencia. No incluye próximos ni cancelados.">
+            <div className="text-sm text-blue-600 font-medium mb-1">Cursos Realizados</div>
             <div className="text-3xl font-bold text-blue-900">{stats.total}</div>
           </div>
           <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
             <div className="text-sm text-purple-600 font-medium mb-1">Horas Totales</div>
-            <div className="text-3xl font-bold text-purple-900">{stats.totalHours}</div>
+            <div className="text-3xl font-bold text-purple-900">
+              {Number.isInteger(stats.totalHours)
+                ? stats.totalHours
+                : (Math.round(stats.totalHours * 10) / 10).toLocaleString('es-MX')}
+            </div>
           </div>
           <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg p-4 border border-yellow-200">
             <div className="text-sm text-yellow-600 font-medium mb-1">En Curso</div>

@@ -1683,8 +1683,12 @@ export default function SolicitudesPage() {
                       value={proposalForm.estimated_cost}
                       onChange={(e) => setProposalForm({ ...proposalForm, estimated_cost: Number(e.target.value) })}
                       min="0"
+                      step="0.01"
                       className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#222D59] focus:border-transparent"
                     />
+                    <span className="text-xs text-[#424846]/60 mt-1 block">
+                      Deja en 0 si está cubierto por licencia anual (ej. Crehana).
+                    </span>
                   </label>
 
                   <label className="block">
@@ -1694,8 +1698,12 @@ export default function SolicitudesPage() {
                       value={proposalForm.estimated_hours}
                       onChange={(e) => setProposalForm({ ...proposalForm, estimated_hours: Number(e.target.value) })}
                       min="0"
+                      step="0.01"
                       className="mt-1 block w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#222D59] focus:border-transparent"
                     />
+                    <span className="text-xs text-[#424846]/60 mt-1 block">
+                      Acepta decimales (ej. 0.5 para 30 min).
+                    </span>
                   </label>
                 </div>
 

@@ -800,8 +800,9 @@ export default function CoursesPage() {
             <input
               type="number"
               min="0"
+              step="0.01"
               value={form.total_hours}
-              onChange={(e) => setForm({ ...form, total_hours: parseInt(e.target.value) || 0 })}
+              onChange={(e) => setForm({ ...form, total_hours: parseFloat(e.target.value) || 0 })}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32]"
             />
           </label>

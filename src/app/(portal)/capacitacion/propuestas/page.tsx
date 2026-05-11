@@ -1263,7 +1263,11 @@ export default function PropuestasPage() {
                       onChange={(e) => setApprovalForm({ ...approvalForm, cost: Number(e.target.value) })}
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                       min="0"
+                      step="0.01"
                     />
+                    <span className="text-xs text-gray-500 mt-1 block">
+                      0 si está cubierto por licencia anual.
+                    </span>
                   </div>
 
                   <div>
@@ -1276,7 +1280,11 @@ export default function PropuestasPage() {
                       onChange={(e) => setApprovalForm({ ...approvalForm, total_hours: Number(e.target.value) })}
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#52AF32] focus:border-transparent"
                       min="0"
+                      step="0.01"
                     />
+                    <span className="text-xs text-gray-500 mt-1 block">
+                      Acepta decimales (ej. 0.5).
+                    </span>
                   </div>
 
                   <div>
