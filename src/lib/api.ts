@@ -1,57 +1,25 @@
-import { createClient } from '@/lib/supabase/client';
+/**
+ * Cliente HTTP del frontend.
+ *
+ * Fase 2: el JWT propio vive en cookies HttpOnly (`access_token`,
+ * `refresh_token`) seteadas por el backend en `/auth/login-local` y
+ * `/auth/callback`. El navegador las envía automáticamente cuando
+ * `credentials: 'include'`. JS no las puede leer (HttpOnly), así que ya
+ * no extraemos token manualmente — la cookie viaja sola.
+ *
+ * Las requests inválidas (401) NO se intentan refrescar automáticamente
+ * aquí — eso lo maneja el `AuthContext` o un wrapper de fetch superior.
+ * Para refrescar manualmente: `POST /auth/refresh` con `credentials: 'include'`.
+ */
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
-// Cache del token para evitar llamadas repetidas
-let cachedToken: string | null = null;
-let tokenExpiry: number = 0;
-
-async function getAuthToken(): Promise<string | null> {
-  if (typeof window === 'undefined') return null;
-
-  // Usar token en cache si no ha expirado
-  if (cachedToken && Date.now() < tokenExpiry) {
-    return cachedToken;
-  }
-
-  try {
-    const supabase = createClient();
-
-    // Timeout de 3 segundos para evitar que se cuelgue
-    const timeoutPromise = new Promise<null>((resolve) => {
-      setTimeout(() => resolve(null), 3000);
-    });
-
-    const sessionPromise = supabase.auth.getSession().then(({ data }) => data.session);
-
-    const session = await Promise.race([sessionPromise, timeoutPromise]);
-
-    if (session?.access_token) {
-      cachedToken = session.access_token;
-      // Cache por 5 minutos (el token dura más, pero refrescamos frecuentemente)
-      tokenExpiry = Date.now() + 5 * 60 * 1000;
-      return cachedToken;
-    }
-  } catch (err) {
-    console.error('Error getting auth session:', err);
-  }
-
-  return null;
-}
-
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = await getAuthToken();
-
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...options?.headers,
   };
 
-  if (token) {
-    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
-  }
-
-  // Timeout de 10 segundos para el fetch
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -59,12 +27,16 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const res = await fetch(`${API_BASE}${path}`, {
       ...options,
       headers,
+      // El navegador adjunta cookies HttpOnly del dominio del backend.
+      credentials: 'include',
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
 
     if (!res.ok) {
-      const error = await res.json().catch(() => ({ message: res.statusText }));
+      const error = await res
+        .json()
+        .catch(() => ({ message: res.statusText }));
       throw new Error(error.message || 'Error en la petición');
     }
 
@@ -86,3 +58,39 @@ export const api = {
     request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };
+
+/**
+ * Helper para subir archivos (multipart/form-data). Mismo manejo de cookies
+ * — el navegador las envía. NO setear `Content-Type` manualmente: el
+ * navegador lo arma con el boundary correcto.
+ */
+export async function uploadFile<T>(
+  path: string,
+  formData: FormData,
+): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(error.message || 'Error al subir el archivo');
+  }
+  return res.json();
+}
+
+/**
+ * Helper para descargar un archivo binario (e.g. Excel export). Devuelve
+ * un Blob para que el caller decida cómo manejarlo (downloadar, abrir, etc).
+ */
+export async function downloadFile(path: string): Promise<Blob> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(error.message || 'Error al descargar');
+  }
+  return res.blob();
+}

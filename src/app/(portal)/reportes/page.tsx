@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
-import { createClient } from '@/lib/supabase/client';
 import { BarChart, PieChart, LineChart, DateRangePicker } from '@/components/charts';
 import { Department } from '@/types/catalogs';
 
@@ -193,9 +192,7 @@ export default function ReportesPage() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
+      // Fase 2: JWT en cookie HttpOnly viaja automáticamente.
       const params = new URLSearchParams({ type: activeTab });
       if (selectedDepartment && (activeTab === 'person' || activeTab === 'department')) {
         params.append('department_id', selectedDepartment);
@@ -203,11 +200,7 @@ export default function ReportesPage() {
 
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/reports/export?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${session?.access_token}`,
-          },
-        }
+        { credentials: 'include' },
       );
 
       if (!response.ok) throw new Error('Error al exportar');

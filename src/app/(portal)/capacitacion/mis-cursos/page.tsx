@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
-import { createClient } from '@/lib/supabase/client';
 import { PlatformEnrollment, PLATFORM_LABELS } from '@/types/platforms';
 
 interface Evidence {
@@ -257,14 +256,10 @@ export default function MisCursosPage() {
       formData.append('enrollment_id', selectedEnrollment.id);
       formData.append('evidence_type', evidenceType);
 
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
+      // Fase 2: JWT en cookie HttpOnly viaja automáticamente.
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/evidences/upload`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
-        },
+        credentials: 'include',
         body: formData,
       });
 

@@ -231,20 +231,9 @@ export default function PresupuestosPage() {
 
   const handleDownloadTemplate = async () => {
     try {
-      // Obtener token PRIMERO
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session?.access_token) {
-        notify.error('No estás autenticado');
-        return;
-      }
-
+      // Fase 2: el JWT viaja en cookie HttpOnly automáticamente.
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/budgets/export-template?include_data=false`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-        },
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -317,15 +306,9 @@ export default function PresupuestosPage() {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/budgets/import`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
+        credentials: 'include',
         body: formData,
       });
 

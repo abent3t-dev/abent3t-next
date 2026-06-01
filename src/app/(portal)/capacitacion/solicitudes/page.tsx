@@ -65,12 +65,7 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-async function getApiToken(): Promise<string> {
-  const { createClient } = await import('@/lib/supabase/client');
-  const supabase = createClient();
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token || '';
-}
+// Fase 2: el JWT viaja en cookie HttpOnly. Los fetch usan `credentials:'include'`.
 
 const Icons = {
   plus: (
@@ -614,7 +609,6 @@ export default function SolicitudesPage() {
     files: File[],
   ) => {
     if (files.length === 0) return;
-    const token = await getApiToken();
     const apiUrl =
       process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
     for (const file of files) {
@@ -622,7 +616,7 @@ export default function SolicitudesPage() {
       formData.append('file', file);
       const res = await fetch(`${apiUrl}/proposals/${proposalId}/attachments`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
         body: formData,
       });
       if (!res.ok) {

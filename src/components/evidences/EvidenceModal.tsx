@@ -193,11 +193,11 @@ export function EvidenceModal({
       formData.append('evidence_type', selectedType);
       if (notes) formData.append('notes', notes);
 
+      // Fase 2: el JWT viaja en cookie HttpOnly — `credentials: 'include'`
+      // basta para que el backend reciba la auth (vía JwtAuthGuard).
       await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/evidences/upload`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${await getToken()}`,
-        },
+        credentials: 'include',
         body: formData,
       });
 
@@ -551,10 +551,5 @@ export function EvidenceModal({
   );
 }
 
-// Helper para obtener token de Supabase
-async function getToken(): Promise<string> {
-  const { createClient } = await import('@/lib/supabase/client');
-  const supabase = createClient();
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token || '';
-}
+// (Fase 2) Helper getToken eliminado: el JWT viaja en cookie HttpOnly y se
+// adjunta automáticamente con `credentials: 'include'` en los fetch.
