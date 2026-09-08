@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
+import { usePurchaseUsers } from '@/hooks/usePurchaseUsers';
 import type { PurchaseOrder, POStatus, ExpenseType } from '@/types/purchases';
 
 interface PurchaseOrderModalProps {
@@ -34,11 +35,6 @@ interface PurchaseType {
   name: string;
   key: string;
   requires_contract: boolean;
-}
-
-interface Profile {
-  id: string;
-  full_name: string;
 }
 
 const Icons = {
@@ -72,6 +68,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, purchaseOrder }: P
     po_number: '',
     requisition_id: '',
     supplier_id: '',
+    contract_id: '',
     purchase_type_id: '',
     buyer_id: '',
     expense_type: 'OPEX' as ExpenseType,
@@ -104,16 +101,12 @@ export default function PurchaseOrderModal({ isOpen, onClose, purchaseOrder }: P
     enabled: isOpen,
   });
 
-  // Cargar compradores
-  const { data: buyersData } = useQuery({
-    queryKey: ['buyers'],
-    queryFn: () => api.get<{ data: Profile[] }>('/auth/users?role=comprador'),
-    enabled: isOpen,
-  });
+  // Cargar compradores — T7: /compras/usuarios (antes /auth/users daba 403)
+  const { data: buyersData } = usePurchaseUsers('comprador', isOpen);
 
   const suppliers = suppliersData?.data ?? [];
   const requisitions = requisitionsData?.data ?? [];
-  const buyers = buyersData?.data ?? [];
+  const buyers = buyersData ?? [];
 
   // Cargar datos si es edición
   useEffect(() => {
@@ -122,6 +115,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, purchaseOrder }: P
         po_number: purchaseOrder.po_number || '',
         requisition_id: purchaseOrder.requisition_id || '',
         supplier_id: purchaseOrder.supplier_id || '',
+        contract_id: purchaseOrder.contract_id || '',
         purchase_type_id: purchaseOrder.purchase_type_id || '',
         buyer_id: purchaseOrder.buyer_id || '',
         expense_type: purchaseOrder.expense_type || 'OPEX',
@@ -137,6 +131,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, purchaseOrder }: P
         po_number: '',
         requisition_id: '',
         supplier_id: '',
+        contract_id: '',
         purchase_type_id: '',
         buyer_id: '',
         expense_type: 'OPEX',
@@ -168,8 +163,12 @@ export default function PurchaseOrderModal({ isOpen, onClose, purchaseOrder }: P
     }
   };
 
+  type PoPayload = Omit<typeof formData, 'contract_id'> & {
+    contract_id?: string;
+  };
+
   const createMutation = useMutation({
-    mutationFn: (data: typeof formData) => api.post('/purchase-orders', data),
+    mutationFn: (data: PoPayload) => api.post('/purchase-orders', data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['purchase-orders'] });
       notify.success('Orden de compra creada correctamente');
@@ -181,7 +180,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, purchaseOrder }: P
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: typeof formData) => api.put(`/purchase-orders/${purchaseOrder?.id}`, data),
+    mutationFn: (data: PoPayload) => api.put(`/purchase-orders/${purchaseOrder?.id}`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['purchase-orders'] });
       notify.success('Orden de compra actualizada correctamente');
@@ -207,11 +206,21 @@ export default function PurchaseOrderModal({ isOpen, onClose, purchaseOrder }: P
       notify.error('Debe indicar la fecha de entrega esperada');
       return;
     }
+    // §15/B5: el backend también lo valida; aquí se avisa antes de enviar
+    if (requiresContract && !formData.contract_id) {
+      notify.error('Este tipo de compra requiere seleccionar un contrato vigente');
+      return;
+    }
 
+    // contract_id vacío no debe viajar ('' no pasa el IsUUID opcional del DTO)
+    const payload = {
+      ...formData,
+      contract_id: formData.contract_id || undefined,
+    };
     if (isEditing) {
-      updateMutation.mutate(formData);
+      updateMutation.mutate(payload);
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(payload);
     }
   };
 
@@ -220,6 +229,18 @@ export default function PurchaseOrderModal({ isOpen, onClose, purchaseOrder }: P
   // Verificar si el proveedor seleccionado requiere contrato
   const selectedPurchaseType = purchaseTypes?.find(pt => pt.id === formData.purchase_type_id);
   const requiresContract = selectedPurchaseType?.requires_contract ?? false;
+
+  // §15/B5: contratos vigentes del proveedor para el selector (solo cuando
+  // el tipo de compra lo exige)
+  const { data: contractsData } = useQuery({
+    queryKey: ['contracts-vigentes', formData.supplier_id],
+    queryFn: () =>
+      api.get<{ data: { id: string; contract_number: string; service_description: string }[] }>(
+        `/compras/contratos?status=vigente&supplier_id=${formData.supplier_id}&limit=100`,
+      ),
+    enabled: isOpen && requiresContract && !!formData.supplier_id,
+  });
+  const availableContracts = contractsData?.data ?? [];
 
   if (!isOpen) return null;
 
@@ -326,9 +347,27 @@ export default function PurchaseOrderModal({ isOpen, onClose, purchaseOrder }: P
                   ))}
                 </select>
                 {requiresContract && (
-                  <p className="flex items-center gap-1 text-xs text-orange-600 mt-1">
-                    {Icons.warning} Este tipo de compra requiere contrato
-                  </p>
+                  <div className="mt-2 space-y-1">
+                    <p className="flex items-center gap-1 text-xs text-orange-600">
+                      {Icons.warning} Este tipo de compra requiere contrato
+                    </p>
+                    <select
+                      value={formData.contract_id}
+                      onChange={(e) => setFormData({ ...formData, contract_id: e.target.value })}
+                      className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+                    >
+                      <option value="">
+                        {formData.supplier_id
+                          ? 'Seleccionar contrato vigente...'
+                          : 'Selecciona primero el proveedor'}
+                      </option>
+                      {availableContracts.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.contract_number} - {c.service_description.substring(0, 40)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 )}
               </div>
               <div>

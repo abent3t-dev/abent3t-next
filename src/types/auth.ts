@@ -230,14 +230,24 @@ export const SIDEBAR_NAV: NavItem[] = [
     label: 'Compras',
     href: '/compras/dashboard',
     icon: 'shopping-cart',
-    roles: [...PURCHASE_VIEWERS, ...EXEC_ROLES],
+    // §15: Contratos abre el grupo a TODA la empresa (el resto de hijos se
+    // sigue filtrando por sus propios roles).
+    roles: ROLE_PRIORITY,
     children: [
       { label: 'Dashboard', href: '/compras/dashboard', icon: 'chart', roles: ['super_admin', ...PURCHASE_TEAM, ...APPROVERS, ...EXEC_ROLES] },
       { label: 'Solicitudes (RQ)', href: '/compras/solicitudes', icon: 'file-text', roles: ['super_admin', ...PURCHASE_TEAM, 'solicitante'] },
       { label: 'Aprobaciones', href: '/compras/aprobaciones', icon: 'check-circle', roles: ['super_admin', ...PURCHASE_TEAM, ...APPROVERS] },
+      // §16: comite semanal con cadena de aprobacion
+      { label: 'Comite', href: '/compras/comite', icon: 'landmark', roles: ['super_admin', ...PURCHASE_TEAM, ...APPROVERS, ...EXEC_ROLES] },
       { label: 'Ordenes (PO)', href: '/compras/ordenes', icon: 'clipboard', roles: ['super_admin', ...PURCHASE_TEAM] },
+      // Expeditación: seguimiento de entregas
+      { label: 'Expeditacion', href: '/compras/expeditacion', icon: 'truck', roles: ['super_admin', ...PURCHASE_TEAM, ...APPROVERS, ...EXEC_ROLES] },
+      // §15: repositorio documental de contratos, consulta para todos
+      { label: 'Contratos', href: '/compras/contratos', icon: 'file-check', roles: ROLE_PRIORITY },
       { label: 'Proveedores', href: '/compras/proveedores', icon: 'truck', roles: ['super_admin', ...PURCHASE_TEAM] },
       { label: 'Reportes', href: '/compras/reportes', icon: 'bar-chart', roles: ['super_admin', ...PURCHASE_TEAM, ...APPROVERS, ...EXEC_ROLES] },
+      // Fase INT-5: estado y corridas del sync Maximo (pagina tecnica)
+      { label: 'Integraciones', href: '/compras/integraciones', icon: 'database', roles: [...PURCHASE_ADMINS, 'executive'] },
     ],
   },
   // ==========================================

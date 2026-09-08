@@ -1,4 +1,5 @@
 import type { UserRole } from '@/types/auth';
+import { ROLE_PRIORITY } from '@/types/auth';
 
 /**
  * Route permission rules.
@@ -32,6 +33,28 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
   { path: '/capacitacion/mi-equipo', roles: ['super_admin', 'admin_rh', 'director', 'jefe_area'] },
   { path: '/capacitacion/historial', roles: ['super_admin', 'admin_rh', 'colaborador', 'collaborator'] },
   { path: '/capacitacion/mis-cursos', roles: ['super_admin', 'admin_rh', 'director', 'jefe_area', 'executive', 'colaborador', 'collaborator'] },
+
+  // Compras sub-routes (ver documentation/CLAUDE_COMPRAS.md § Roles y Permisos).
+  // PURCHASE_TEAM = lider_procura, coordinador_compras, comprador
+  // APPROVERS     = aprobador_nivel_1/2/3, director_general
+  // PURCHASE_ADMINS = super_admin, lider_procura
+  // Integraciones (Fase INT-5): pagina tecnica de estado/corridas/disparo Maximo
+  { path: '/compras/integraciones', roles: ['super_admin', 'lider_procura', 'executive'] },
+  // Comite de Compras (§16): equipo de procura + cadena de aprobadores + executive
+  { path: '/compras/comite', roles: ['super_admin', 'lider_procura', 'coordinador_compras', 'comprador', 'aprobador_nivel_1', 'aprobador_nivel_2', 'aprobador_nivel_3', 'director_general', 'executive'] },
+  { path: '/compras/dashboard', roles: ['super_admin', 'lider_procura', 'coordinador_compras', 'comprador', 'aprobador_nivel_1', 'aprobador_nivel_2', 'aprobador_nivel_3', 'director_general', 'executive'] },
+  { path: '/compras/solicitudes', roles: ['super_admin', 'lider_procura', 'coordinador_compras', 'comprador', 'solicitante'] },
+  { path: '/compras/aprobaciones', roles: ['super_admin', 'lider_procura', 'coordinador_compras', 'comprador', 'aprobador_nivel_1', 'aprobador_nivel_2', 'aprobador_nivel_3', 'director_general'] },
+  { path: '/compras/ordenes', roles: ['super_admin', 'lider_procura', 'coordinador_compras', 'comprador'] },
+  // El doc también contempla `proveedor_externo`; ese rol aún no existe en UserRole.
+  // Expeditación (fase 2026-09): lectura también para aprobadores y executive
+  { path: '/compras/expeditacion', roles: ['super_admin', 'lider_procura', 'coordinador_compras', 'comprador', 'aprobador_nivel_1', 'aprobador_nivel_2', 'aprobador_nivel_3', 'director_general', 'executive'] },
+  // §15: Contratos es el ÚNICO apartado de compras con consulta para TODA la
+  // empresa — regla explícita con todos los roles (no ausencia de regla). Las
+  // mutaciones las restringe el backend a PURCHASE_TEAM.
+  { path: '/compras/contratos', roles: ROLE_PRIORITY },
+  { path: '/compras/proveedores', roles: ['super_admin', 'lider_procura', 'coordinador_compras', 'comprador'] },
+  { path: '/compras/reportes', roles: ['super_admin', 'lider_procura', 'coordinador_compras', 'comprador', 'aprobador_nivel_1', 'aprobador_nivel_2', 'aprobador_nivel_3', 'director_general', 'executive'] },
 
   // Reportes
   { path: '/reportes', roles: ['super_admin', 'admin_rh', 'executive'] },
