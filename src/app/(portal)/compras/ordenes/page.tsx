@@ -8,10 +8,22 @@ import {
   POStatus,
   PO_STATUS_LABELS,
   PO_STATUS_COLORS,
-  EXPENSE_TYPE_LABELS,
-  PROCUREMENT_TYPE_LABELS,
+  DELIVERY_STATUS_CLASSES,
+  DELIVERY_STATUS_LABELS,
+  deriveDeliveryChip,
 } from '@/types/purchases';
+import ExpeditingModal from '@/components/compras/ExpeditingModal';
 import PurchaseOrderModal from '@/components/compras/PurchaseOrderModal';
+import MaximoOrdersTab from '@/components/compras/MaximoOrdersTab';
+
+// Fase INT-5 (T6): pestanas por fuente. La pestana "Contratos Maximo" se
+// movio a /compras/contratos al implementarse §15.
+type OrdersTab = 'abent' | 'maximo_po';
+
+const ORDER_TABS: { id: OrdersTab; label: string }[] = [
+  { id: 'abent', label: 'Ordenes ABENT' },
+  { id: 'maximo_po', label: 'Ordenes Maximo' },
+];
 
 interface PaginatedResponse {
   data: PurchaseOrder[];
@@ -70,11 +82,14 @@ const getStatusBadgeClass = (status: POStatus) => {
 };
 
 export default function OrdenesPage() {
+  const [activeTab, setActiveTab] = useState<OrdersTab>('abent');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<POStatus | ''>('');
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
+  // Fase Expeditación (B4): acceso al seguimiento desde la fila
+  const [expeditingPoId, setExpeditingPoId] = useState<string | null>(null);
 
   const queryParams = new URLSearchParams();
   queryParams.set('page', page.toString());
@@ -98,20 +113,43 @@ export default function OrdenesPage() {
           <h1 className="text-2xl font-bold text-[#424846]">Ordenes de Compra (PO)</h1>
           <p className="text-gray-500">Gestiona las ordenes de compra emitidas</p>
         </div>
-        <button
-          onClick={() => {
-            setEditingOrder(null);
-            setShowModal(true);
-          }}
-          className="px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#52AF32]/90 transition-colors flex items-center gap-2"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Nueva Orden
-        </button>
+        {activeTab === 'abent' && (
+          <button
+            onClick={() => {
+              setEditingOrder(null);
+              setShowModal(true);
+            }}
+            className="px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#52AF32]/90 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Nueva Orden
+          </button>
+        )}
       </div>
 
+      {/* Tabs por fuente (T6) */}
+      <div className="flex gap-2 bg-white rounded-xl p-2 shadow">
+        {ORDER_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+              activeTab === tab.id
+                ? 'bg-[#52AF32] text-white'
+                : 'bg-white text-[#424846] border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'maximo_po' && <MaximoOrdersTab />}
+
+      {activeTab === 'abent' && (
+      <>
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow">
         <div className="flex items-center gap-4">
@@ -164,6 +202,7 @@ export default function OrdenesPage() {
                   <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Tipo</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Monto</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Entrega Est.</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Entrega</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estado</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Acciones</th>
                 </tr>
@@ -195,6 +234,16 @@ export default function OrdenesPage() {
                       {formatDate(po.expected_delivery_date)}
                     </td>
                     <td className="px-4 py-3 text-center">
+                      {(() => {
+                        const chip = deriveDeliveryChip(po);
+                        return (
+                          <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${DELIVERY_STATUS_CLASSES[chip]}`}>
+                            {DELIVERY_STATUS_LABELS[chip]}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-4 py-3 text-center">
                       <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full ${getStatusBadgeClass(po.status)}`}>
                         {po.status === 'en_transito' && Icons.truck}
                         {PO_STATUS_LABELS[po.status]}
@@ -215,11 +264,11 @@ export default function OrdenesPage() {
                           </svg>
                         </button>
                         <button
-                          onClick={() => console.log('Ver detalle:', po.id)}
+                          onClick={() => setExpeditingPoId(po.id)}
                           className="p-2 text-[#222D59] hover:bg-[#222D59]/10 rounded-lg transition-colors"
-                          title="Ver detalle"
+                          title="Expeditación (seguimiento de entrega)"
                         >
-                          {Icons.eye}
+                          {Icons.truck}
                         </button>
                       </div>
                     </td>
@@ -227,7 +276,7 @@ export default function OrdenesPage() {
                 ))}
                 {orders.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                       No hay ordenes de compra que coincidan con los filtros
                     </td>
                   </tr>
@@ -275,6 +324,15 @@ export default function OrdenesPage() {
         }}
         purchaseOrder={editingOrder}
       />
+      {/* Fase Expeditación (B4): seguimiento de entrega de la PO */}
+      <ExpeditingModal
+        isOpen={expeditingPoId !== null}
+        onClose={() => setExpeditingPoId(null)}
+        purchaseOrderId={expeditingPoId}
+        canEdit
+      />
+      </>
+      )}
     </div>
   );
 }

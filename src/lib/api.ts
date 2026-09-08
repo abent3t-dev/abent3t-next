@@ -14,6 +14,22 @@
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
+/**
+ * Error HTTP con el status code adjunto (Fase INT-5). Extiende Error, asi
+ * que todos los `catch` existentes que solo leen `message` siguen igual;
+ * los flujos que necesitan distinguir respuestas (503 sync deshabilitado
+ * vs 409 corrida en curso en /integrations/maximo) hacen
+ * `err instanceof ApiError && err.status === ...`.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -37,7 +53,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       const error = await res
         .json()
         .catch(() => ({ message: res.statusText }));
-      throw new Error(error.message || 'Error en la petición');
+      throw new ApiError(error.message || 'Error en la petición', res.status);
     }
 
     return res.json();
