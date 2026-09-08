@@ -3,270 +3,715 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { MaximoSummary } from '@/types/purchases';
 
-interface ReportSummary {
-  total_requisitions: number;
-  total_purchase_orders: number;
-  total_suppliers: number;
-  total_amount_rq: number;
-  total_amount_po: number;
-  by_status: Record<string, number>;
-  by_expense_type: Record<string, number>;
+/**
+ * Fase Reportes — datos REALES desde /compras/reportes/* (adios datos
+ * simulados). Aprobaciones, entregas y comite consumen las formulas
+ * existentes (acumuladas); el resto respeta el periodo. El ahorro se muestra
+ * POR FUENTE (T10: ABENT y Maximo no se suman) y los historicos de Maximo
+ * aparecen como "sin clasificar", nunca ocultos.
+ */
+
+// ── Tipos de las respuestas del backend ────────────────────────────────────
+
+interface Resumen {
+  periodo: { from: string; to: string };
+  requisiciones: {
+    creadas_en_periodo: number;
+    abiertas_actuales: number;
+    promedio_dias_gestion: number | null;
+  };
+  ordenes: { creadas_en_periodo: number; monto_total: number };
+  entregas: {
+    pendientes: number;
+    vencidas: number;
+    entregadas: number;
+    retraso_promedio_dias: number | null;
+  };
+  contratos: { por_vencer_30_dias: number; valor_vigentes: number };
+  proveedores: { bloqueados: number };
 }
 
-const Icons = {
-  document: (
-    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-    </svg>
-  ),
-  cart: (
-    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-    </svg>
-  ),
-  truck: (
-    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
-    </svg>
-  ),
-  currency: (
-    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-};
+interface RequisicionesReport {
+  serie_mensual: Array<{ month: string; creadas: number; cerradas: number }>;
+  por_estatus: Array<{ status: string; count: number; monto: number }>;
+  por_tipo: Array<{ expense_type: string; count: number; monto: number }>;
+  por_departamento: Array<{ departamento: string; count: number }>;
+}
+
+interface OrdenesReport {
+  serie_mensual: Array<{ month: string; count: number; monto: number }>;
+  por_tipo_compra: Array<{ tipo: string; count: number; monto: number }>;
+  por_tipo_gasto: Array<{ expense_type: string; count: number; monto: number }>;
+  top_proveedores: Array<{ proveedor: string; count: number; monto: number }>;
+}
+
+interface AprobacionesReport {
+  stats: Record<
+    string,
+    {
+      level: number;
+      level_name: string;
+      total: number;
+      approved: number;
+      rejected: number;
+      pending: number;
+      approval_rate: number;
+      average_time_days: number;
+    }
+  >;
+}
+
+interface EntregasReport {
+  stats: {
+    counts: Record<string, number>;
+    avg_delay_days: number | null;
+    top_delayed_suppliers: Array<{ legal_name: string; late_orders: number }>;
+  };
+  on_time_por_proveedor: Array<{
+    proveedor: string;
+    entregadas: number;
+    a_tiempo: number;
+    rate: number;
+  }>;
+}
+
+interface ContratosReport {
+  por_vencer_30_dias: Array<{
+    id: string;
+    contract_number: string;
+    proveedor: string;
+    end_date: string;
+    total_amount: number | null;
+  }>;
+  vigentes: { total: number; valor_total: number };
+  promedio_consumo_pct: number | null;
+}
+
+interface ComiteReport {
+  tiempos: {
+    byApprover: Array<{
+      approver_profile_id: string;
+      full_name: string | null;
+      avg_hours: number;
+      actions: number;
+      bottleneck: boolean;
+    }>;
+    avgTotalHours: number | null;
+    byStatus: Array<{ status: string; count: number }>;
+    rejectionRateByLevel: Array<{
+      level: number;
+      total: number;
+      rejected: number;
+      rate: number;
+    }>;
+  };
+}
+
+interface MaximoReport {
+  purchase_orders: {
+    por_estatus: Array<{ status: string; count: number }>;
+    serie_mensual_aprobadas: Array<{ month: string; count: number }>;
+    sin_fecha_aprobacion: number;
+  };
+  contracts: { por_estatus: Array<{ status: string; count: number }> };
+}
+
+interface AhorroReport {
+  abent: { disponible: boolean; motivo?: string };
+  maximo: {
+    por_moneda: Array<{ currency: string; total: number; registros: number }>;
+    sin_clasificar: number;
+  };
+}
+
+// ── Utilerías de presentación ──────────────────────────────────────────────
 
 const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
+  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(
+    amount,
+  );
+
+const monthLabel = (month: string) => {
+  const [year, m] = month.split('-');
+  const names = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  return `${names[Number(m) - 1]} ${year.slice(2)}`;
+};
+
+const iso = (d: Date) => d.toISOString().split('T')[0];
+
+type Preset = 'mes' | 'trimestre' | '12m' | 'custom';
+
+function presetRange(preset: Preset): { from: string; to: string } {
+  const now = new Date();
+  const to = iso(now);
+  if (preset === 'mes') {
+    return { from: iso(new Date(now.getFullYear(), now.getMonth(), 1)), to };
+  }
+  if (preset === 'trimestre') {
+    return { from: iso(new Date(now.getFullYear(), now.getMonth() - 2, 1)), to };
+  }
+  return { from: iso(new Date(now.getFullYear(), now.getMonth() - 11, 1)), to };
+}
+
+function Section({
+  title,
+  note,
+  children,
+}: {
+  title: string;
+  note?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white rounded-lg shadow p-6">
+      <div className="flex items-baseline justify-between mb-4 gap-3 flex-wrap">
+        <h3 className="text-lg font-semibold text-[#424846]">{title}</h3>
+        {note && <span className="text-xs text-gray-400">{note}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Empty({ text = 'Sin datos en el periodo' }: { text?: string }) {
+  return <p className="text-sm text-gray-500">{text}</p>;
+}
+
+function HBar({
+  label,
+  value,
+  max,
+  display,
+  color = 'bg-[#52AF32]',
+  highlight = false,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  display?: string;
+  color?: string;
+  highlight?: boolean;
+}) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+  return (
+    <div className="flex items-center gap-3">
+      <div className={`w-40 text-sm truncate ${highlight ? 'text-red-700 font-medium' : 'text-gray-600'}`} title={label}>
+        {label}
+      </div>
+      <div className="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
+        <div className={`h-full ${highlight ? 'bg-red-500' : color}`} style={{ width: `${pct}%` }} />
+      </div>
+      <div className="w-28 text-sm text-right text-gray-700">{display ?? value}</div>
+    </div>
+  );
+}
+
+function KpiCard({
+  label,
+  value,
+  sub,
+  border,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  border: string;
+}) {
+  return (
+    <div className={`bg-white p-4 rounded-lg shadow border-l-4 ${border}`}>
+      <p className="text-sm text-gray-500">{label}</p>
+      <p className="text-xl font-bold text-[#424846]">{value}</p>
+      {sub && <p className="text-xs text-gray-400">{sub}</p>}
+    </div>
+  );
+}
+
+// ── Página ─────────────────────────────────────────────────────────────────
 
 export default function ReportesComprasPage() {
-  const [dateRange, setDateRange] = useState({
-    start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0],
+  const [preset, setPreset] = useState<Preset>('12m');
+  const [customRange, setCustomRange] = useState(presetRange('12m'));
+  const range = preset === 'custom' ? customRange : presetRange(preset);
+  const periodQs = `from=${range.from}&to=${range.to}`;
+
+  const resumenQ = useQuery({
+    queryKey: ['reportes', 'resumen', periodQs],
+    queryFn: () => api.get<Resumen>(`/compras/reportes/resumen?${periodQs}`),
+  });
+  const rqQ = useQuery({
+    queryKey: ['reportes', 'requisiciones', periodQs],
+    queryFn: () =>
+      api.get<RequisicionesReport>(`/compras/reportes/requisiciones?${periodQs}`),
+  });
+  const poQ = useQuery({
+    queryKey: ['reportes', 'ordenes', periodQs],
+    queryFn: () => api.get<OrdenesReport>(`/compras/reportes/ordenes?${periodQs}`),
+  });
+  const aprobacionesQ = useQuery({
+    queryKey: ['reportes', 'aprobaciones'],
+    queryFn: () =>
+      api.get<AprobacionesReport>('/compras/reportes/aprobaciones'),
+  });
+  const entregasQ = useQuery({
+    queryKey: ['reportes', 'entregas'],
+    queryFn: () => api.get<EntregasReport>('/compras/reportes/entregas'),
+  });
+  const contratosQ = useQuery({
+    queryKey: ['reportes', 'contratos'],
+    queryFn: () => api.get<ContratosReport>('/compras/reportes/contratos'),
+  });
+  const comiteQ = useQuery({
+    queryKey: ['reportes', 'comite'],
+    queryFn: () => api.get<ComiteReport>('/compras/reportes/comite'),
+  });
+  const maximoQ = useQuery({
+    queryKey: ['reportes', 'maximo', periodQs],
+    queryFn: () => api.get<MaximoReport>(`/compras/reportes/maximo?${periodQs}`),
+  });
+  const ahorroQ = useQuery({
+    queryKey: ['reportes', 'ahorro', periodQs],
+    queryFn: () => api.get<AhorroReport>(`/compras/reportes/ahorro?${periodQs}`),
+  });
+  const maximoSummaryQ = useQuery({
+    queryKey: ['maximo', 'summary'],
+    queryFn: () => api.get<MaximoSummary>('/maximo/summary'),
+    retry: false,
   });
 
-  // Datos simulados mientras se implementa el backend
-  const mockData: ReportSummary = {
-    total_requisitions: 24,
-    total_purchase_orders: 18,
-    total_suppliers: 12,
-    total_amount_rq: 1250000,
-    total_amount_po: 980000,
-    by_status: {
-      en_revision: 5,
-      en_aprobacion: 8,
-      aprobada: 4,
-      en_progreso: 3,
-      cerrada: 3,
-      cancelada: 1,
-    },
-    by_expense_type: {
-      CAPEX: 850000,
-      OPEX: 400000,
-    },
-  };
+  const resumen = resumenQ.data;
+  const rq = rqQ.data;
+  const po = poQ.data;
+  const aprobaciones = aprobacionesQ.data;
+  const entregas = entregasQ.data;
+  const contratos = contratosQ.data;
+  const comite = comiteQ.data;
+  const maximo = maximoQ.data;
+  const ahorro = ahorroQ.data;
 
-  const data = mockData;
+  const maximoPendiente =
+    maximoSummaryQ.data?.syncEnabled === false &&
+    (maximo?.purchase_orders.por_estatus.length ?? 0) === 0;
+
+  const maxAvgLevel = aprobaciones
+    ? Math.max(
+        0,
+        ...Object.values(aprobaciones.stats).map((l) => l.average_time_days),
+      )
+    : 0;
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Header + periodo */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-[#424846]">Reportes de Compras</h1>
-          <p className="text-gray-500">Metricas y analisis del modulo de compras</p>
+          <p className="text-gray-500">
+            Datos reales del periodo {range.from} — {range.to}
+          </p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Desde:</label>
-            <input
-              type="date"
-              value={dateRange.start}
-              onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Hasta:</label>
-            <input
-              type="date"
-              value={dateRange.end}
-              onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-100 rounded-lg text-blue-600">
-              {Icons.document}
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Requisiciones</p>
-              <p className="text-2xl font-bold text-gray-900">{data.total_requisitions}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-green-100 rounded-lg text-green-600">
-              {Icons.cart}
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Ordenes de Compra</p>
-              <p className="text-2xl font-bold text-gray-900">{data.total_purchase_orders}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-purple-100 rounded-lg text-purple-600">
-              {Icons.truck}
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Proveedores Activos</p>
-              <p className="text-2xl font-bold text-gray-900">{data.total_suppliers}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-yellow-100 rounded-lg text-yellow-600">
-              {Icons.currency}
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Monto Total PO</p>
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(data.total_amount_po)}</p>
-            </div>
-          </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {(
+            [
+              ['mes', 'Este mes'],
+              ['trimestre', 'Trimestre'],
+              ['12m', '12 meses'],
+              ['custom', 'Personalizado'],
+            ] as Array<[Preset, string]>
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => setPreset(value)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                preset === value
+                  ? 'bg-[#52AF32] text-white'
+                  : 'bg-white text-[#424846] border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          {preset === 'custom' && (
+            <>
+              <input
+                type="date"
+                value={customRange.from}
+                onChange={(e) => setCustomRange({ ...customRange, from: e.target.value })}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-gray-900 text-sm"
+              />
+              <input
+                type="date"
+                value={customRange.to}
+                onChange={(e) => setCustomRange({ ...customRange, to: e.target.value })}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-gray-900 text-sm"
+              />
+            </>
+          )}
         </div>
       </div>
 
-      {/* Charts Section */}
+      {/* KPIs cabecera */}
+      {resumen && (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <KpiCard
+            label="RQs del periodo"
+            value={resumen.requisiciones.creadas_en_periodo}
+            sub={`${resumen.requisiciones.abiertas_actuales} abiertas hoy`}
+            border="border-blue-500"
+          />
+          <KpiCard
+            label="Días de gestión (prom.)"
+            value={resumen.requisiciones.promedio_dias_gestion ?? '—'}
+            sub="RQs cerradas en el periodo"
+            border="border-yellow-500"
+          />
+          <KpiCard
+            label="POs del periodo"
+            value={resumen.ordenes.creadas_en_periodo}
+            sub={formatCurrency(resumen.ordenes.monto_total)}
+            border="border-[#52AF32]"
+          />
+          <KpiCard
+            label="Entregas pendientes"
+            value={resumen.entregas.pendientes}
+            sub={`${resumen.entregas.vencidas} vencidas`}
+            border="border-orange-500"
+          />
+          <KpiCard
+            label="Contratos por vencer"
+            value={resumen.contratos.por_vencer_30_dias}
+            sub={`vigentes: ${formatCurrency(resumen.contratos.valor_vigentes)}`}
+            border="border-[#222D59]"
+          />
+          <KpiCard
+            label="Proveedores bloqueados"
+            value={resumen.proveedores.bloqueados}
+            border="border-red-500"
+          />
+        </div>
+      )}
+
+      {/* Requisiciones */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Status Distribution */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Requisiciones por Estado</h3>
-          <div className="space-y-3">
-            {Object.entries(data.by_status).map(([status, count]) => {
-              const total = Object.values(data.by_status).reduce((a, b) => a + b, 0);
-              const percentage = ((count / total) * 100).toFixed(1);
-              const colors: Record<string, string> = {
-                en_revision: 'bg-yellow-500',
-                en_aprobacion: 'bg-blue-500',
-                aprobada: 'bg-green-500',
-                en_progreso: 'bg-purple-500',
-                cerrada: 'bg-gray-500',
-                cancelada: 'bg-red-500',
-              };
-              return (
-                <div key={status} className="flex items-center gap-3">
-                  <div className="w-24 text-sm text-gray-600 capitalize">
-                    {status.replace(/_/g, ' ')}
+        <Section title="Requisiciones — creadas vs cerradas por mes">
+          {!rq || rq.serie_mensual.every((m) => m.creadas === 0 && m.cerradas === 0) ? (
+            <Empty />
+          ) : (
+            <div className="space-y-2">
+              {rq.serie_mensual.map((m) => {
+                const max = Math.max(
+                  1,
+                  ...rq.serie_mensual.map((x) => Math.max(x.creadas, x.cerradas)),
+                );
+                return (
+                  <div key={m.month} className="flex items-center gap-3">
+                    <div className="w-14 text-xs text-gray-500">{monthLabel(m.month)}</div>
+                    <div className="flex-1 space-y-1">
+                      <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-[#52AF32]" style={{ width: `${(m.creadas / max) * 100}%` }} />
+                      </div>
+                      <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-[#222D59]" style={{ width: `${(m.cerradas / max) * 100}%` }} />
+                      </div>
+                    </div>
+                    <div className="w-20 text-xs text-right text-gray-600">
+                      {m.creadas} / {m.cerradas}
+                    </div>
                   </div>
-                  <div className="flex-1 h-4 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full ${colors[status] || 'bg-gray-400'}`}
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
-                  <div className="w-16 text-sm text-right text-gray-700">
-                    {count} ({percentage}%)
-                  </div>
+                );
+              })}
+              <p className="text-xs text-gray-400 pt-1">
+                <span className="inline-block w-2 h-2 bg-[#52AF32] rounded-full mr-1" />creadas
+                <span className="inline-block w-2 h-2 bg-[#222D59] rounded-full ml-3 mr-1" />cerradas
+              </p>
+            </div>
+          )}
+        </Section>
+
+        <Section title="Requisiciones — por estatus y tipo">
+          {!rq || rq.por_estatus.length === 0 ? (
+            <Empty />
+          ) : (
+            <div className="space-y-2">
+              {rq.por_estatus.map((row) => (
+                <HBar
+                  key={row.status}
+                  label={row.status.replace(/_/g, ' ')}
+                  value={row.count}
+                  max={Math.max(...rq.por_estatus.map((r) => r.count))}
+                  display={`${row.count} · ${formatCurrency(row.monto)}`}
+                />
+              ))}
+              <div className="pt-2 flex gap-6 text-sm text-gray-600">
+                {rq.por_tipo.map((t) => (
+                  <span key={t.expense_type}>
+                    <strong>{t.expense_type}:</strong> {t.count} ({formatCurrency(t.monto)})
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </Section>
+      </div>
+
+      {/* Órdenes y montos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Section title="Órdenes — monto adjudicado por mes">
+          {!po || po.serie_mensual.every((m) => m.count === 0) ? (
+            <Empty />
+          ) : (
+            <div className="space-y-2">
+              {po.serie_mensual.map((m) => (
+                <HBar
+                  key={m.month}
+                  label={monthLabel(m.month)}
+                  value={m.monto}
+                  max={Math.max(1, ...po.serie_mensual.map((x) => x.monto))}
+                  display={`${m.count} PO · ${formatCurrency(m.monto)}`}
+                  color="bg-[#222D59]"
+                />
+              ))}
+              <div className="pt-2 flex gap-6 text-sm text-gray-600">
+                {po.por_tipo_gasto.map((t) => (
+                  <span key={t.expense_type}>
+                    <strong>{t.expense_type}:</strong> {formatCurrency(t.monto)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </Section>
+
+        <Section title="Órdenes — top proveedores y tipo de compra">
+          {!po || po.top_proveedores.length === 0 ? (
+            <Empty />
+          ) : (
+            <div className="space-y-2">
+              {po.top_proveedores.map((row) => (
+                <HBar
+                  key={row.proveedor}
+                  label={row.proveedor}
+                  value={row.monto}
+                  max={Math.max(...po.top_proveedores.map((r) => r.monto))}
+                  display={formatCurrency(row.monto)}
+                />
+              ))}
+              {po.por_tipo_compra.length > 0 && (
+                <div className="pt-2 text-sm text-gray-600 space-y-1">
+                  {po.por_tipo_compra.map((t) => (
+                    <p key={t.tipo}>
+                      {t.tipo}: {t.count} PO · {formatCurrency(t.monto)}
+                    </p>
+                  ))}
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* CAPEX vs OPEX */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Distribucion CAPEX / OPEX</h3>
-          <div className="flex items-center justify-center gap-8 h-48">
-            <div className="text-center">
-              <div className="w-24 h-24 rounded-full bg-[#52AF32] flex items-center justify-center mx-auto mb-2">
-                <span className="text-white text-xl font-bold">
-                  {((data.by_expense_type.CAPEX / (data.by_expense_type.CAPEX + data.by_expense_type.OPEX)) * 100).toFixed(0)}%
-                </span>
-              </div>
-              <p className="text-sm font-medium text-gray-900">CAPEX</p>
-              <p className="text-sm text-gray-500">{formatCurrency(data.by_expense_type.CAPEX)}</p>
+              )}
             </div>
-            <div className="text-center">
-              <div className="w-24 h-24 rounded-full bg-[#222D59] flex items-center justify-center mx-auto mb-2">
-                <span className="text-white text-xl font-bold">
-                  {((data.by_expense_type.OPEX / (data.by_expense_type.CAPEX + data.by_expense_type.OPEX)) * 100).toFixed(0)}%
-                </span>
-              </div>
-              <p className="text-sm font-medium text-gray-900">OPEX</p>
-              <p className="text-sm text-gray-500">{formatCurrency(data.by_expense_type.OPEX)}</p>
-            </div>
-          </div>
-        </div>
+          )}
+        </Section>
       </div>
 
-      {/* Summary Cards */}
+      {/* Aprobaciones + Entregas */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Resumen de Montos</h3>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
-              <span className="text-gray-600">Monto Total Requisiciones</span>
-              <span className="font-semibold text-gray-900">{formatCurrency(data.total_amount_rq)}</span>
+        <Section title="Tiempos de aprobación por nivel" note="acumulado (fórmula existente)">
+          {!aprobaciones || Object.values(aprobaciones.stats).every((l) => l.total === 0) ? (
+            <Empty text="Sin aprobaciones registradas" />
+          ) : (
+            <div className="space-y-2">
+              {Object.values(aprobaciones.stats).map((level) => (
+                <HBar
+                  key={level.level}
+                  label={level.level_name}
+                  value={level.average_time_days}
+                  max={Math.max(1, maxAvgLevel)}
+                  display={`${level.average_time_days} días · ${level.approval_rate}%`}
+                  highlight={
+                    level.average_time_days === maxAvgLevel && maxAvgLevel > 0
+                  }
+                />
+              ))}
+              <p className="text-xs text-gray-400">
+                En rojo: el nivel más lento (cuello de botella)
+              </p>
             </div>
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
-              <span className="text-gray-600">Monto Total Ordenes</span>
-              <span className="font-semibold text-gray-900">{formatCurrency(data.total_amount_po)}</span>
-            </div>
-            <div className="flex justify-between items-center py-2">
-              <span className="text-gray-600">Diferencia (RQ - PO)</span>
-              <span className="font-semibold text-green-600">
-                {formatCurrency(data.total_amount_rq - data.total_amount_po)}
-              </span>
-            </div>
-          </div>
-        </div>
+          )}
+        </Section>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Indicadores Clave</h3>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
-              <span className="text-gray-600">Tasa de Conversion (RQ → PO)</span>
-              <span className="font-semibold text-blue-600">
-                {((data.total_purchase_orders / data.total_requisitions) * 100).toFixed(1)}%
-              </span>
+        <Section title="Desempeño de entregas" note="acumulado (fórmula existente)">
+          {!entregas ? (
+            <Empty />
+          ) : (
+            <div className="space-y-3">
+              <div className="flex gap-4 text-sm text-gray-600 flex-wrap">
+                <span><strong>En tiempo:</strong> {entregas.stats.counts.en_tiempo}</span>
+                <span><strong>En riesgo:</strong> {entregas.stats.counts.en_riesgo}</span>
+                <span className="text-red-700"><strong>Retrasadas:</strong> {entregas.stats.counts.retrasada}</span>
+                <span><strong>Entregadas:</strong> {entregas.stats.counts.entregada}</span>
+                <span><strong>Retraso prom.:</strong> {entregas.stats.avg_delay_days ?? '—'} días</span>
+              </div>
+              {entregas.on_time_por_proveedor.length === 0 ? (
+                <Empty text="Aún no hay entregas completadas" />
+              ) : (
+                entregas.on_time_por_proveedor.map((row) => (
+                  <HBar
+                    key={row.proveedor}
+                    label={row.proveedor}
+                    value={row.rate}
+                    max={100}
+                    display={`${row.rate}% (${row.a_tiempo}/${row.entregadas})`}
+                    color={row.rate >= 80 ? 'bg-[#52AF32]' : row.rate >= 50 ? 'bg-amber-500' : 'bg-red-500'}
+                  />
+                ))
+              )}
             </div>
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
-              <span className="text-gray-600">Monto Promedio por PO</span>
-              <span className="font-semibold text-gray-900">
-                {formatCurrency(data.total_amount_po / data.total_purchase_orders)}
-              </span>
-            </div>
-            <div className="flex justify-between items-center py-2">
-              <span className="text-gray-600">PO por Proveedor (promedio)</span>
-              <span className="font-semibold text-gray-900">
-                {(data.total_purchase_orders / data.total_suppliers).toFixed(1)}
-              </span>
-            </div>
-          </div>
-        </div>
+          )}
+        </Section>
       </div>
 
-      {/* Note */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <p className="text-sm text-yellow-800">
-          <strong>Nota:</strong> Los datos mostrados son de ejemplo. Los reportes completos estaran disponibles
-          cuando se implemente el endpoint <code className="bg-yellow-100 px-1 rounded">/api/compras/reports</code> en el backend.
-        </p>
+      {/* Contratos + Ahorro */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Section title="Contratos">
+          {!contratos ? (
+            <Empty />
+          ) : (
+            <div className="space-y-3">
+              <div className="flex gap-6 text-sm text-gray-600 flex-wrap">
+                <span><strong>Vigentes:</strong> {contratos.vigentes.total} ({formatCurrency(contratos.vigentes.valor_total)})</span>
+                <span><strong>Consumo prom.:</strong> {contratos.promedio_consumo_pct ?? '—'}%</span>
+              </div>
+              {contratos.por_vencer_30_dias.length === 0 ? (
+                <Empty text="Sin contratos por vencer en 30 días" />
+              ) : (
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-amber-700">Por vencer (≤30 días):</p>
+                  {contratos.por_vencer_30_dias.map((contract) => (
+                    <p key={contract.id} className="text-sm text-gray-700">
+                      <span className="font-mono">{contract.contract_number}</span>
+                      {' · '}{contract.proveedor}{' · vence '}
+                      {new Date(contract.end_date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', timeZone: 'UTC' })}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </Section>
+
+        <Section
+          title="Ahorro por fuente"
+          note="fuentes NO sumables entre sí (T10)"
+        >
+          {!ahorro ? (
+            <Empty />
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="border border-gray-200 rounded-lg p-3">
+                <p className="text-sm font-medium text-[#424846]">ABENT</p>
+                {ahorro.abent.disponible ? null : (
+                  <p className="text-xs text-gray-500 mt-1">
+                    No disponible: {ahorro.abent.motivo}
+                  </p>
+                )}
+              </div>
+              <div className="border border-gray-200 rounded-lg p-3">
+                <p className="text-sm font-medium text-[#424846]">Maximo (AB_AHORRO)</p>
+                {ahorro.maximo.por_moneda.length === 0 ? (
+                  <p className="text-xs text-gray-500 mt-1">Sin registros con ahorro</p>
+                ) : (
+                  ahorro.maximo.por_moneda.map((row) => (
+                    <p key={row.currency} className="text-sm text-gray-700 mt-1">
+                      {row.currency}: <strong>{row.total.toLocaleString('es-MX')}</strong>{' '}
+                      <span className="text-xs text-gray-400">({row.registros} POs)</span>
+                    </p>
+                  ))
+                )}
+                <p className="text-xs text-gray-400 mt-1">
+                  Sin clasificar (histórico): {ahorro.maximo.sin_clasificar} POs
+                </p>
+              </div>
+            </div>
+          )}
+        </Section>
       </div>
+
+      {/* Comité (cierra el pendiente de §16) */}
+      <Section title="Comité de Compras — tiempos por aprobador" note="acumulado (fórmula de §16)">
+        {!comite || comite.tiempos.byApprover.length === 0 ? (
+          <Empty text="Sin comités con aprobaciones registradas" />
+        ) : (
+          <div className="space-y-2">
+            {comite.tiempos.byApprover.map((approver) => (
+              <HBar
+                key={approver.approver_profile_id}
+                label={approver.full_name ?? '—'}
+                value={approver.avg_hours}
+                max={Math.max(1, ...comite.tiempos.byApprover.map((a) => a.avg_hours))}
+                display={`${approver.avg_hours} h · ${approver.actions} acciones`}
+                highlight={approver.bottleneck}
+              />
+            ))}
+            <div className="pt-2 flex gap-6 text-sm text-gray-600 flex-wrap">
+              <span><strong>Prom. total del flujo:</strong> {comite.tiempos.avgTotalHours ?? '—'} h</span>
+              {comite.tiempos.byStatus.map((s) => (
+                <span key={s.status}>{s.status}: {s.count}</span>
+              ))}
+            </div>
+            {comite.tiempos.rejectionRateByLevel.length > 0 && (
+              <p className="text-xs text-gray-400">
+                Rechazo por nivel:{' '}
+                {comite.tiempos.rejectionRateByLevel
+                  .map((l) => `N${l.level} ${l.rate}%`)
+                  .join(' · ')}
+                {' — '}En rojo: cuello de botella (&gt;72 h)
+              </p>
+            )}
+          </div>
+        )}
+      </Section>
+
+      {/* Maximo */}
+      <Section title="Maximo — volumen en staging" note="históricos con campos vacíos = sin clasificar">
+        {maximoPendiente ? (
+          <Empty text="Sincronización pendiente de activación (configuración del servidor)" />
+        ) : !maximo ? (
+          <Empty />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-[#424846]">Órdenes por estatus</p>
+              {maximo.purchase_orders.por_estatus.map((row) => (
+                <HBar
+                  key={row.status}
+                  label={row.status}
+                  value={row.count}
+                  max={Math.max(...maximo.purchase_orders.por_estatus.map((r) => r.count), 1)}
+                  color={row.status === 'sin_clasificar' ? 'bg-gray-400' : 'bg-[#52AF32]'}
+                />
+              ))}
+              <p className="text-xs text-gray-400">
+                Sin fecha de aprobación: {maximo.purchase_orders.sin_fecha_aprobacion} POs
+                (fuera de la serie mensual)
+              </p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-[#424846]">Contratos por estatus</p>
+              {maximo.contracts.por_estatus.length === 0 ? (
+                <Empty text="Sin contratos en staging" />
+              ) : (
+                maximo.contracts.por_estatus.map((row) => (
+                  <HBar
+                    key={row.status}
+                    label={row.status}
+                    value={row.count}
+                    max={Math.max(...maximo.contracts.por_estatus.map((r) => r.count), 1)}
+                    color={row.status === 'sin_clasificar' ? 'bg-gray-400' : 'bg-[#222D59]'}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </Section>
     </div>
   );
 }

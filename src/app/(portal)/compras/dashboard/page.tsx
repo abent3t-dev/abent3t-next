@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import {
@@ -9,6 +10,8 @@ import {
   REQUISITION_STATUS_LABELS,
   PO_STATUS_LABELS,
   EXPENSE_TYPE_LABELS,
+  MaximoSummary,
+  maximoStatusBadgeClass,
 } from '@/types/purchases';
 
 const Icons = {
@@ -58,17 +61,33 @@ export default function ComprasDashboardPage() {
     queryFn: () => api.get<ApprovalStats>('/approvals/stats'),
   });
 
+  // Fase INT-5: staging de Maximo (si el rol no alcanza, la tarjeta se oculta)
+  const maximoQuery = useQuery({
+    queryKey: ['maximo', 'summary'],
+    queryFn: () => api.get<MaximoSummary>('/maximo/summary'),
+    retry: false,
+  });
+
   const rqStats = rqStatsQuery.data;
   const poStats = poStatsQuery.data;
   const approvalStats = approvalStatsQuery.data;
+  const maximo = maximoQuery.data;
   const loading = rqStatsQuery.isLoading || poStatsQuery.isLoading || approvalStatsQuery.isLoading;
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-[#424846]">Dashboard de Compras</h1>
-        <p className="text-gray-500">KPIs y metricas del modulo de compras</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[#424846]">Dashboard de Compras</h1>
+          <p className="text-gray-500">KPIs y metricas del modulo de compras</p>
+        </div>
+        <Link
+          href="/compras/reportes"
+          className="px-4 py-2 text-sm bg-white border border-gray-200 text-[#424846] rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          Ver reportes
+        </Link>
       </div>
 
       {loading ? (
@@ -192,11 +211,86 @@ export default function ComprasDashboardPage() {
             </div>
           </div>
 
+          {/* Tarjeta Maximo (Fase INT-5) — staging sincronizado */}
+          {maximo && (
+            <div className="bg-white p-6 rounded-lg shadow">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-[#424846]">Maximo</h3>
+                {!maximo.syncEnabled && (
+                  <span className="inline-flex px-2.5 py-1 text-xs font-medium rounded-full bg-gray-200 text-gray-700">
+                    Pendiente de activacion
+                  </span>
+                )}
+              </div>
+              {maximo.purchaseOrders.total === 0 &&
+              maximo.contracts.total === 0 &&
+              !maximo.syncEnabled ? (
+                <p className="text-sm text-gray-500">
+                  Sincronizacion pendiente de activacion (configuracion del
+                  servidor). Los datos de Maximo apareceran aqui en cuanto se
+                  habilite.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <p className="text-sm text-gray-500">Ordenes en staging</p>
+                    <p className="text-2xl font-bold text-[#424846]">
+                      {maximo.purchaseOrders.total}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {maximo.purchaseOrders.byStatus.map((s) => (
+                        <span
+                          key={s.status ?? 'null'}
+                          className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${maximoStatusBadgeClass(s.status)}`}
+                        >
+                          {s.status ?? '—'}: {s.count}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Contratos en staging</p>
+                    <p className="text-2xl font-bold text-[#424846]">
+                      {maximo.contracts.total}
+                      <span className="ml-2 text-sm font-normal text-gray-500">
+                        ({maximo.contracts.withContract} con contrato)
+                      </span>
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {maximo.contracts.byStatus.map((s) => (
+                        <span
+                          key={s.status ?? 'null'}
+                          className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${maximoStatusBadgeClass(s.status)}`}
+                        >
+                          {s.status ?? '—'}: {s.count}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Ultima sincronizacion</p>
+                    {(['purchase_orders', 'contracts'] as const).map((t) => {
+                      const run = maximo.lastSync[t];
+                      return (
+                        <p key={t} className="text-sm text-gray-700 mt-1">
+                          {t === 'purchase_orders' ? 'Ordenes' : 'Contratos'}:{' '}
+                          {run
+                            ? `${new Date(run.started_at).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} (${run.status})`
+                            : 'sin corridas'}
+                        </p>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Approval Stats */}
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-lg font-semibold text-[#424846] mb-4">Tiempos de Aprobacion por Nivel</h3>
             <div className="grid grid-cols-4 gap-4">
-              {approvalStats && Object.values(approvalStats).map((level: any) => (
+              {approvalStats && Object.values(approvalStats).map((level) => (
                 <div key={level.level} className="p-4 bg-gray-50 rounded-lg">
                   <p className="text-sm text-gray-500 mb-1">{level.level_name}</p>
                   <p className="text-2xl font-bold text-[#424846]">{level.average_time_days} dias</p>
