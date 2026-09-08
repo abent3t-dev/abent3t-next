@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
+import { usePurchaseUsers } from '@/hooks/usePurchaseUsers';
 import type { Requisition, ExpenseType } from '@/types/purchases';
 
 interface RequisitionModalProps {
@@ -15,12 +16,6 @@ interface RequisitionModalProps {
 interface Department {
   id: string;
   name: string;
-}
-
-interface Profile {
-  id: string;
-  full_name: string;
-  email: string;
 }
 
 const Icons = {
@@ -55,12 +50,8 @@ export default function RequisitionModal({ isOpen, onClose, requisition }: Requi
     enabled: isOpen,
   });
 
-  // Cargar compradores (usuarios con rol de compras)
-  const { data: buyers } = useQuery({
-    queryKey: ['buyers'],
-    queryFn: () => api.get<{ data: Profile[] }>('/auth/users?role=comprador'),
-    enabled: isOpen,
-  });
+  // Cargar compradores — T7: /compras/usuarios (antes /auth/users daba 403)
+  const { data: buyers } = usePurchaseUsers('comprador', isOpen);
 
   // Cargar datos si es edicion
   useEffect(() => {
@@ -243,7 +234,7 @@ export default function RequisitionModal({ isOpen, onClose, requisition }: Requi
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
                 >
                   <option value="">Sin asignar</option>
-                  {buyers?.data?.map((buyer) => (
+                  {buyers?.map((buyer) => (
                     <option key={buyer.id} value={buyer.id}>{buyer.full_name}</option>
                   ))}
                 </select>
