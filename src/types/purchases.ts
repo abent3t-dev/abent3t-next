@@ -858,3 +858,172 @@ export function deriveDeliveryChip(po: {
   if (daysLeft <= 15) return 'en_riesgo';
   return 'en_tiempo';
 }
+
+// ==========================================
+// INTEGRACION SAP B1 (Fase INT-4) — lectura de staging
+// Fuente: GET /sap/* (dominio) y GET /integrations/sap/* (sync).
+// null en clasificacion/proceso/ahorro = SIN CAPTURAR en el ERP (la captura
+// arranco el 2026-09-15 y es incremental): la UI muestra "No disponible",
+// nunca 0 ni el placeholder "SELECCIONAR" (T10 / regla 6).
+// ==========================================
+
+export type SapSyncTarget = 'purchase_orders' | 'purchase_requests';
+
+export interface SapPurchaseOrder {
+  id: string;
+  doc_entry: number;
+  doc_num: number | null;
+  doc_date: string | null;
+  doc_due_date: string | null;
+  update_date_source: string | null;
+  document_status: string | null;
+  comments: string | null;
+  card_code: string | null;
+  card_name: string | null;
+  doc_total: number | null;
+  currency: string | null;
+  lines_total: number;
+  lines_classified: number;
+  ahorro_total: number | null;
+  last_changed_at: string | null;
+  last_seen_at: string;
+}
+
+export interface SapPurchaseRequest {
+  id: string;
+  doc_entry: number;
+  doc_num: number | null;
+  doc_date: string | null;
+  doc_due_date: string | null;
+  required_date: string | null;
+  update_date_source: string | null;
+  document_status: string | null;
+  comments: string | null;
+  requester: string | null;
+  requester_name: string | null;
+  doc_total: number | null;
+  currency: string | null;
+  lines_total: number;
+  lines_classified: number;
+  ahorro_total: number | null;
+  last_changed_at: string | null;
+  last_seen_at: string;
+}
+
+export interface SapDocumentLine {
+  lineNum: number | null;
+  itemCode: string | null;
+  itemDescription: string | null;
+  lineTotal: number | null;
+  currency: string | null;
+  clasGts: string | null;
+  impAhorro: number | null;
+  procComp: string | null;
+}
+
+export interface SapPurchaseOrderDetail {
+  document: SapPurchaseOrder;
+  lines: SapDocumentLine[];
+  raw?: unknown; // solo llega para PURCHASE_ADMINS
+}
+
+export interface SapPurchaseRequestDetail {
+  document: SapPurchaseRequest;
+  lines: SapDocumentLine[];
+  raw?: unknown;
+}
+
+export interface SapStatusCount {
+  status: string | null;
+  count: number;
+}
+
+export interface SapSyncRun {
+  id: string;
+  target: SapSyncTarget;
+  triggered_by: 'cron' | 'manual';
+  triggered_by_user_id: string | null;
+  mode: 'full' | 'incremental';
+  since_filter: string | null;
+  started_at: string;
+  finished_at: string | null;
+  status: 'running' | 'success' | 'partial' | 'failed';
+  pages_total: number | null;
+  pages_ok: number;
+  records_fetched: number;
+  records_inserted: number;
+  records_updated: number;
+  records_unchanged: number;
+  records_failed: number;
+  error_summary: string | null;
+  mapper_version: string;
+}
+
+export interface SapSyncStatus {
+  enabled: boolean;
+  intervalMinutes: number;
+  pageSize: number;
+  running: SapSyncTarget[];
+  lastRuns: Record<SapSyncTarget, SapSyncRun | null>;
+  counts: Record<SapSyncTarget, number>;
+}
+
+export interface SapSummaryLastRun {
+  status: string;
+  triggered_by: string;
+  mode: string;
+  started_at: string;
+  finished_at: string | null;
+  records_inserted: number;
+  records_updated: number;
+  records_unchanged: number;
+  records_failed: number;
+}
+
+export interface SapEntitySummary {
+  total: number;
+  byStatus: SapStatusCount[];
+  montoTotal: number;
+  linesTotal: number;
+  linesClassified: number;
+  docsConAhorro: number;
+}
+
+export interface SapSummary {
+  syncEnabled: boolean;
+  purchaseOrders: SapEntitySummary;
+  purchaseRequests: SapEntitySummary;
+  lastSync: Record<SapSyncTarget, SapSummaryLastRun | null>;
+}
+
+// Estatus de documento de SAP (bost_*): etiquetas y colores conocidos;
+// cualquier otro valor se muestra tal cual con badge neutro.
+export const SAP_STATUS_LABELS: Record<string, string> = {
+  bost_Open: 'Abierta',
+  bost_Close: 'Cerrada',
+};
+
+export const SAP_STATUS_BADGE_CLASSES: Record<string, string> = {
+  bost_Open: 'bg-green-100 text-green-800',
+  bost_Close: 'bg-gray-200 text-gray-700',
+};
+
+export function sapStatusLabel(status: string | null): string {
+  return (status && SAP_STATUS_LABELS[status]) || (status ?? '—');
+}
+
+export function sapStatusBadgeClass(status: string | null): string {
+  return (
+    (status && SAP_STATUS_BADGE_CLASSES[status]) || 'bg-gray-100 text-gray-800'
+  );
+}
+
+export const SAP_TARGET_LABELS: Record<SapSyncTarget, string> = {
+  purchase_orders: 'Ordenes (OC)',
+  purchase_requests: 'Solicitudes de Pedido',
+};
+
+export const SAP_RUN_MODE_LABELS: Record<SapSyncRun['mode'], string> = {
+  full: 'Completa',
+  incremental: 'Incremental',
+};

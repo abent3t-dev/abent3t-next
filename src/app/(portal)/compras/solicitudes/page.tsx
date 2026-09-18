@@ -12,6 +12,32 @@ import {
   EXPENSE_TYPE_LABELS,
 } from '@/types/purchases';
 import RequisitionModal from '@/components/compras/RequisitionModal';
+import SapRequestsTab from '@/components/compras/SapRequestsTab';
+import { useAuth } from '@/contexts/AuthContext';
+import type { UserRole } from '@/types/auth';
+
+// Int-4 (T6): pestanas por fuente, mismo patron que /compras/ordenes.
+// La pestana SAP solo se muestra a quien el backend deja leer /sap/*
+// (SAP_VIEWERS): 'solicitante' entra a esta pagina pero NO es viewer de SAP
+// y veria puros 403.
+type RequestsTab = 'abent' | 'sap_pr';
+
+const SAP_VIEWER_ROLES: UserRole[] = [
+  'super_admin',
+  'lider_procura',
+  'coordinador_compras',
+  'comprador',
+  'aprobador_nivel_1',
+  'aprobador_nivel_2',
+  'aprobador_nivel_3',
+  'director_general',
+  'executive',
+];
+
+const REQUEST_TABS: { id: RequestsTab; label: string }[] = [
+  { id: 'abent', label: 'Solicitudes ABENT' },
+  { id: 'sap_pr', label: 'Solicitudes SAP' },
+];
 
 interface PaginatedResponse {
   data: Requisition[];
@@ -66,6 +92,12 @@ const getStatusBadgeClass = (status: RequisitionStatus) => {
 };
 
 export default function SolicitudesPage() {
+  const { hasRole } = useAuth();
+  const canSeeSap = hasRole(...SAP_VIEWER_ROLES);
+  const [activeTab, setActiveTab] = useState<RequestsTab>('abent');
+  const visibleTabs = canSeeSap
+    ? REQUEST_TABS
+    : REQUEST_TABS.filter((tab) => tab.id !== 'sap_pr');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<RequisitionStatus | ''>('');
   const [typeFilter, setTypeFilter] = useState<ExpenseType | ''>('');
@@ -96,20 +128,43 @@ export default function SolicitudesPage() {
           <h1 className="text-2xl font-bold text-[#424846]">Solicitudes de Compra (RQ)</h1>
           <p className="text-gray-500">Gestiona las requisiciones de compra</p>
         </div>
-        <button
-          onClick={() => {
-            setEditingRequisition(null);
-            setShowModal(true);
-          }}
-          className="px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#52AF32]/90 transition-colors flex items-center gap-2"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Nueva Requisición
-        </button>
+        {activeTab === 'abent' && (
+          <button
+            onClick={() => {
+              setEditingRequisition(null);
+              setShowModal(true);
+            }}
+            className="px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#52AF32]/90 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Nueva Requisición
+          </button>
+        )}
       </div>
 
+      {/* Tabs por fuente (T6) */}
+      <div className="flex gap-2 bg-white rounded-xl p-2 shadow">
+        {visibleTabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+              activeTab === tab.id
+                ? 'bg-[#52AF32] text-white'
+                : 'bg-white text-[#424846] border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'sap_pr' && canSeeSap && <SapRequestsTab />}
+
+      {activeTab === 'abent' && (
+      <>
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow">
         <div className="flex items-center gap-4">
@@ -281,6 +336,9 @@ export default function SolicitudesPage() {
           </>
         )}
       </div>
+
+      </>
+      )}
 
       {/* Modal de Requisición */}
       <RequisitionModal

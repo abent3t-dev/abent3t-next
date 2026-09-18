@@ -12,6 +12,9 @@ import {
   EXPENSE_TYPE_LABELS,
   MaximoSummary,
   maximoStatusBadgeClass,
+  SapSummary,
+  sapStatusBadgeClass,
+  sapStatusLabel,
 } from '@/types/purchases';
 
 const Icons = {
@@ -68,10 +71,18 @@ export default function ComprasDashboardPage() {
     retry: false,
   });
 
+  // Fase INT-4: staging de SAP (misma regla: sin rol, la tarjeta se oculta)
+  const sapQuery = useQuery({
+    queryKey: ['sap', 'summary'],
+    queryFn: () => api.get<SapSummary>('/sap/summary'),
+    retry: false,
+  });
+
   const rqStats = rqStatsQuery.data;
   const poStats = poStatsQuery.data;
   const approvalStats = approvalStatsQuery.data;
   const maximo = maximoQuery.data;
+  const sap = sapQuery.data;
   const loading = rqStatsQuery.isLoading || poStatsQuery.isLoading || approvalStatsQuery.isLoading;
 
   return (
@@ -274,6 +285,83 @@ export default function ComprasDashboardPage() {
                       return (
                         <p key={t} className="text-sm text-gray-700 mt-1">
                           {t === 'purchase_orders' ? 'Ordenes' : 'Contratos'}:{' '}
+                          {run
+                            ? `${new Date(run.started_at).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} (${run.status})`
+                            : 'sin corridas'}
+                        </p>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tarjeta SAP (Fase INT-4) — staging sincronizado */}
+          {sap && (
+            <div className="bg-white p-6 rounded-lg shadow">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-[#424846]">SAP Business One</h3>
+                {!sap.syncEnabled && (
+                  <span className="inline-flex px-2.5 py-1 text-xs font-medium rounded-full bg-gray-200 text-gray-700">
+                    Pendiente de activacion
+                  </span>
+                )}
+              </div>
+              {sap.purchaseOrders.total === 0 &&
+              sap.purchaseRequests.total === 0 &&
+              !sap.syncEnabled ? (
+                <p className="text-sm text-gray-500">
+                  Sincronizacion pendiente de activacion (configuracion del
+                  servidor). Los datos de SAP apareceran aqui en cuanto se
+                  habilite.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <p className="text-sm text-gray-500">Ordenes de compra</p>
+                    <p className="text-2xl font-bold text-[#424846]">
+                      {sap.purchaseOrders.total}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {sap.purchaseOrders.byStatus.map((st) => (
+                        <span
+                          key={st.status ?? 'null'}
+                          className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${sapStatusBadgeClass(st.status)}`}
+                        >
+                          {sapStatusLabel(st.status)}: {st.count}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500">
+                      {sap.purchaseOrders.linesClassified > 0
+                        ? `${sap.purchaseOrders.linesClassified} de ${sap.purchaseOrders.linesTotal} lineas clasificadas`
+                        : 'Clasificacion aun sin capturar en el ERP'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Solicitudes de pedido</p>
+                    <p className="text-2xl font-bold text-[#424846]">
+                      {sap.purchaseRequests.total}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {sap.purchaseRequests.byStatus.map((st) => (
+                        <span
+                          key={st.status ?? 'null'}
+                          className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${sapStatusBadgeClass(st.status)}`}
+                        >
+                          {sapStatusLabel(st.status)}: {st.count}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Ultima sincronizacion</p>
+                    {(['purchase_orders', 'purchase_requests'] as const).map((t) => {
+                      const run = sap.lastSync[t];
+                      return (
+                        <p key={t} className="text-sm text-gray-700 mt-1">
+                          {t === 'purchase_orders' ? 'Ordenes' : 'Solicitudes'}:{' '}
                           {run
                             ? `${new Date(run.started_at).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} (${run.status})`
                             : 'sin corridas'}

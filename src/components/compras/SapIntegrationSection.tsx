@@ -7,29 +7,29 @@ import { notify } from '@/lib/notifications';
 import { useAuth } from '@/contexts/AuthContext';
 import { PURCHASE_ADMIN_ROLES } from '@/types/auth';
 import type { PaginatedResponse } from '@/types/pagination';
-import SapIntegrationSection from '@/components/compras/SapIntegrationSection';
 import {
   MAXIMO_RUN_STATUS_CLASSES,
   MAXIMO_RUN_STATUS_LABELS,
-  MAXIMO_TARGET_LABELS,
-  MAXIMO_TRIGGER_LABELS,
-  MaximoSyncRun,
-  MaximoSyncStatus,
-  MaximoSyncTarget,
+  SAP_RUN_MODE_LABELS,
+  SAP_TARGET_LABELS,
+  SapSyncRun,
+  SapSyncStatus,
+  SapSyncTarget,
 } from '@/types/purchases';
 
 /**
- * Fase INT-5 — Pagina tecnica de la integracion Maximo: estado del sync,
- * historial de corridas y disparo manual. Consume los endpoints de Int-3
- * (/integrations/maximo/*) tal cual; no re-implementa nada.
- * Acceso: PURCHASE_ADMINS + executive (el boton de sincronizar, solo admins).
+ * Fase INT-4 — Seccion SAP de /compras/integraciones: estado del sync,
+ * historial de corridas y disparo manual (full/incremental). Consume los
+ * endpoints /integrations/sap/* tal cual. Mismo layout que la seccion
+ * Maximo (los estados de corrida comparten etiquetas y colores).
+ * Acceso: la pagina ya restringe a PURCHASE_ADMINS + executive; el boton
+ * de sincronizar, solo admins.
  */
 
-interface TriggerResponse {
+interface SapTriggerResponse {
   accepted: boolean;
-  runs: Array<{ target: MaximoSyncTarget; run_id: string }>;
-  skipped: Array<{ target: MaximoSyncTarget; reason: string }>;
-  conflicts: Array<{ target: MaximoSyncTarget; message?: string }>;
+  runs: Array<{ target: SapSyncTarget; run_id: string }>;
+  conflicts: Array<{ target: SapSyncTarget; reason: string }>;
 }
 
 const RUNS_PAGE_SIZE = 10;
@@ -55,7 +55,7 @@ const formatDuration = (start: string, end: string | null) => {
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 };
 
-function RunBadge({ status }: { status: MaximoSyncRun['status'] }) {
+function RunBadge({ status }: { status: SapSyncRun['status'] }) {
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full ${MAXIMO_RUN_STATUS_CLASSES[status]}`}>
       {status === 'running' && (
@@ -66,30 +66,33 @@ function RunBadge({ status }: { status: MaximoSyncRun['status'] }) {
   );
 }
 
-export default function IntegracionesPage() {
+export default function SapIntegrationSection() {
   const { hasRole } = useAuth();
   const queryClient = useQueryClient();
   const isAdmin = hasRole(...PURCHASE_ADMIN_ROLES);
 
-  const [target, setTarget] = useState<'all' | MaximoSyncTarget>('all');
+  const [target, setTarget] = useState<'all' | SapSyncTarget>('all');
+  const [mode, setMode] = useState<'auto' | 'full' | 'incremental'>('auto');
   const [triggering, setTriggering] = useState(false);
   const [runsPage, setRunsPage] = useState(1);
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
 
   const statusQuery = useQuery({
-    queryKey: ['maximo-sync-status'],
-    queryFn: () => api.get<MaximoSyncStatus>('/integrations/maximo/status'),
+    queryKey: ['sap-sync-status'],
+    queryFn: () => api.get<SapSyncStatus>('/integrations/sap/status'),
     refetchInterval: (query) =>
       query.state.data?.running.length ? REFRESH_MS : false,
   });
 
   const runsQuery = useQuery({
-    queryKey: ['maximo-sync-runs', runsPage],
+    queryKey: ['sap-sync-runs', runsPage],
     queryFn: () =>
-      api.get<PaginatedResponse<MaximoSyncRun>>(
-        `/integrations/maximo/runs?page=${runsPage}&limit=${RUNS_PAGE_SIZE}`,
+      api.get<PaginatedResponse<SapSyncRun>>(
+        `/integrations/sap/runs?page=${runsPage}&limit=${RUNS_PAGE_SIZE}`,
       ),
-    // Auto-refresh cada 15 s mientras haya corridas en curso
+    // El endpoint de corridas es solo para admins: sin el rol ni se consulta
+    // (executive veria un 403 pintado como "sin corridas").
+    enabled: isAdmin,
     refetchInterval: (query) =>
       query.state.data?.data.some((run) => run.status === 'running')
         ? REFRESH_MS
@@ -104,24 +107,21 @@ export default function IntegracionesPage() {
   const triggerSync = async () => {
     setTriggering(true);
     try {
-      const body = target === 'all' ? {} : { target };
-      const res = await api.post<TriggerResponse>(
-        '/integrations/maximo/sync',
+      const body: Record<string, string> = {};
+      if (target !== 'all') body.target = target;
+      if (mode !== 'auto') body.mode = mode;
+      const res = await api.post<SapTriggerResponse>(
+        '/integrations/sap/sync',
         body,
       );
       if (res.runs.length > 0) {
         notify.success(
-          `Sincronizacion aceptada: ${res.runs.map((r) => MAXIMO_TARGET_LABELS[r.target]).join(', ')}`,
-        );
-      }
-      for (const skipped of res.skipped) {
-        notify.info(
-          `${MAXIMO_TARGET_LABELS[skipped.target]} omitido: ${skipped.reason}`,
+          `Sincronizacion SAP aceptada: ${res.runs.map((r) => SAP_TARGET_LABELS[r.target]).join(', ')}`,
         );
       }
       for (const conflict of res.conflicts) {
         notify.info(
-          `${MAXIMO_TARGET_LABELS[conflict.target]}: ya hay una corrida en curso`,
+          `${SAP_TARGET_LABELS[conflict.target]}: ya hay una corrida en curso`,
         );
       }
     } catch (err) {
@@ -129,31 +129,26 @@ export default function IntegracionesPage() {
         notify.error('Ya hay una corrida en curso para ese objetivo');
       } else if (err instanceof ApiError && err.status === 503) {
         notify.info(
-          'Sincronizacion pendiente de activacion (configuracion del servidor)',
+          'Sincronizacion de SAP pendiente de activacion (configuracion del servidor)',
         );
       } else {
         notify.error(err instanceof Error ? err.message : 'Error al sincronizar');
       }
     } finally {
       setTriggering(false);
-      void queryClient.invalidateQueries({ queryKey: ['maximo-sync-status'] });
-      void queryClient.invalidateQueries({ queryKey: ['maximo-sync-runs'] });
+      void queryClient.invalidateQueries({ queryKey: ['sap-sync-status'] });
+      void queryClient.invalidateQueries({ queryKey: ['sap-sync-runs'] });
+      // Los datos recien sincronizados deben reflejarse sin recargar:
+      void queryClient.invalidateQueries({ queryKey: ['sap-purchase-orders'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['sap-purchase-requests'],
+      });
+      void queryClient.invalidateQueries({ queryKey: ['sap', 'summary'] });
     }
   };
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[#424846]">Integraciones</h1>
-          <p className="text-gray-500">
-            Sincronizacion de datos desde IBM Maximo y SAP Business One (solo
-            lectura hacia los ERP)
-          </p>
-        </div>
-      </div>
-
+    <>
       {/* Banner: sync pendiente de activacion (no es error) */}
       {status && !enabled && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-center gap-3">
@@ -161,28 +156,38 @@ export default function IntegracionesPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <p className="text-sm text-blue-800">
-            Sincronizacion de Maximo pendiente de activacion (configuracion del
+            Sincronizacion de SAP pendiente de activacion (configuracion del
             servidor). Los datos apareceran aqui en cuanto se habilite.
           </p>
         </div>
       )}
 
-      {/* Seccion IBM Maximo */}
+      {/* Tarjeta de estado */}
       <div className="bg-white p-6 rounded-lg shadow">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <h3 className="text-lg font-semibold text-[#424846]">
-            IBM Maximo — estado de la sincronizacion
+            SAP Business One — estado de la sincronizacion
           </h3>
           {isAdmin && (
             <div className="flex items-center gap-2">
               <select
                 value={target}
-                onChange={(e) => setTarget(e.target.value as 'all' | MaximoSyncTarget)}
+                onChange={(e) => setTarget(e.target.value as 'all' | SapSyncTarget)}
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900 bg-white"
               >
                 <option value="all">Todo</option>
-                <option value="purchase_orders">Ordenes (PO)</option>
-                <option value="contracts">Contratos</option>
+                <option value="purchase_orders">Ordenes (OC)</option>
+                <option value="purchase_requests">Solicitudes de Pedido</option>
+              </select>
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.target.value as 'auto' | 'full' | 'incremental')}
+                title="auto = incremental si ya hay datos"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900 bg-white"
+              >
+                <option value="auto">Modo automatico</option>
+                <option value="incremental">Incremental</option>
+                <option value="full">Completa</option>
               </select>
               <button
                 onClick={() => void triggerSync()}
@@ -215,26 +220,20 @@ export default function IntegracionesPage() {
               </span>
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase">Contratos</p>
-              <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${status.contractsEnabled ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700'}`}>
-                {status.contractsEnabled ? 'Habilitados' : 'Deshabilitados'}
-              </span>
-            </div>
-            <div>
               <p className="text-xs text-gray-500 uppercase">Intervalo</p>
               <p className="text-sm text-gray-900">cada {status.intervalMinutes} min</p>
             </div>
-            <div>
+            <div className="md:col-span-2">
               <p className="text-xs text-gray-500 uppercase">Tamano de pagina</p>
-              <p className="text-sm text-gray-900">{status.pageSize} registros</p>
+              <p className="text-sm text-gray-900">{status.pageSize} documentos</p>
             </div>
-            {(['purchase_orders', 'contracts'] as const).map((t) => {
+            {(['purchase_orders', 'purchase_requests'] as const).map((t) => {
               const lastRun = status.lastRuns[t];
               return (
                 <div key={t} className="md:col-span-2 border border-gray-200 rounded-lg p-3">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-sm font-medium text-[#424846]">
-                      {MAXIMO_TARGET_LABELS[t]}
+                      {SAP_TARGET_LABELS[t]}
                     </p>
                     <div className="flex items-center gap-2">
                       {status.running.includes(t) && (
@@ -251,6 +250,9 @@ export default function IntegracionesPage() {
                   {lastRun ? (
                     <div className="flex items-center gap-2 text-sm text-gray-600 flex-wrap">
                       <RunBadge status={lastRun.status} />
+                      <span className="text-xs text-gray-500">
+                        {SAP_RUN_MODE_LABELS[lastRun.mode]}
+                      </span>
                       <span>{formatDateTime(lastRun.started_at)}</span>
                       <span className="text-xs text-gray-400">
                         +{lastRun.records_inserted} / ~{lastRun.records_updated} /
@@ -267,11 +269,12 @@ export default function IntegracionesPage() {
         )}
       </div>
 
-      {/* Tabla de corridas */}
+      {/* Historial de corridas (endpoint solo admins) */}
+      {isAdmin && (
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-[#424846]">
-            Historial de corridas — Maximo
+            Historial de corridas — SAP
           </h3>
         </div>
         {runsQuery.isLoading ? (
@@ -290,6 +293,7 @@ export default function IntegracionesPage() {
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Objetivo</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Disparo</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Modo</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Inicio</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Duracion</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estado</th>
@@ -299,16 +303,13 @@ export default function IntegracionesPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {runs.map((run, idx) => {
-                    const hasDetail =
-                      !!run.error_summary || run.filter_warnings != null;
                     const expanded = expandedRunId === run.id;
                     return (
-                      <RunRow
+                      <SapRunRow
                         key={run.id}
                         run={run}
                         idx={idx}
                         expanded={expanded}
-                        hasDetail={hasDetail}
                         onToggle={() =>
                           setExpandedRunId(expanded ? null : run.id)
                         }
@@ -344,34 +345,34 @@ export default function IntegracionesPage() {
           </>
         )}
       </div>
-
-      {/* Seccion SAP Business One (Int-4) */}
-      <SapIntegrationSection />
-    </div>
+      )}
+    </>
   );
 }
 
-function RunRow({
+function SapRunRow({
   run,
   idx,
   expanded,
-  hasDetail,
   onToggle,
 }: {
-  run: MaximoSyncRun;
+  run: SapSyncRun;
   idx: number;
   expanded: boolean;
-  hasDetail: boolean;
   onToggle: () => void;
 }) {
+  const hasDetail = !!run.error_summary;
   return (
     <>
       <tr className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
         <td className="px-4 py-3 text-sm text-gray-900">
-          {MAXIMO_TARGET_LABELS[run.target]}
+          {SAP_TARGET_LABELS[run.target]}
         </td>
         <td className="px-4 py-3 text-sm text-gray-600">
-          {MAXIMO_TRIGGER_LABELS[run.triggered_by]}
+          {run.triggered_by === 'cron' ? 'Automatico' : 'Manual'}
+        </td>
+        <td className="px-4 py-3 text-center text-sm text-gray-600">
+          {SAP_RUN_MODE_LABELS[run.mode]}
         </td>
         <td className="px-4 py-3 text-sm text-gray-600">
           {formatDateTime(run.started_at)}
@@ -396,23 +397,11 @@ function RunRow({
           )}
         </td>
       </tr>
-      {expanded && (
+      {expanded && run.error_summary && (
         <tr className="bg-amber-50/50">
-          <td colSpan={7} className="px-6 py-3 space-y-2">
-            {run.error_summary && (
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase">Errores</p>
-                <p className="text-sm text-red-700 whitespace-pre-wrap">{run.error_summary}</p>
-              </div>
-            )}
-            {run.filter_warnings != null && (
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase">Advertencias de filtro</p>
-                <pre className="text-xs text-gray-700 bg-white border border-gray-200 rounded p-2 overflow-x-auto">
-                  {JSON.stringify(run.filter_warnings, null, 2)}
-                </pre>
-              </div>
-            )}
+          <td colSpan={8} className="px-6 py-3">
+            <p className="text-xs font-medium text-gray-500 uppercase">Errores</p>
+            <p className="text-sm text-red-700 whitespace-pre-wrap">{run.error_summary}</p>
           </td>
         </tr>
       )}

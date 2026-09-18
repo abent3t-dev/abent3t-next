@@ -15,14 +15,16 @@ import {
 import ExpeditingModal from '@/components/compras/ExpeditingModal';
 import PurchaseOrderModal from '@/components/compras/PurchaseOrderModal';
 import MaximoOrdersTab from '@/components/compras/MaximoOrdersTab';
+import SapOrdersTab from '@/components/compras/SapOrdersTab';
 
 // Fase INT-5 (T6): pestanas por fuente. La pestana "Contratos Maximo" se
-// movio a /compras/contratos al implementarse §15.
-type OrdersTab = 'abent' | 'maximo_po';
+// movio a /compras/contratos al implementarse §15. Int-4 agrego "Ordenes SAP".
+type OrdersTab = 'abent' | 'maximo_po' | 'sap_po';
 
 const ORDER_TABS: { id: OrdersTab; label: string }[] = [
   { id: 'abent', label: 'Ordenes ABENT' },
   { id: 'maximo_po', label: 'Ordenes Maximo' },
+  { id: 'sap_po', label: 'Ordenes SAP' },
 ];
 
 interface PaginatedResponse {
@@ -147,6 +149,7 @@ export default function OrdenesPage() {
       </div>
 
       {activeTab === 'maximo_po' && <MaximoOrdersTab />}
+      {activeTab === 'sap_po' && <SapOrdersTab />}
 
       {activeTab === 'abent' && (
       <>
