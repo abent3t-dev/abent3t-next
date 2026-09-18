@@ -23,6 +23,11 @@ const Icons = {
 export default function SupplierModal({ isOpen, onClose, supplier }: SupplierModalProps) {
   const qc = useQueryClient();
   const isEditing = !!supplier;
+  // Proveedor espejado desde SAP: los basicos (razon social, RFC, email,
+  // telefono, contacto) se actualizan desde SAP y son de solo lectura; el
+  // backend rechaza editarlos. Editables: nombre comercial, direccion y el
+  // contacto interno de ABENT.
+  const isSap = supplier?.source === 'sap';
 
   const [formData, setFormData] = useState({
     legal_name: '',
@@ -102,7 +107,20 @@ export default function SupplierModal({ isOpen, onClose, supplier }: SupplierMod
     }
 
     if (isEditing) {
-      updateMutation.mutate(formData);
+      if (isSap) {
+        // Solo los campos de ABENT: mandar los sincronizados (aunque no
+        // cambien) haria que el backend rechace la peticion con 400.
+        const { commercial_name, address, contact_email, contact_phone } =
+          formData;
+        updateMutation.mutate({
+          commercial_name,
+          address,
+          contact_email,
+          contact_phone,
+        } as typeof formData);
+      } else {
+        updateMutation.mutate(formData);
+      }
     } else {
       createMutation.mutate(formData);
     }
@@ -128,6 +146,14 @@ export default function SupplierModal({ isOpen, onClose, supplier }: SupplierMod
         {/* Form */}
         <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-140px)]">
           <div className="px-6 py-4 space-y-4">
+            {isSap && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
+                Proveedor sincronizado desde SAP ({supplier?.external_id}). Los
+                datos basicos son de solo lectura y se actualizan
+                automaticamente; aqui solo se editan los campos propios de
+                ABENT (nombre comercial, direccion y contacto interno).
+              </div>
+            )}
             {/* Datos Fiscales */}
             <div className="border-b border-gray-200 pb-4">
               <h3 className="text-sm font-semibold text-[#424846] mb-3">Datos Fiscales</h3>
@@ -140,7 +166,8 @@ export default function SupplierModal({ isOpen, onClose, supplier }: SupplierMod
                     type="text"
                     value={formData.legal_name}
                     onChange={(e) => setFormData({ ...formData, legal_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900"
+                    disabled={isSap}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
                     placeholder="Nombre legal completo"
                   />
                 </div>
@@ -164,7 +191,8 @@ export default function SupplierModal({ isOpen, onClose, supplier }: SupplierMod
                     type="text"
                     value={formData.tax_id}
                     onChange={(e) => setFormData({ ...formData, tax_id: e.target.value.toUpperCase() })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 font-mono"
+                    disabled={isSap}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 font-mono disabled:bg-gray-100 disabled:text-gray-500"
                     placeholder="ABC123456XYZ"
                     maxLength={13}
                   />
@@ -184,7 +212,8 @@ export default function SupplierModal({ isOpen, onClose, supplier }: SupplierMod
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900"
+                    disabled={isSap}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
                     placeholder="contacto@empresa.com"
                   />
                 </div>
@@ -196,7 +225,8 @@ export default function SupplierModal({ isOpen, onClose, supplier }: SupplierMod
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900"
+                    disabled={isSap}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
                     placeholder="55-1234-5678"
                   />
                 </div>
@@ -227,7 +257,8 @@ export default function SupplierModal({ isOpen, onClose, supplier }: SupplierMod
                     type="text"
                     value={formData.contact_name}
                     onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900"
+                    disabled={isSap}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
                     placeholder="Juan Perez"
                   />
                 </div>

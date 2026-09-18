@@ -14,8 +14,12 @@ interface PaginatedResponse {
     page: number;
     limit: number;
     totalPages: number;
+    hasNext?: boolean;
+    hasPrev?: boolean;
   };
 }
+
+const PAGE_SIZE = 20;
 
 const Icons = {
   search: (
@@ -60,19 +64,25 @@ export default function ProveedoresPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [blockedFilter, setBlockedFilter] = useState<'' | 'true' | 'false'>('');
+  const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
 
+  // Siempre paginado: con el espejo de SAP el catalogo supera los 800
+  // proveedores y la lista completa ya no es renderizable de golpe.
   const queryParams = new URLSearchParams();
+  queryParams.set('page', String(page));
+  queryParams.set('limit', String(PAGE_SIZE));
   if (search) queryParams.set('search', search);
   if (blockedFilter) queryParams.set('is_blocked', blockedFilter);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['suppliers', search, blockedFilter],
+    queryKey: ['suppliers', search, blockedFilter, page],
     queryFn: () => api.get<PaginatedResponse>(`/suppliers?${queryParams.toString()}`),
   });
 
   const suppliers = data?.data ?? [];
+  const meta = data?.meta;
 
   const blockMutation = useMutation({
     mutationFn: (params: { id: string; reason: string }) =>
@@ -142,14 +152,20 @@ export default function ProveedoresPage() {
             <input
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
               placeholder="Buscar por nombre, RFC o email..."
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
             />
           </div>
           <select
             value={blockedFilter}
-            onChange={(e) => setBlockedFilter(e.target.value as '' | 'true' | 'false')}
+            onChange={(e) => {
+              setBlockedFilter(e.target.value as '' | 'true' | 'false');
+              setPage(1);
+            }}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
           >
             <option value="">Todos</option>
@@ -172,6 +188,7 @@ export default function ProveedoresPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Proveedor</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">RFC</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Contacto</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Moneda</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Puntuacion</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estado</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Acciones</th>
@@ -182,7 +199,33 @@ export default function ProveedoresPage() {
                 <tr key={supplier.id} className={`hover:bg-[#52AF32]/5 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                   <td className="px-4 py-3">
                     <div>
-                      <p className="font-medium text-gray-900">{supplier.legal_name}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-gray-900">{supplier.legal_name}</p>
+                        {supplier.source === 'sap' && (
+                          <span
+                            className="inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded bg-[#222D59]/10 text-[#222D59]"
+                            title={`Sincronizado desde SAP (${supplier.external_id ?? ''})`}
+                          >
+                            SAP
+                          </span>
+                        )}
+                        {supplier.sap_valid === false && (
+                          <span
+                            className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-gray-200 text-gray-600"
+                            title="Marcado como no vigente en SAP (informativo)"
+                          >
+                            Inactivo en SAP
+                          </span>
+                        )}
+                        {supplier.sap_frozen === true && (
+                          <span
+                            className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-700"
+                            title="Congelado en SAP (informativo)"
+                          >
+                            Congelado en SAP
+                          </span>
+                        )}
+                      </div>
                       {supplier.commercial_name && (
                         <p className="text-sm text-gray-500">{supplier.commercial_name}</p>
                       )}
@@ -192,6 +235,9 @@ export default function ProveedoresPage() {
                   <td className="px-4 py-3 text-sm">
                     <p className="text-gray-900">{supplier.contact_name || '-'}</p>
                     <p className="text-gray-500">{supplier.contact_email || supplier.email || '-'}</p>
+                  </td>
+                  <td className="px-4 py-3 text-center text-sm text-gray-600">
+                    {supplier.currency === '##' ? 'Multi' : (supplier.currency ?? '-')}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-1">
@@ -242,13 +288,40 @@ export default function ProveedoresPage() {
               ))}
               {suppliers.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                     No hay proveedores que coincidan con los filtros
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+        )}
+        {meta && meta.totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
+            <div className="text-sm text-gray-500">
+              Mostrando {(meta.page - 1) * meta.limit + 1} -{' '}
+              {Math.min(meta.page * meta.limit, meta.total)} de {meta.total}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage(page - 1)}
+                disabled={meta.page <= 1}
+                className="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Anterior
+              </button>
+              <span className="text-sm text-gray-700">
+                Pagina {meta.page} de {meta.totalPages}
+              </span>
+              <button
+                onClick={() => setPage(page + 1)}
+                disabled={meta.page >= meta.totalPages}
+                className="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

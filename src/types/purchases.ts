@@ -61,6 +61,13 @@ export interface Supplier {
   is_blocked: boolean;
   blocked_reason: string | null;
   is_active: boolean;
+  // Origen del registro (espejo de SAP): los basicos de source='sap' son de
+  // solo lectura; puntuacion/bloqueo siguen siendo de ABENT.
+  source: 'manual' | 'sap';
+  external_id: string | null;
+  currency: string | null;
+  sap_valid: boolean | null;
+  sap_frozen: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -867,7 +874,10 @@ export function deriveDeliveryChip(po: {
 // nunca 0 ni el placeholder "SELECCIONAR" (T10 / regla 6).
 // ==========================================
 
-export type SapSyncTarget = 'purchase_orders' | 'purchase_requests';
+export type SapSyncTarget =
+  | 'purchase_orders'
+  | 'purchase_requests'
+  | 'business_partners';
 
 export interface SapPurchaseOrder {
   id: string;
@@ -1021,6 +1031,7 @@ export function sapStatusBadgeClass(status: string | null): string {
 export const SAP_TARGET_LABELS: Record<SapSyncTarget, string> = {
   purchase_orders: 'Ordenes (OC)',
   purchase_requests: 'Solicitudes de Pedido',
+  business_partners: 'Proveedores',
 };
 
 export const SAP_RUN_MODE_LABELS: Record<SapSyncRun['mode'], string> = {

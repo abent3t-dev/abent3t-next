@@ -178,6 +178,7 @@ export default function SapIntegrationSection() {
                 <option value="all">Todo</option>
                 <option value="purchase_orders">Ordenes (OC)</option>
                 <option value="purchase_requests">Solicitudes de Pedido</option>
+                <option value="business_partners">Proveedores</option>
               </select>
               <select
                 value={mode}
@@ -227,7 +228,9 @@ export default function SapIntegrationSection() {
               <p className="text-xs text-gray-500 uppercase">Tamano de pagina</p>
               <p className="text-sm text-gray-900">{status.pageSize} documentos</p>
             </div>
-            {(['purchase_orders', 'purchase_requests'] as const).map((t) => {
+            {(
+              ['purchase_orders', 'purchase_requests', 'business_partners'] as const
+            ).map((t) => {
               const lastRun = status.lastRuns[t];
               return (
                 <div key={t} className="md:col-span-2 border border-gray-200 rounded-lg p-3">
