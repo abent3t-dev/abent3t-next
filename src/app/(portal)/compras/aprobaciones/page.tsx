@@ -5,6 +5,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
 import { Approval, REQUISITION_STATUS_LABELS, APPROVAL_LEVEL_NAMES } from '@/types/purchases';
+import { useAuth } from '@/contexts/AuthContext';
+import { APPROVER_ROLES } from '@/types/auth';
 
 const Icons = {
   check: (
@@ -42,12 +44,19 @@ const formatDate = (date: string) =>
 
 export default function AprobacionesPage() {
   const qc = useQueryClient();
+  // Esta página es la BANDEJA PERSONAL del aprobador: /approvals/pending
+  // sigue restringido a la cadena de aprobación aunque el resto del módulo
+  // sea de consulta abierta ("ver todos, actuar por rol"). A quien no es
+  // aprobador se le explica en lugar de dispararle un 403.
+  const { hasRole } = useAuth();
+  const isApprover = hasRole('super_admin', ...APPROVER_ROLES);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
   const { data: pendingApprovals, isLoading } = useQuery({
     queryKey: ['approvals', 'pending'],
     queryFn: () => api.get<Approval[]>('/approvals/pending'),
+    enabled: isApprover,
   });
 
   const approveMutation = useMutation({
@@ -94,6 +103,26 @@ export default function AprobacionesPage() {
   };
 
   const approvals = pendingApprovals ?? [];
+
+  if (!isApprover) {
+    return (
+      <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
+        <div>
+          <h1 className="text-2xl font-bold text-[#424846]">Panel de Aprobaciones</h1>
+          <p className="text-gray-500">Requisiciones pendientes de tu aprobacion</p>
+        </div>
+        <div className="bg-white p-8 rounded-lg shadow text-center text-gray-500">
+          <p className="font-medium text-[#424846] mb-1">
+            Esta bandeja es exclusiva de la cadena de aprobacion
+          </p>
+          <p className="text-sm">
+            El estado y el historial de aprobacion de cada requisicion se
+            consultan desde Solicitudes (RQ) o en Reportes.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">

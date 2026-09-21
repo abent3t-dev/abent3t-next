@@ -166,14 +166,8 @@ const PURCHASE_TEAM: UserRole[] = ['lider_procura', 'coordinador_compras', 'comp
 // Cadena de aprobadores
 const APPROVERS: UserRole[] = ['aprobador_nivel_1', 'aprobador_nivel_2', 'aprobador_nivel_3', 'director_general'];
 
-// Acceso a compras (lectura) - super_admin tiene acceso total
-const PURCHASE_VIEWERS: UserRole[] = ['super_admin', ...PURCHASE_TEAM, ...APPROVERS, 'solicitante'];
-
 // Administracion de compras
 const PURCHASE_ADMINS: UserRole[] = ['super_admin', 'lider_procura'];
-
-// Todos los roles de compras (incluyendo super_admin para acceso completo)
-const ALL_PURCHASE_ROLES: UserRole[] = ['super_admin', ...PURCHASE_TEAM, ...APPROVERS, 'solicitante'];
 
 // ==========================================
 // GRUPOS DE ROLES - CONTABILIDAD Y FISCAL
@@ -230,22 +224,26 @@ export const SIDEBAR_NAV: NavItem[] = [
     label: 'Compras',
     href: '/compras/dashboard',
     icon: 'shopping-cart',
-    // §15: Contratos abre el grupo a TODA la empresa (el resto de hijos se
-    // sigue filtrando por sus propios roles).
+    // Modelo de acceso (junta 2026-09-17): "ver todos, actuar por rol" —
+    // consulta de todo el módulo para cualquier autenticado (generaliza el
+    // §15 de Contratos). Los botones de acción los condiciona cada página;
+    // solo Integraciones (técnica) y Roles (gestión) siguen restringidos.
     roles: ROLE_PRIORITY,
     children: [
-      { label: 'Dashboard', href: '/compras/dashboard', icon: 'chart', roles: ['super_admin', ...PURCHASE_TEAM, ...APPROVERS, ...EXEC_ROLES] },
-      { label: 'Solicitudes (RQ)', href: '/compras/solicitudes', icon: 'file-text', roles: ['super_admin', ...PURCHASE_TEAM, 'solicitante'] },
-      { label: 'Aprobaciones', href: '/compras/aprobaciones', icon: 'check-circle', roles: ['super_admin', ...PURCHASE_TEAM, ...APPROVERS] },
+      { label: 'Dashboard', href: '/compras/dashboard', icon: 'chart', roles: ROLE_PRIORITY },
+      { label: 'Solicitudes (RQ)', href: '/compras/solicitudes', icon: 'file-text', roles: ROLE_PRIORITY },
+      { label: 'Aprobaciones', href: '/compras/aprobaciones', icon: 'check-circle', roles: ROLE_PRIORITY },
       // §16: comite semanal con cadena de aprobacion
-      { label: 'Comite', href: '/compras/comite', icon: 'landmark', roles: ['super_admin', ...PURCHASE_TEAM, ...APPROVERS, ...EXEC_ROLES] },
-      { label: 'Ordenes (PO)', href: '/compras/ordenes', icon: 'clipboard', roles: ['super_admin', ...PURCHASE_TEAM] },
+      { label: 'Comite', href: '/compras/comite', icon: 'landmark', roles: ROLE_PRIORITY },
+      { label: 'Ordenes (PO)', href: '/compras/ordenes', icon: 'clipboard', roles: ROLE_PRIORITY },
       // Expeditación: seguimiento de entregas
-      { label: 'Expeditacion', href: '/compras/expeditacion', icon: 'truck', roles: ['super_admin', ...PURCHASE_TEAM, ...APPROVERS, ...EXEC_ROLES] },
+      { label: 'Expeditacion', href: '/compras/expeditacion', icon: 'truck', roles: ROLE_PRIORITY },
       // §15: repositorio documental de contratos, consulta para todos
       { label: 'Contratos', href: '/compras/contratos', icon: 'file-check', roles: ROLE_PRIORITY },
-      { label: 'Proveedores', href: '/compras/proveedores', icon: 'truck', roles: ['super_admin', ...PURCHASE_TEAM] },
-      { label: 'Reportes', href: '/compras/reportes', icon: 'bar-chart', roles: ['super_admin', ...PURCHASE_TEAM, ...APPROVERS, ...EXEC_ROLES] },
+      { label: 'Proveedores', href: '/compras/proveedores', icon: 'truck', roles: ROLE_PRIORITY },
+      { label: 'Reportes', href: '/compras/reportes', icon: 'bar-chart', roles: ROLE_PRIORITY },
+      // Gestión de roles de Compras (autoservicio del líder de procura)
+      { label: 'Roles', href: '/compras/roles', icon: 'shield', roles: PURCHASE_ADMINS },
       // Fase INT-5: estado y corridas del sync Maximo (pagina tecnica)
       { label: 'Integraciones', href: '/compras/integraciones', icon: 'database', roles: [...PURCHASE_ADMINS, 'executive'] },
     ],

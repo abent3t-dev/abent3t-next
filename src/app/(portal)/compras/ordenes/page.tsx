@@ -16,6 +16,8 @@ import ExpeditingModal from '@/components/compras/ExpeditingModal';
 import PurchaseOrderModal from '@/components/compras/PurchaseOrderModal';
 import MaximoOrdersTab from '@/components/compras/MaximoOrdersTab';
 import SapOrdersTab from '@/components/compras/SapOrdersTab';
+import { useAuth } from '@/contexts/AuthContext';
+import { PURCHASE_TEAM_ROLES } from '@/types/auth';
 
 // Fase INT-5 (T6): pestanas por fuente. La pestana "Contratos Maximo" se
 // movio a /compras/contratos al implementarse §15. Int-4 agrego "Ordenes SAP".
@@ -84,6 +86,11 @@ const getStatusBadgeClass = (status: POStatus) => {
 };
 
 export default function OrdenesPage() {
+  // Modelo "ver todos, actuar por rol": crear/editar solo equipo de compras
+  // (espejo de los @Roles del backend). La expeditación desde la fila queda
+  // abierta: es consulta, y sus formularios se gatean dentro del modal.
+  const { hasRole } = useAuth();
+  const canEdit = hasRole('super_admin', ...PURCHASE_TEAM_ROLES);
   const [activeTab, setActiveTab] = useState<OrdersTab>('abent');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<POStatus | ''>('');
@@ -115,7 +122,7 @@ export default function OrdenesPage() {
           <h1 className="text-2xl font-bold text-[#424846]">Ordenes de Compra (PO)</h1>
           <p className="text-gray-500">Gestiona las ordenes de compra emitidas</p>
         </div>
-        {activeTab === 'abent' && (
+        {activeTab === 'abent' && canEdit && (
           <button
             onClick={() => {
               setEditingOrder(null);
@@ -254,6 +261,7 @@ export default function OrdenesPage() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
+                        {canEdit && (
                         <button
                           onClick={() => {
                             setEditingOrder(po);
@@ -266,6 +274,7 @@ export default function OrdenesPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
                         </button>
+                        )}
                         <button
                           onClick={() => setExpeditingPoId(po.id)}
                           className="p-2 text-[#222D59] hover:bg-[#222D59]/10 rounded-lg transition-colors"
@@ -327,12 +336,13 @@ export default function OrdenesPage() {
         }}
         purchaseOrder={editingOrder}
       />
-      {/* Fase Expeditación (B4): seguimiento de entrega de la PO */}
+      {/* Fase Expeditación (B4): seguimiento de entrega de la PO. El modal
+          es consulta para cualquiera; sus formularios respetan canEdit. */}
       <ExpeditingModal
         isOpen={expeditingPoId !== null}
         onClose={() => setExpeditingPoId(null)}
         purchaseOrderId={expeditingPoId}
-        canEdit
+        canEdit={canEdit}
       />
       </>
       )}

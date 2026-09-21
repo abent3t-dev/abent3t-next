@@ -15,24 +15,18 @@ import RequisitionModal from '@/components/compras/RequisitionModal';
 import SapRequestsTab from '@/components/compras/SapRequestsTab';
 import { useAuth } from '@/contexts/AuthContext';
 import type { UserRole } from '@/types/auth';
+import { PURCHASE_TEAM_ROLES } from '@/types/auth';
 
 // Int-4 (T6): pestanas por fuente, mismo patron que /compras/ordenes.
-// La pestana SAP solo se muestra a quien el backend deja leer /sap/*
-// (SAP_VIEWERS): 'solicitante' entra a esta pagina pero NO es viewer de SAP
-// y veria puros 403.
+// Modelo "ver todos, actuar por rol" (junta 2026-09-17): la lectura —
+// pestana SAP incluida — es para cualquier autenticado; los botones de
+// accion se condicionan por rol (espejo de los @Roles del backend).
 type RequestsTab = 'abent' | 'sap_pr';
 
-const SAP_VIEWER_ROLES: UserRole[] = [
-  'super_admin',
-  'lider_procura',
-  'coordinador_compras',
-  'comprador',
-  'aprobador_nivel_1',
-  'aprobador_nivel_2',
-  'aprobador_nivel_3',
-  'director_general',
-  'executive',
-];
+// POST /requisitions: equipo de compras + solicitante.
+const CREATOR_ROLES: UserRole[] = ['super_admin', ...PURCHASE_TEAM_ROLES, 'solicitante'];
+// PUT /requisitions/:id: solo equipo de compras.
+const EDITOR_ROLES: UserRole[] = ['super_admin', ...PURCHASE_TEAM_ROLES];
 
 const REQUEST_TABS: { id: RequestsTab; label: string }[] = [
   { id: 'abent', label: 'Solicitudes ABENT' },
@@ -93,11 +87,10 @@ const getStatusBadgeClass = (status: RequisitionStatus) => {
 
 export default function SolicitudesPage() {
   const { hasRole } = useAuth();
-  const canSeeSap = hasRole(...SAP_VIEWER_ROLES);
+  const canCreate = hasRole(...CREATOR_ROLES);
+  const canEdit = hasRole(...EDITOR_ROLES);
   const [activeTab, setActiveTab] = useState<RequestsTab>('abent');
-  const visibleTabs = canSeeSap
-    ? REQUEST_TABS
-    : REQUEST_TABS.filter((tab) => tab.id !== 'sap_pr');
+  const visibleTabs = REQUEST_TABS;
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<RequisitionStatus | ''>('');
   const [typeFilter, setTypeFilter] = useState<ExpenseType | ''>('');
@@ -128,7 +121,7 @@ export default function SolicitudesPage() {
           <h1 className="text-2xl font-bold text-[#424846]">Solicitudes de Compra (RQ)</h1>
           <p className="text-gray-500">Gestiona las requisiciones de compra</p>
         </div>
-        {activeTab === 'abent' && (
+        {activeTab === 'abent' && canCreate && (
           <button
             onClick={() => {
               setEditingRequisition(null);
@@ -161,7 +154,7 @@ export default function SolicitudesPage() {
         ))}
       </div>
 
-      {activeTab === 'sap_pr' && canSeeSap && <SapRequestsTab />}
+      {activeTab === 'sap_pr' && <SapRequestsTab />}
 
       {activeTab === 'abent' && (
       <>
@@ -273,6 +266,7 @@ export default function SolicitudesPage() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
+                        {canEdit && (
                         <button
                           onClick={() => {
                             setEditingRequisition(rq);
@@ -285,6 +279,7 @@ export default function SolicitudesPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
                         </button>
+                        )}
                         <button
                           onClick={() => console.log('Ver detalle:', rq.id)}
                           className="p-2 text-[#222D59] hover:bg-[#222D59]/10 rounded-lg transition-colors"

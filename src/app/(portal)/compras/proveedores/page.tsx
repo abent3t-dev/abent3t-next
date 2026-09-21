@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
 import { Supplier } from '@/types/purchases';
 import SupplierModal from '@/components/compras/SupplierModal';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface PaginatedResponse {
   data: Supplier[];
@@ -62,6 +63,11 @@ const getScoreColor = (score: number) => {
 
 export default function ProveedoresPage() {
   const qc = useQueryClient();
+  // Modelo "ver todos, actuar por rol": el catálogo es consulta para
+  // cualquiera; alta/edición/bloqueo solo administración de compras (espejo
+  // de los @Roles del backend: super_admin + lider_procura).
+  const { hasRole } = useAuth();
+  const canManage = hasRole('super_admin', 'lider_procura');
   const [search, setSearch] = useState('');
   const [blockedFilter, setBlockedFilter] = useState<'' | 'true' | 'false'>('');
   const [page, setPage] = useState(1);
@@ -133,13 +139,15 @@ export default function ProveedoresPage() {
           <h1 className="text-2xl font-bold text-[#424846]">Catalogo de Proveedores</h1>
           <p className="text-gray-500">Gestiona los proveedores de la organizacion</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] transition-colors"
-        >
-          {Icons.plus}
-          <span>Nuevo Proveedor</span>
-        </button>
+        {canManage && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] transition-colors"
+          >
+            {Icons.plus}
+            <span>Nuevo Proveedor</span>
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -257,32 +265,36 @@ export default function ProveedoresPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => handleEdit(supplier)}
-                        className="p-2 text-[#52AF32] hover:bg-[#52AF32]/10 rounded-lg transition-colors"
-                        title="Editar"
-                      >
-                        {Icons.edit}
-                      </button>
-                      {supplier.is_blocked ? (
+                    {canManage ? (
+                      <div className="flex items-center justify-center gap-2">
                         <button
-                          onClick={() => handleUnblock(supplier.id)}
-                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                          title="Desbloquear"
+                          onClick={() => handleEdit(supplier)}
+                          className="p-2 text-[#52AF32] hover:bg-[#52AF32]/10 rounded-lg transition-colors"
+                          title="Editar"
                         >
-                          {Icons.check}
+                          {Icons.edit}
                         </button>
-                      ) : (
-                        <button
-                          onClick={() => handleBlock(supplier.id)}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Bloquear"
-                        >
-                          {Icons.ban}
-                        </button>
-                      )}
-                    </div>
+                        {supplier.is_blocked ? (
+                          <button
+                            onClick={() => handleUnblock(supplier.id)}
+                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Desbloquear"
+                          >
+                            {Icons.check}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleBlock(supplier.id)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Bloquear"
+                          >
+                            {Icons.ban}
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-center text-xs text-gray-400">Solo consulta</p>
+                    )}
                   </td>
                 </tr>
               ))}
