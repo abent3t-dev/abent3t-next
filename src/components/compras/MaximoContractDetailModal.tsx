@@ -66,6 +66,17 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+/** MAXVOL no lo expone la Object Structure de AB_CONTRATOS (pendiente
+ *  CIISA): null → "No disponible", nunca 0 ni "—". */
+const NotAvailable = () => (
+  <span
+    className="text-gray-400 italic"
+    title="La Object Structure de Maximo aun no expone este campo (ajuste pendiente con CIISA)"
+  >
+    No disponible
+  </span>
+);
+
 export default function MaximoContractDetailModal({
   isOpen,
   onClose,
@@ -73,7 +84,7 @@ export default function MaximoContractDetailModal({
 }: MaximoContractDetailModalProps) {
   const [showRaw, setShowRaw] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['maximo-contract', contractKey],
     queryFn: () =>
       api.get<MaximoContractDetail>(
@@ -112,7 +123,11 @@ export default function MaximoContractDetailModal({
         </div>
 
         <div className="overflow-y-auto max-h-[calc(90vh-140px)] px-6 py-5 space-y-6">
-          {isLoading || !current ? (
+          {isError ? (
+            <div className="p-8 text-center text-red-600">
+              No se pudo cargar el detalle del contrato. Intenta de nuevo.
+            </div>
+          ) : isLoading || !current ? (
             <div className="p-8 text-center">
               <div className="w-8 h-8 border-4 border-[#52AF32] border-t-transparent rounded-full animate-spin mx-auto" />
             </div>
@@ -136,7 +151,16 @@ export default function MaximoContractDetailModal({
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <Field label="Proveedor" value={dash(current.vendor_name)} />
-                <Field label="MAXVOL" value={formatMoney(current.maxvol, current.currency)} />
+                <Field
+                  label="MAXVOL"
+                  value={
+                    current.maxvol === null ? (
+                      <NotAvailable />
+                    ) : (
+                      formatMoney(current.maxvol, current.currency)
+                    )
+                  }
+                />
                 <Field label="Monto" value={formatMoney(current.total_cost, current.currency)} />
                 <Field label="Moneda" value={dash(current.currency)} />
                 <Field label="Vigencia inicio" value={formatDate(current.start_date)} />

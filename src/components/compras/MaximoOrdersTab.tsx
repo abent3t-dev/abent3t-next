@@ -17,13 +17,26 @@ import MaximoPoDetailModal from './MaximoPoDetailModal';
 /**
  * Fase INT-5 (T6) — Pestana "Ordenes Maximo" dentro de /compras/ordenes.
  * Lista la vista actual del staging (GET /maximo/purchase-orders). Solo
- * lectura; nulls se muestran como "—" (decision 20.A.1).
+ * lectura; nulls se muestran como "—" (decision 20.A.1), EXCEPTO los campos
+ * que la Object Structure de Maximo aun no expone (AB_AHORRO / AB_TIPOCOMP /
+ * AB_CLASFPO, ajuste pendiente con CIISA): esos van como "No disponible",
+ * nunca 0 — cuando CIISA los exponga, los valores se pintan sin tocar UI.
  */
 
 const PAGE_SIZE = 15;
 
+const OS_FIELD_HINT =
+  'La Object Structure de Maximo aun no expone este campo (ajuste pendiente con CIISA)';
+
 const dash = (value: string | number | null | undefined) =>
   value === null || value === undefined || value === '' ? '—' : String(value);
+
+/** Campos AB_* no expuestos por la Object Structure: null → "No disponible". */
+const NotAvailable = () => (
+  <span className="text-gray-400 italic" title={OS_FIELD_HINT}>
+    No disponible
+  </span>
+);
 
 const formatMoney = (amount: number | null, currency: string | null) => {
   if (amount === null) return '—';
@@ -67,7 +80,7 @@ export default function MaximoOrdersTab() {
   if (approvedFrom) queryParams.set('approved_from', approvedFrom);
   if (approvedTo) queryParams.set('approved_to', approvedTo);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: [
       'maximo-purchase-orders',
       search,
@@ -158,6 +171,10 @@ export default function MaximoOrdersTab() {
           <div className="p-8 text-center">
             <div className="w-8 h-8 border-4 border-[#52AF32] border-t-transparent rounded-full animate-spin mx-auto" />
           </div>
+        ) : isError ? (
+          <div className="p-8 text-center text-red-600">
+            No se pudieron cargar las ordenes de Maximo. Intenta de nuevo.
+          </div>
         ) : orders.length === 0 && !hasFilters ? (
           <div className="p-10 text-center space-y-2">
             <p className="text-gray-500">
@@ -212,9 +229,15 @@ export default function MaximoOrdersTab() {
                         {formatMoney(po.total_cost, po.currency)}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">{dash(po.department)}</td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-600">{dash(po.ab_clasfpo)}</td>
+                      <td className="px-4 py-3 text-center text-sm text-gray-600">
+                        {po.ab_clasfpo === null ? <NotAvailable /> : po.ab_clasfpo}
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-600 text-right">
-                        {formatMoney(po.ab_ahorro, po.currency)}
+                        {po.ab_ahorro === null ? (
+                          <NotAvailable />
+                        ) : (
+                          formatMoney(po.ab_ahorro, po.currency)
+                        )}
                       </td>
                       <td className="px-4 py-3 text-center text-sm text-gray-600">
                         {formatDate(po.approved_at)}

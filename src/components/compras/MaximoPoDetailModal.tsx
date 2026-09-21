@@ -56,6 +56,17 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+/** Campos AB_* que la Object Structure de Maximo aun no expone (pendiente
+ *  CIISA): null → "No disponible", nunca 0 ni "—". */
+const NotAvailable = () => (
+  <span
+    className="text-gray-400 italic"
+    title="La Object Structure de Maximo aun no expone este campo (ajuste pendiente con CIISA)"
+  >
+    No disponible
+  </span>
+);
+
 export default function MaximoPoDetailModal({
   isOpen,
   onClose,
@@ -63,7 +74,7 @@ export default function MaximoPoDetailModal({
 }: MaximoPoDetailModalProps) {
   const [showRaw, setShowRaw] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['maximo-purchase-order', ponum],
     queryFn: () =>
       api.get<MaximoPurchaseOrderDetail>(
@@ -100,7 +111,11 @@ export default function MaximoPoDetailModal({
         </div>
 
         <div className="overflow-y-auto max-h-[calc(90vh-140px)] px-6 py-5 space-y-6">
-          {isLoading || !current ? (
+          {isError ? (
+            <div className="p-8 text-center text-red-600">
+              No se pudo cargar el detalle de la orden. Intenta de nuevo.
+            </div>
+          ) : isLoading || !current ? (
             <div className="p-8 text-center">
               <div className="w-8 h-8 border-4 border-[#52AF32] border-t-transparent rounded-full animate-spin mx-auto" />
             </div>
@@ -126,12 +141,36 @@ export default function MaximoPoDetailModal({
                 />
                 <Field label="Moneda" value={dash(current.currency)} />
                 <Field label="Departamento" value={dash(current.department)} />
-                <Field label="Clasificacion" value={dash(current.ab_clasfpo)} />
+                <Field
+                  label="Clasificacion"
+                  value={
+                    current.ab_clasfpo === null ? (
+                      <NotAvailable />
+                    ) : (
+                      current.ab_clasfpo
+                    )
+                  }
+                />
                 <Field
                   label="Ahorro"
-                  value={formatMoney(current.ab_ahorro, current.currency)}
+                  value={
+                    current.ab_ahorro === null ? (
+                      <NotAvailable />
+                    ) : (
+                      formatMoney(current.ab_ahorro, current.currency)
+                    )
+                  }
                 />
-                <Field label="Tipo compra" value={dash(current.ab_tipocomp)} />
+                <Field
+                  label="Tipo compra"
+                  value={
+                    current.ab_tipocomp === null ? (
+                      <NotAvailable />
+                    ) : (
+                      current.ab_tipocomp
+                    )
+                  }
+                />
                 <Field label="Solicitado por" value={dash(current.requested_by)} />
                 <Field
                   label="Fecha aprobacion"

@@ -15,9 +15,12 @@ import {
 import MaximoContractDetailModal from './MaximoContractDetailModal';
 
 /**
- * Fase INT-5 (T6) — Pestana "Contratos Maximo", provisional en /compras/ordenes
- * hasta que exista /compras/contratos (§15). Vista actual del staging
- * (GET /maximo/contracts), incluye PRs sin contrato. Solo lectura.
+ * Fase INT-5 (T6) — Pestana "Contratos Maximo" (vive en /compras/contratos
+ * desde §15). Vista actual del staging (GET /maximo/contracts), incluye PRs
+ * sin contrato. Solo lectura. El listado muestra el VALOR del contrato
+ * (contract_value ≡ TOTALCOST, §20.2 resuelta por Isaac 2026-09); MAXVOL no
+ * lo expone la Object Structure (pendiente CIISA) y va como "No disponible"
+ * en el detalle, nunca 0.
  */
 
 const PAGE_SIZE = 15;
@@ -71,7 +74,7 @@ export default function MaximoContractsTab() {
   if (statusFilter) queryParams.set('status', statusFilter);
   if (hasContractFilter) queryParams.set('has_contract', hasContractFilter);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: [
       'maximo-contracts',
       search,
@@ -139,6 +142,10 @@ export default function MaximoContractsTab() {
           <div className="p-8 text-center">
             <div className="w-8 h-8 border-4 border-[#52AF32] border-t-transparent rounded-full animate-spin mx-auto" />
           </div>
+        ) : isError ? (
+          <div className="p-8 text-center text-red-600">
+            No se pudieron cargar los contratos de Maximo. Intenta de nuevo.
+          </div>
         ) : contracts.length === 0 && !hasFilters ? (
           <div className="p-10 text-center space-y-2">
             <p className="text-gray-500">
@@ -163,7 +170,7 @@ export default function MaximoContractsTab() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Contrato</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Proveedor</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">MAXVOL</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Valor contrato</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Moneda</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Vigencia</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Depto.</th>
@@ -198,7 +205,7 @@ export default function MaximoContractsTab() {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900">{dash(contract.vendor_name)}</td>
                         <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                          {formatMoney(contract.maxvol, contract.currency)}
+                          {formatMoney(contract.contract_value, contract.currency)}
                         </td>
                         <td className="px-4 py-3 text-center text-sm text-gray-600">{dash(contract.currency)}</td>
                         <td className="px-4 py-3 text-center text-sm text-gray-600">
