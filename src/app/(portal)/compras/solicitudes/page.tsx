@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import {
   Requisition,
   RequisitionStatus,
+  RequisitionStats,
   ExpenseType,
   REQUISITION_STATUS_LABELS,
   REQUISITION_STATUS_COLORS,
@@ -13,6 +15,9 @@ import {
 } from '@/types/purchases';
 import RequisitionModal from '@/components/compras/RequisitionModal';
 import SapRequestsTab from '@/components/compras/SapRequestsTab';
+import MaximoRequestsTab from '@/components/compras/MaximoRequestsTab';
+import ResultChips from '@/components/compras/ResultChips';
+import StatusMultiSelect from '@/components/compras/StatusMultiSelect';
 import { useAuth } from '@/contexts/AuthContext';
 import type { UserRole } from '@/types/auth';
 import { PURCHASE_TEAM_ROLES } from '@/types/auth';
@@ -21,7 +26,10 @@ import { PURCHASE_TEAM_ROLES } from '@/types/auth';
 // Modelo "ver todos, actuar por rol" (junta 2026-09-17): la lectura —
 // pestana SAP incluida — es para cualquier autenticado; los botones de
 // accion se condicionan por rol (espejo de los @Roles del backend).
-type RequestsTab = 'abent' | 'sap_pr';
+// Sprint 2026-09-22 (A7): pestana de solicitudes de Maximo; la pestana
+// inicial y el estatus vienen de la URL (clic en un pie del dashboard, A2).
+type RequestsTab = 'abent' | 'sap_pr' | 'maximo_pr';
+const TAB_IDS: RequestsTab[] = ['abent', 'sap_pr', 'maximo_pr'];
 
 // POST /requisitions: equipo de compras + solicitante.
 const CREATOR_ROLES: UserRole[] = ['super_admin', ...PURCHASE_TEAM_ROLES, 'solicitante'];
@@ -31,7 +39,10 @@ const EDITOR_ROLES: UserRole[] = ['super_admin', ...PURCHASE_TEAM_ROLES];
 const REQUEST_TABS: { id: RequestsTab; label: string }[] = [
   { id: 'abent', label: 'Solicitudes ABENT' },
   { id: 'sap_pr', label: 'Solicitudes SAP' },
+  { id: 'maximo_pr', label: 'Solicitudes Maximo' },
 ];
+
+const STATUS_OPTIONS = Object.entries(REQUISITION_STATUS_LABELS).map(([value, label]) => ({ value, label }));
 
 interface PaginatedResponse {
   data: Requisition[];
@@ -85,14 +96,24 @@ const getStatusBadgeClass = (status: RequisitionStatus) => {
   return colorMap[REQUISITION_STATUS_COLORS[status]] || 'bg-gray-100 text-gray-800';
 };
 
-export default function SolicitudesPage() {
+function SolicitudesPageInner({
+  initialTab,
+  initialStatus,
+}: {
+  initialTab: RequestsTab | null;
+  initialStatus: string[];
+}) {
   const { hasRole } = useAuth();
   const canCreate = hasRole(...CREATOR_ROLES);
   const canEdit = hasRole(...EDITOR_ROLES);
-  const [activeTab, setActiveTab] = useState<RequestsTab>('abent');
+  // null = el usuario no ha elegido pestana: se abre la primera con datos
+  // (A7 extra — Ingrid entraba y veia la tabla ABENT vacia).
+  const [userTab, setUserTab] = useState<RequestsTab | null>(initialTab);
   const visibleTabs = REQUEST_TABS;
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<RequisitionStatus | ''>('');
+  const [statuses, setStatuses] = useState<string[]>(
+    initialTab === 'abent' ? initialStatus : [],
+  );
   const [typeFilter, setTypeFilter] = useState<ExpenseType | ''>('');
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
@@ -102,16 +123,33 @@ export default function SolicitudesPage() {
   queryParams.set('page', page.toString());
   queryParams.set('limit', '15');
   if (search) queryParams.set('search', search);
-  if (statusFilter) queryParams.set('status', statusFilter);
+  if (statuses.length) queryParams.set('status', statuses.join(','));
   if (typeFilter) queryParams.set('expense_type', typeFilter);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['requisitions', search, statusFilter, typeFilter, page],
+    queryKey: ['requisitions', search, statuses.join(','), typeFilter, page],
     queryFn: () => api.get<PaginatedResponse>(`/requisitions?${queryParams.toString()}`),
+  });
+  const statsQ = useQuery({
+    queryKey: ['requisitions', 'stats'],
+    queryFn: () => api.get<RequisitionStats>('/requisitions/stats'),
   });
 
   const requisitions = data?.data ?? [];
   const meta = data?.meta;
+  const hasFilters = !!search || statuses.length > 0 || !!typeFilter;
+  const abentEmpty = data !== undefined && meta?.total === 0 && !hasFilters;
+  const activeTab: RequestsTab = userTab ?? (abentEmpty ? 'sap_pr' : 'abent');
+  const chips = STATUS_OPTIONS.map((opt) => ({
+    key: opt.value,
+    label: opt.label,
+    count: statsQ.data?.by_status?.[opt.value as RequisitionStatus] ?? 0,
+    className: getStatusBadgeClass(opt.value as RequisitionStatus),
+  }));
+  const toggleStatus = (key: string) => {
+    setStatuses(statuses.includes(key) ? statuses.filter((s) => s !== key) : [...statuses, key]);
+    setPage(1);
+  };
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -142,7 +180,7 @@ export default function SolicitudesPage() {
         {visibleTabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => setUserTab(tab.id)}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
               activeTab === tab.id
                 ? 'bg-[#52AF32] text-white'
@@ -154,7 +192,12 @@ export default function SolicitudesPage() {
         ))}
       </div>
 
-      {activeTab === 'sap_pr' && <SapRequestsTab />}
+      {activeTab === 'sap_pr' && (
+        <SapRequestsTab initialStatus={initialTab === 'sap_pr' ? initialStatus : []} />
+      )}
+      {activeTab === 'maximo_pr' && (
+        <MaximoRequestsTab initialStatus={initialTab === 'maximo_pr' ? initialStatus : []} />
+      )}
 
       {activeTab === 'abent' && (
       <>
@@ -178,20 +221,13 @@ export default function SolicitudesPage() {
             />
           </div>
 
-          {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value as RequisitionStatus | '');
-              setPage(1);
-            }}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
-          >
-            <option value="">Todos los estados</option>
-            {Object.entries(REQUISITION_STATUS_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
+          {/* Status Filter (A5: multi-seleccion) */}
+          <StatusMultiSelect
+            options={STATUS_OPTIONS}
+            value={statuses}
+            onChange={(next) => { setStatuses(next); setPage(1); }}
+            placeholder="Todos los estados"
+          />
 
           {/* Type Filter */}
           <select
@@ -207,6 +243,16 @@ export default function SolicitudesPage() {
               <option key={value} value={value}>{label}</option>
             ))}
           </select>
+        </div>
+        <div className="mt-3">
+          <ResultChips
+            filteredTotal={meta?.total}
+            grandTotal={statsQ.data?.total}
+            statuses={chips}
+            activeStatuses={statuses}
+            onToggleStatus={toggleStatus}
+            loading={isLoading}
+          />
         </div>
       </div>
 
@@ -345,5 +391,31 @@ export default function SolicitudesPage() {
         requisition={editingRequisition}
       />
     </div>
+  );
+}
+
+/**
+ * La pestana y el estatus iniciales vienen de la URL (?tab=sap_pr&status=open);
+ * useSearchParams exige un Suspense en el arbol.
+ */
+function SolicitudesFromUrl() {
+  const params = useSearchParams();
+  const tabParam = params.get('tab');
+  const initialTab = TAB_IDS.includes(tabParam as RequestsTab) ? (tabParam as RequestsTab) : null;
+  const initialStatus = (params.get('status') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  return (
+    <SolicitudesPageInner
+      key={`${initialTab ?? ''}|${initialStatus.join(',')}`}
+      initialTab={initialTab}
+      initialStatus={initialStatus}
+    />
+  );
+}
+
+export default function SolicitudesPage() {
+  return (
+    <Suspense fallback={null}>
+      <SolicitudesFromUrl />
+    </Suspense>
   );
 }

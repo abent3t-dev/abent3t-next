@@ -4,15 +4,21 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { toQuery } from '@/lib/compras-format';
 import { useAuth } from '@/contexts/AuthContext';
 import { PURCHASE_ADMIN_ROLES } from '@/types/auth';
 import type { PaginatedResponse } from '@/types/pagination';
 import {
   MAXIMO_STATUS_BADGE_CLASSES,
   MaximoPurchaseOrder,
+  MaximoSummary,
   maximoStatusBadgeClass,
+  maximoStatusLabel,
 } from '@/types/purchases';
 import MaximoPoDetailModal from './MaximoPoDetailModal';
+import ResultChips from './ResultChips';
+import StatusMultiSelect from './StatusMultiSelect';
+import ExportExcelButton from './ExportExcelButton';
 
 /**
  * Fase INT-5 (T6) — Pestana "Ordenes Maximo" dentro de /compras/ordenes.
@@ -21,12 +27,20 @@ import MaximoPoDetailModal from './MaximoPoDetailModal';
  * que la Object Structure de Maximo aun no expone (AB_AHORRO / AB_TIPOCOMP /
  * AB_CLASFPO, ajuste pendiente con CIISA): esos van como "No disponible",
  * nunca 0 — cuando CIISA los exponga, los valores se pintan sin tocar UI.
+ *
+ * Sprint 2026-09-22: filtro multi-estatus (A5), chips (A4), export (B1),
+ * filtro inicial desde la URL (clic en un pie del dashboard, A2).
  */
 
 const PAGE_SIZE = 15;
 
 const OS_FIELD_HINT =
   'La Object Structure de Maximo aun no expone este campo (ajuste pendiente con CIISA)';
+
+const STATUS_OPTIONS = Object.keys(MAXIMO_STATUS_BADGE_CLASSES).map((value) => ({
+  value,
+  label: `${maximoStatusLabel(value)} (${value})`,
+}));
 
 const dash = (value: string | number | null | undefined) =>
   value === null || value === undefined || value === '' ? '—' : String(value);
@@ -43,9 +57,7 @@ const formatMoney = (amount: number | null, currency: string | null) => {
   try {
     return new Intl.NumberFormat(
       'es-MX',
-      currency
-        ? { style: 'currency', currency }
-        : { minimumFractionDigits: 2 },
+      currency ? { style: 'currency', currency } : { minimumFractionDigits: 2 },
     ).format(amount);
   } catch {
     return `${amount.toLocaleString('es-MX')} ${currency ?? ''}`.trim();
@@ -54,88 +66,76 @@ const formatMoney = (amount: number | null, currency: string | null) => {
 
 const formatDate = (date: string | null) =>
   date
-    ? new Date(date).toLocaleDateString('es-MX', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      })
+    ? new Date(date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
     : '—';
 
-export default function MaximoOrdersTab() {
+export default function MaximoOrdersTab({ initialStatus = [] }: { initialStatus?: string[] }) {
   const { hasRole } = useAuth();
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statuses, setStatuses] = useState<string[]>(initialStatus);
   const [clasfFilter, setClasfFilter] = useState('');
   const [approvedFrom, setApprovedFrom] = useState('');
   const [approvedTo, setApprovedTo] = useState('');
   const [page, setPage] = useState(1);
   const [detailPonum, setDetailPonum] = useState<string | null>(null);
 
-  const queryParams = new URLSearchParams();
-  queryParams.set('page', page.toString());
-  queryParams.set('limit', String(PAGE_SIZE));
-  if (search) queryParams.set('search', search);
-  if (statusFilter) queryParams.set('status', statusFilter);
-  if (clasfFilter) queryParams.set('ab_clasfpo', clasfFilter);
-  if (approvedFrom) queryParams.set('approved_from', approvedFrom);
-  if (approvedTo) queryParams.set('approved_to', approvedTo);
+  const filters = {
+    search,
+    status: statuses,
+    ab_clasfpo: clasfFilter,
+    approved_from: approvedFrom,
+    approved_to: approvedTo,
+  };
+  const filterQs = toQuery(filters);
+  const listQs = toQuery({ page, limit: PAGE_SIZE, ...filters });
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: [
-      'maximo-purchase-orders',
-      search,
-      statusFilter,
-      clasfFilter,
-      approvedFrom,
-      approvedTo,
-      page,
-    ],
-    queryFn: () =>
-      api.get<PaginatedResponse<MaximoPurchaseOrder>>(
-        `/maximo/purchase-orders?${queryParams.toString()}`,
-      ),
+    queryKey: ['maximo-purchase-orders', listQs],
+    queryFn: () => api.get<PaginatedResponse<MaximoPurchaseOrder>>(`/maximo/purchase-orders?${listQs}`),
+  });
+  const summaryQ = useQuery({
+    queryKey: ['maximo', 'summary'],
+    queryFn: () => api.get<MaximoSummary>('/maximo/summary'),
   });
 
   const orders = data?.data ?? [];
   const meta = data?.meta;
-  const hasFilters =
-    !!search || !!statusFilter || !!clasfFilter || !!approvedFrom || !!approvedTo;
+  const hasFilters = !!search || statuses.length > 0 || !!clasfFilter || !!approvedFrom || !!approvedTo;
   const canSeeIntegrations = hasRole(...PURCHASE_ADMIN_ROLES, 'executive');
+  const summary = summaryQ.data?.purchaseOrders;
+  const chips = (summary?.byStatus ?? [])
+    .filter((s) => s.status !== null)
+    .map((s) => ({
+      key: s.status as string,
+      label: maximoStatusLabel(s.status),
+      count: s.count,
+      className: maximoStatusBadgeClass(s.status),
+    }));
+  const toggleStatus = (key: string) => {
+    setStatuses(statuses.includes(key) ? statuses.filter((s) => s !== key) : [...statuses, key]);
+    setPage(1);
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Filtros */}
-      <div className="bg-white p-4 rounded-lg shadow">
+      <div className="bg-white p-4 rounded-lg shadow space-y-3">
         <div className="flex flex-wrap items-center gap-3">
           <input
             type="text"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Buscar por PONUM o descripcion..."
             className="flex-1 min-w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
           />
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPage(1);
-            }}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900 bg-white"
-          >
-            <option value="">Todos los estatus</option>
-            {Object.keys(MAXIMO_STATUS_BADGE_CLASSES).map((status) => (
-              <option key={status} value={status}>{status}</option>
-            ))}
-          </select>
+          <StatusMultiSelect
+            options={STATUS_OPTIONS}
+            value={statuses}
+            onChange={(next) => { setStatuses(next); setPage(1); }}
+          />
           <select
             value={clasfFilter}
-            onChange={(e) => {
-              setClasfFilter(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => { setClasfFilter(e.target.value); setPage(1); }}
             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900 bg-white"
           >
             <option value="">Clasificacion</option>
@@ -145,24 +145,31 @@ export default function MaximoOrdersTab() {
           <input
             type="date"
             value={approvedFrom}
-            onChange={(e) => {
-              setApprovedFrom(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => { setApprovedFrom(e.target.value); setPage(1); }}
             title="Aprobada desde"
             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900"
           />
           <input
             type="date"
             value={approvedTo}
-            onChange={(e) => {
-              setApprovedTo(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => { setApprovedTo(e.target.value); setPage(1); }}
             title="Aprobada hasta"
             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900"
           />
+          <ExportExcelButton
+            path={`/maximo/purchase-orders/export${filterQs ? `?${filterQs}` : ''}`}
+            filename={`ordenes_maximo_${new Date().toISOString().slice(0, 10)}.xlsx`}
+            disabled={isLoading || orders.length === 0}
+          />
         </div>
+        <ResultChips
+          filteredTotal={meta?.total}
+          grandTotal={summary?.total}
+          statuses={chips}
+          activeStatuses={statuses}
+          onToggleStatus={toggleStatus}
+          loading={isLoading}
+        />
       </div>
 
       {/* Tabla */}
@@ -177,14 +184,9 @@ export default function MaximoOrdersTab() {
           </div>
         ) : orders.length === 0 && !hasFilters ? (
           <div className="p-10 text-center space-y-2">
-            <p className="text-gray-500">
-              Aun no hay datos sincronizados desde Maximo
-            </p>
+            <p className="text-gray-500">Aun no hay datos sincronizados desde Maximo</p>
             {canSeeIntegrations && (
-              <Link
-                href="/compras/integraciones"
-                className="text-sm text-[#52AF32] hover:underline"
-              >
+              <Link href="/compras/integraciones" className="text-sm text-[#52AF32] hover:underline">
                 Ver estado de la integracion
               </Link>
             )}
@@ -216,12 +218,13 @@ export default function MaximoOrdersTab() {
                       <td className="px-4 py-3">
                         <span className="font-mono font-medium text-[#222D59]">{po.ponum}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900 max-w-64 truncate">
-                        {dash(po.description)}
-                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900 max-w-64 truncate">{dash(po.description)}</td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${maximoStatusBadgeClass(po.status)}`}>
-                          {dash(po.status)}
+                        <span
+                          className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${maximoStatusBadgeClass(po.status)}`}
+                          title={po.status ?? undefined}
+                        >
+                          {maximoStatusLabel(po.status)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">{dash(po.vendor_name)}</td>
@@ -233,15 +236,9 @@ export default function MaximoOrdersTab() {
                         {po.ab_clasfpo === null ? <NotAvailable /> : po.ab_clasfpo}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600 text-right">
-                        {po.ab_ahorro === null ? (
-                          <NotAvailable />
-                        ) : (
-                          formatMoney(po.ab_ahorro, po.currency)
-                        )}
+                        {po.ab_ahorro === null ? <NotAvailable /> : formatMoney(po.ab_ahorro, po.currency)}
                       </td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-600">
-                        {formatDate(po.approved_at)}
-                      </td>
+                      <td className="px-4 py-3 text-center text-sm text-gray-600">{formatDate(po.approved_at)}</td>
                     </tr>
                   ))}
                   {orders.length === 0 && (
@@ -255,31 +252,15 @@ export default function MaximoOrdersTab() {
               </table>
             </div>
 
-            {/* Paginacion */}
             {meta && meta.totalPages > 1 && (
               <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
                 <div className="text-sm text-gray-500">
-                  Mostrando {(meta.page - 1) * meta.limit + 1} -{' '}
-                  {Math.min(meta.page * meta.limit, meta.total)} de {meta.total}
+                  Mostrando {(meta.page - 1) * meta.limit + 1} - {Math.min(meta.page * meta.limit, meta.total)} de {meta.total}
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setPage(page - 1)}
-                    disabled={!meta.hasPrev}
-                    className="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Anterior
-                  </button>
-                  <span className="text-sm text-gray-700">
-                    Pagina {meta.page} de {meta.totalPages}
-                  </span>
-                  <button
-                    onClick={() => setPage(page + 1)}
-                    disabled={!meta.hasNext}
-                    className="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Siguiente
-                  </button>
+                  <button onClick={() => setPage(page - 1)} disabled={!meta.hasPrev} className="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Anterior</button>
+                  <span className="text-sm text-gray-700">Pagina {meta.page} de {meta.totalPages}</span>
+                  <button onClick={() => setPage(page + 1)} disabled={!meta.hasNext} className="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Siguiente</button>
                 </div>
               </div>
             )}

@@ -1,10 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import ResultChips from '@/components/compras/ResultChips';
+import StatusMultiSelect from '@/components/compras/StatusMultiSelect';
 import {
   PurchaseOrder,
+  PurchaseOrderStats,
   POStatus,
   PO_STATUS_LABELS,
   PO_STATUS_COLORS,
@@ -22,6 +26,8 @@ import { PURCHASE_TEAM_ROLES } from '@/types/auth';
 // Fase INT-5 (T6): pestanas por fuente. La pestana "Contratos Maximo" se
 // movio a /compras/contratos al implementarse §15. Int-4 agrego "Ordenes SAP".
 type OrdersTab = 'abent' | 'maximo_po' | 'sap_po';
+const TAB_IDS: OrdersTab[] = ['abent', 'maximo_po', 'sap_po'];
+const STATUS_OPTIONS = Object.entries(PO_STATUS_LABELS).map(([value, label]) => ({ value, label }));
 
 const ORDER_TABS: { id: OrdersTab; label: string }[] = [
   { id: 'abent', label: 'Ordenes ABENT' },
@@ -85,15 +91,23 @@ const getStatusBadgeClass = (status: POStatus) => {
   return colorMap[PO_STATUS_COLORS[status]] || 'bg-gray-100 text-gray-800';
 };
 
-export default function OrdenesPage() {
+function OrdenesPageInner({
+  initialTab,
+  initialStatus,
+}: {
+  initialTab: OrdersTab | null;
+  initialStatus: string[];
+}) {
   // Modelo "ver todos, actuar por rol": crear/editar solo equipo de compras
   // (espejo de los @Roles del backend). La expeditación desde la fila queda
   // abierta: es consulta, y sus formularios se gatean dentro del modal.
   const { hasRole } = useAuth();
   const canEdit = hasRole('super_admin', ...PURCHASE_TEAM_ROLES);
-  const [activeTab, setActiveTab] = useState<OrdersTab>('abent');
+  const [activeTab, setActiveTab] = useState<OrdersTab>(initialTab ?? 'abent');
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<POStatus | ''>('');
+  const [statuses, setStatuses] = useState<string[]>(
+    initialTab === 'abent' ? initialStatus : [],
+  );
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
@@ -104,15 +118,29 @@ export default function OrdenesPage() {
   queryParams.set('page', page.toString());
   queryParams.set('limit', '15');
   if (search) queryParams.set('search', search);
-  if (statusFilter) queryParams.set('status', statusFilter);
+  if (statuses.length) queryParams.set('status', statuses.join(','));
 
   const { data, isLoading } = useQuery({
-    queryKey: ['purchase-orders', search, statusFilter, page],
+    queryKey: ['purchase-orders', search, statuses.join(','), page],
     queryFn: () => api.get<PaginatedResponse>(`/purchase-orders?${queryParams.toString()}`),
+  });
+  const statsQ = useQuery({
+    queryKey: ['purchase-orders', 'stats'],
+    queryFn: () => api.get<PurchaseOrderStats>('/purchase-orders/stats'),
   });
 
   const orders = data?.data ?? [];
   const meta = data?.meta;
+  const chips = STATUS_OPTIONS.map((opt) => ({
+    key: opt.value,
+    label: opt.label,
+    count: statsQ.data?.by_status?.[opt.value as POStatus]?.count ?? 0,
+    className: getStatusBadgeClass(opt.value as POStatus),
+  }));
+  const toggleStatus = (key: string) => {
+    setStatuses(statuses.includes(key) ? statuses.filter((s) => s !== key) : [...statuses, key]);
+    setPage(1);
+  };
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -155,8 +183,12 @@ export default function OrdenesPage() {
         ))}
       </div>
 
-      {activeTab === 'maximo_po' && <MaximoOrdersTab />}
-      {activeTab === 'sap_po' && <SapOrdersTab />}
+      {activeTab === 'maximo_po' && (
+        <MaximoOrdersTab initialStatus={initialTab === 'maximo_po' ? initialStatus : []} />
+      )}
+      {activeTab === 'sap_po' && (
+        <SapOrdersTab initialStatus={initialTab === 'sap_po' ? initialStatus : []} />
+      )}
 
       {activeTab === 'abent' && (
       <>
@@ -179,19 +211,22 @@ export default function OrdenesPage() {
             />
           </div>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value as POStatus | '');
-              setPage(1);
-            }}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
-          >
-            <option value="">Todos los estados</option>
-            {Object.entries(PO_STATUS_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
+          <StatusMultiSelect
+            options={STATUS_OPTIONS}
+            value={statuses}
+            onChange={(next) => { setStatuses(next); setPage(1); }}
+            placeholder="Todos los estados"
+          />
+        </div>
+        <div className="mt-3">
+          <ResultChips
+            filteredTotal={meta?.total}
+            grandTotal={statsQ.data?.total}
+            statuses={chips}
+            activeStatuses={statuses}
+            onToggleStatus={toggleStatus}
+            loading={isLoading}
+          />
         </div>
       </div>
 
@@ -347,5 +382,28 @@ export default function OrdenesPage() {
       </>
       )}
     </div>
+  );
+}
+
+/** Pestana/estatus iniciales desde la URL (?tab=sap_po&status=open); Suspense por useSearchParams. */
+function OrdenesFromUrl() {
+  const params = useSearchParams();
+  const tabParam = params.get('tab');
+  const initialTab = TAB_IDS.includes(tabParam as OrdersTab) ? (tabParam as OrdersTab) : null;
+  const initialStatus = (params.get('status') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  return (
+    <OrdenesPageInner
+      key={`${initialTab ?? ''}|${initialStatus.join(',')}`}
+      initialTab={initialTab}
+      initialStatus={initialStatus}
+    />
+  );
+}
+
+export default function OrdenesPage() {
+  return (
+    <Suspense fallback={null}>
+      <OrdenesFromUrl />
+    </Suspense>
   );
 }

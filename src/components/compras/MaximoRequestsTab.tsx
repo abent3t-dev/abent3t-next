@@ -21,18 +21,14 @@ import StatusMultiSelect from './StatusMultiSelect';
 import ExportExcelButton from './ExportExcelButton';
 
 /**
- * Fase INT-5 (T6) — Pestana "Contratos Maximo" (vive en /compras/contratos
- * desde §15). Vista actual del staging (GET /maximo/contracts), incluye PRs
- * sin contrato. Solo lectura. El listado muestra el VALOR del contrato
- * (contract_value ≡ TOTALCOST, §20.2 resuelta por Isaac 2026-09); MAXVOL no
- * lo expone la Object Structure (pendiente CIISA) y va como "No disponible"
- * en el detalle, nunca 0.
- *
- * Sprint 2026-09-22: filtro multi-estatus (A5), chips (A4), export (B1).
+ * Sprint 2026-09-22 (A7) — Pestana "Solicitudes Maximo" en /compras/solicitudes.
+ * Las filas de `maximo_contracts` tienen como raiz la PR (prnum, estatus,
+ * fecha WAPPR = solicitud, fecha APPR = aprobacion, depto, contrato si ya lo
+ * tiene), asi que GET /maximo/contracts ya sirve como listado de solicitudes.
+ * Solo lectura; los dias se calculan aprobacion − solicitud (null = N/D).
  */
 
 const PAGE_SIZE = 15;
-const EXPIRY_WARNING_DAYS = 30;
 
 const STATUS_OPTIONS = Object.keys(MAXIMO_STATUS_BADGE_CLASSES).map((value) => ({
   value,
@@ -42,44 +38,30 @@ const STATUS_OPTIONS = Object.keys(MAXIMO_STATUS_BADGE_CLASSES).map((value) => (
 const dash = (value: string | number | null | undefined) =>
   value === null || value === undefined || value === '' ? '—' : String(value);
 
-const formatMoney = (amount: number | null, currency: string | null) => {
-  if (amount === null) return '—';
-  try {
-    return new Intl.NumberFormat(
-      'es-MX',
-      currency ? { style: 'currency', currency } : { minimumFractionDigits: 2 },
-    ).format(amount);
-  } catch {
-    return `${amount.toLocaleString('es-MX')} ${currency ?? ''}`.trim();
-  }
-};
-
 const formatDate = (date: string | null) =>
   date
     ? new Date(date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
     : '—';
 
-/** Vence en < 30 dias (indicador visual T6; las alertas reales son de §15). */
-const expiresSoon = (endDate: string | null): boolean => {
-  if (!endDate) return false;
-  const days = (new Date(endDate).getTime() - Date.now()) / 86_400_000;
-  return days >= 0 && days < EXPIRY_WARNING_DAYS;
+const daysBetween = (from: string | null, to: string | null): number | null => {
+  if (!from || !to) return null;
+  const d = Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86_400_000);
+  return d < 0 ? null : d;
 };
 
-export default function MaximoContractsTab({ initialStatus = [] }: { initialStatus?: string[] }) {
+export default function MaximoRequestsTab({ initialStatus = [] }: { initialStatus?: string[] }) {
   const { hasRole } = useAuth();
   const [search, setSearch] = useState('');
   const [statuses, setStatuses] = useState<string[]>(initialStatus);
-  const [hasContractFilter, setHasContractFilter] = useState('');
   const [page, setPage] = useState(1);
   const [detailKey, setDetailKey] = useState<string | null>(null);
 
-  const filters = { search, status: statuses, has_contract: hasContractFilter };
+  const filters = { search, status: statuses };
   const filterQs = toQuery(filters);
   const listQs = toQuery({ page, limit: PAGE_SIZE, ...filters });
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['maximo-contracts', listQs],
+    queryKey: ['maximo-requests', listQs],
     queryFn: () => api.get<PaginatedResponse<MaximoContract>>(`/maximo/contracts?${listQs}`),
   });
   const summaryQ = useQuery({
@@ -87,9 +69,9 @@ export default function MaximoContractsTab({ initialStatus = [] }: { initialStat
     queryFn: () => api.get<MaximoSummary>('/maximo/summary'),
   });
 
-  const contracts = data?.data ?? [];
+  const rows = data?.data ?? [];
   const meta = data?.meta;
-  const hasFilters = !!search || statuses.length > 0 || !!hasContractFilter;
+  const hasFilters = !!search || statuses.length > 0;
   const canSeeIntegrations = hasRole(...PURCHASE_ADMIN_ROLES, 'executive');
   const summary = summaryQ.data?.contracts;
   const chips = (summary?.byStatus ?? [])
@@ -121,19 +103,10 @@ export default function MaximoContractsTab({ initialStatus = [] }: { initialStat
             value={statuses}
             onChange={(next) => { setStatuses(next); setPage(1); }}
           />
-          <select
-            value={hasContractFilter}
-            onChange={(e) => { setHasContractFilter(e.target.value); setPage(1); }}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900 bg-white"
-          >
-            <option value="">Con y sin contrato</option>
-            <option value="true">Con contrato</option>
-            <option value="false">Sin contrato</option>
-          </select>
           <ExportExcelButton
             path={`/maximo/contracts/export${filterQs ? `?${filterQs}` : ''}`}
-            filename={`contratos_maximo_${new Date().toISOString().slice(0, 10)}.xlsx`}
-            disabled={isLoading || contracts.length === 0}
+            filename={`solicitudes_maximo_${new Date().toISOString().slice(0, 10)}.xlsx`}
+            disabled={isLoading || rows.length === 0}
           />
         </div>
         <ResultChips
@@ -153,11 +126,11 @@ export default function MaximoContractsTab({ initialStatus = [] }: { initialStat
           </div>
         ) : isError ? (
           <div className="p-8 text-center text-red-600">
-            No se pudieron cargar los contratos de Maximo. Intenta de nuevo.
+            No se pudieron cargar las solicitudes de Maximo. Intenta de nuevo.
           </div>
-        ) : contracts.length === 0 && !hasFilters ? (
+        ) : rows.length === 0 && !hasFilters ? (
           <div className="p-10 text-center space-y-2">
-            <p className="text-gray-500">Aun no hay datos sincronizados desde Maximo</p>
+            <p className="text-gray-500">Aun no hay solicitudes sincronizadas desde Maximo</p>
             {canSeeIntegrations && (
               <Link href="/compras/integraciones" className="text-sm text-[#52AF32] hover:underline">
                 Ver estado de la integracion
@@ -170,75 +143,62 @@ export default function MaximoContractsTab({ initialStatus = [] }: { initialStat
               <table className="w-full">
                 <thead className="bg-[#424846]">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">PRNUM</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Contrato</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">PR</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Proveedor</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Valor contrato</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Moneda</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Vigencia</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">F. Solicitud</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">F. Aprobacion</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Dias</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Solicitado por</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Depto.</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Rev.</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Contrato</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {contracts.map((contract, idx) => {
-                    const key = contract.prnum ?? contract.contractnum;
+                  {rows.map((pr, idx) => {
+                    const key = pr.prnum ?? pr.contractnum;
+                    const days = daysBetween(pr.created_at_source, pr.approved_at);
                     return (
                       <tr
-                        key={contract.id}
+                        key={pr.id}
                         onClick={() => key && setDetailKey(key)}
                         className={`cursor-pointer hover:bg-[#52AF32]/5 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                       >
                         <td className="px-4 py-3">
-                          <span className="font-mono font-medium text-[#222D59]">{dash(contract.prnum)}</span>
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {contract.has_contract ? (
-                            <span className="font-mono text-gray-900">{dash(contract.contractnum)}</span>
-                          ) : (
-                            <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
-                              Sin contrato
-                            </span>
-                          )}
+                          <span className="font-mono font-medium text-[#222D59]">{dash(pr.prnum)}</span>
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span
-                            className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${maximoStatusBadgeClass(contract.status)}`}
-                            title={contract.status ?? undefined}
+                            className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${maximoStatusBadgeClass(pr.status)}`}
+                            title={pr.status ?? undefined}
                           >
-                            {maximoStatusLabel(contract.status)}
+                            {maximoStatusLabel(pr.status)}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{dash(contract.vendor_name)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                          {formatMoney(contract.contract_value, contract.currency)}
-                        </td>
-                        <td className="px-4 py-3 text-center text-sm text-gray-600">{dash(contract.currency)}</td>
-                        <td className="px-4 py-3 text-center text-sm text-gray-600">
-                          <span className="whitespace-nowrap">
-                            {formatDate(contract.start_date)} – {formatDate(contract.end_date)}
-                          </span>
-                          {expiresSoon(contract.end_date) && (
-                            <span className="ml-2 inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800">
-                              Vence pronto
-                            </span>
+                        <td className="px-4 py-3 text-center text-sm text-gray-600">{formatDate(pr.created_at_source)}</td>
+                        <td className="px-4 py-3 text-center text-sm text-gray-600">{formatDate(pr.approved_at)}</td>
+                        <td className="px-4 py-3 text-center text-sm">
+                          {days === null ? (
+                            <span className="text-gray-400 italic" title="Sin fecha de solicitud o de aprobacion en Maximo">N/D</span>
+                          ) : (
+                            <span className="text-gray-700">{days}</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{dash(contract.department)}</td>
-                        <td className="px-4 py-3 text-center text-sm text-gray-600">
-                          {dash(contract.revisionnum)}
-                          {contract.purchview_count > 1 && (
-                            <span className="ml-1 text-xs text-gray-400">({contract.purchview_count})</span>
+                        <td className="px-4 py-3 text-sm text-gray-600">{dash(pr.requested_by)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{dash(pr.department)}</td>
+                        <td className="px-4 py-3 text-sm">
+                          {pr.has_contract ? (
+                            <span className="font-mono text-gray-900">{dash(pr.contractnum)}</span>
+                          ) : (
+                            <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600">Sin contrato</span>
                           )}
                         </td>
                       </tr>
                     );
                   })}
-                  {contracts.length === 0 && (
+                  {rows.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
-                        No hay contratos de Maximo que coincidan con los filtros
+                      <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                        No hay solicitudes de Maximo que coincidan con los filtros
                       </td>
                     </tr>
                   )}
