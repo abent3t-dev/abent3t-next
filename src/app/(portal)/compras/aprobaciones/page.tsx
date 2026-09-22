@@ -7,6 +7,43 @@ import { notify } from '@/lib/notifications';
 import { Approval, REQUISITION_STATUS_LABELS, APPROVAL_LEVEL_NAMES } from '@/types/purchases';
 import { useAuth } from '@/contexts/AuthContext';
 import { APPROVER_ROLES } from '@/types/auth';
+import SapApprovalsTab from '@/components/compras/SapApprovalsTab';
+
+// Sprint 2026-09-22 (B5): pestana con la cola de autorizacion de SAP (solo
+// lectura, para cualquiera) junto a la bandeja propia (solo aprobadores).
+type ApprovalsTab = 'sap' | 'abent';
+
+function ApprovalTabs({
+  tab,
+  setTab,
+  showAbent,
+}: {
+  tab: ApprovalsTab;
+  setTab: (t: ApprovalsTab) => void;
+  showAbent: boolean;
+}) {
+  const tabs: Array<{ id: ApprovalsTab; label: string }> = [
+    { id: 'sap', label: 'Pendientes de autorización (SAP)' },
+    ...(showAbent ? [{ id: 'abent' as const, label: 'Mi bandeja (flujo ABENT)' }] : []),
+  ];
+  return (
+    <div className="flex gap-2 bg-white rounded-xl p-2 shadow">
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => setTab(t.id)}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+            tab === t.id
+              ? 'bg-[#52AF32] text-white'
+              : 'bg-white text-[#424846] border border-gray-200 hover:bg-gray-50'
+          }`}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 const Icons = {
   check: (
@@ -50,6 +87,7 @@ export default function AprobacionesPage() {
   // aprobador se le explica en lugar de dispararle un 403.
   const { hasRole } = useAuth();
   const isApprover = hasRole('super_admin', ...APPROVER_ROLES);
+  const [tab, setTab] = useState<ApprovalsTab>('sap');
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
@@ -104,22 +142,19 @@ export default function AprobacionesPage() {
 
   const approvals = pendingApprovals ?? [];
 
-  if (!isApprover) {
+  // Cola de SAP: consulta para cualquiera. La bandeja propia (flujo ABENT)
+  // sigue siendo exclusiva de la cadena de aprobacion.
+  if (!isApprover || tab === 'sap') {
     return (
       <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
         <div>
           <h1 className="text-2xl font-bold text-[#424846]">Panel de Aprobaciones</h1>
-          <p className="text-gray-500">Requisiciones pendientes de tu aprobacion</p>
-        </div>
-        <div className="bg-white p-8 rounded-lg shadow text-center text-gray-500">
-          <p className="font-medium text-[#424846] mb-1">
-            Esta bandeja es exclusiva de la cadena de aprobacion
-          </p>
-          <p className="text-sm">
-            El estado y el historial de aprobacion de cada requisicion se
-            consultan desde Solicitudes (RQ) o en Reportes.
+          <p className="text-gray-500">
+            Lo que falta autorizar en SAP y, para la cadena de aprobacion, la bandeja del flujo propio
           </p>
         </div>
+        <ApprovalTabs tab="sap" setTab={setTab} showAbent={isApprover} />
+        <SapApprovalsTab />
       </div>
     );
   }
@@ -131,6 +166,7 @@ export default function AprobacionesPage() {
         <h1 className="text-2xl font-bold text-[#424846]">Panel de Aprobaciones</h1>
         <p className="text-gray-500">Requisiciones pendientes de tu aprobacion</p>
       </div>
+      <ApprovalTabs tab="abent" setTab={setTab} showAbent />
 
       {/* Stats */}
       <div className="flex items-center gap-4">

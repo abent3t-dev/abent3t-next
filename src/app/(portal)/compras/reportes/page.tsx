@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { MaximoSummary } from '@/types/purchases';
+import { formatMoney } from '@/lib/compras-format';
+import { PieChart } from '@/components/charts/PieChart';
+import { MaximoSummary, maximoStatusLabel, sapStatusLabel } from '@/types/purchases';
 
 /**
  * Fase Reportes — datos REALES desde /compras/reportes/* (adios datos
@@ -118,7 +120,47 @@ interface MaximoReport {
   contracts: { por_estatus: Array<{ status: string; count: number }> };
 }
 
+// Sprint 2026-09-22 (B2/B3): SAP + Maximo por periodo y tiempos de aprobación
+interface ErpSerie {
+  monedas: string[];
+  meses: Array<{
+    month: string;
+    count: number;
+    por_moneda: Array<{ currency: string; count: number; monto: number }>;
+  }>;
+}
+interface ErpReport {
+  sap: {
+    ordenes: { serie_mensual: ErpSerie; por_estatus: Array<{ status: string | null; count: number }> };
+    solicitudes: { serie_mensual: ErpSerie; por_estatus: Array<{ status: string | null; count: number }> };
+    top_proveedores: Array<{ proveedor: string; currency: string | null; count: number; monto: number }>;
+  };
+  maximo: {
+    ordenes: { serie_mensual: ErpSerie; por_estatus: Array<{ status: string | null; count: number }> };
+    contratos: { por_estatus: Array<{ status: string | null; count: number }> };
+    top_proveedores: Array<{ proveedor: string; currency: string | null; count: number; monto: number }>;
+  };
+}
+interface TiemposReport {
+  maximo: {
+    ordenes: { promedio_dias: number | null; total: number };
+    ordenes_por_aprobador: Array<{ aprobador: string; promedio_dias: number; total: number }>;
+    contratos: { promedio_dias: number | null; total: number };
+  };
+  sap: {
+    solicitudes_autorizadas: { promedio_dias: number | null; total: number };
+    por_aprobador: Array<{ aprobador: string; promedio_dias: number; total: number }>;
+    pendientes: { total: number; dias_esperando_promedio: number | null };
+  };
+}
+
 interface AhorroReport {
+  sap?: {
+    por_moneda: Array<{ currency: string; total: number; documentos_con_ahorro: number }>;
+    lineas_total: number;
+    lineas_clasificadas: number;
+    nota: string;
+  };
   abent: { disponible: boolean; motivo?: string };
   maximo: {
     por_moneda: Array<{ currency: string; total: number; registros: number }>;
@@ -228,6 +270,45 @@ function KpiCard({
   );
 }
 
+const ERP_PIE_COLORS = ['#52AF32', '#9ca3af', '#ef4444', '#222D59', '#DFA922', '#3b82f6', '#f59e0b', '#67B52E'];
+
+function ErpPie({
+  data,
+  labelOf,
+}: {
+  data: Array<{ status: string | null; count: number }>;
+  labelOf: (s: string | null) => string;
+}) {
+  const rows = data.filter((d) => d.count > 0).map((d) => ({ name: labelOf(d.status), value: d.count }));
+  if (rows.length === 0) return <Empty />;
+  return <PieChart data={rows} dataKey="value" nameKey="name" colors={ERP_PIE_COLORS} height={220} />;
+}
+
+function ErpMonths({ serie }: { serie: ErpSerie }) {
+  const max = Math.max(...serie.meses.map((m) => m.count), 1);
+  if (serie.meses.every((m) => m.count === 0)) return <Empty />;
+  return (
+    <div className="space-y-1">
+      {serie.meses.map((m) => (
+        <HBar
+          key={m.month}
+          label={monthLabel(m.month)}
+          value={m.count}
+          max={max}
+          display={
+            m.count === 0
+              ? '0'
+              : m.por_moneda
+                  .filter((c) => c.count > 0)
+                  .map((c) => `${c.currency} ${formatMoney(c.monto, c.currency)}`)
+                  .join(' · ') + ` · ${m.count}`
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
 // ── Página ─────────────────────────────────────────────────────────────────
 
 export default function ReportesComprasPage() {
@@ -279,6 +360,16 @@ export default function ReportesComprasPage() {
     queryFn: () => api.get<MaximoSummary>('/maximo/summary'),
     retry: false,
   });
+  const erpQ = useQuery({
+    queryKey: ['reportes', 'erp', periodQs],
+    queryFn: () => api.get<ErpReport>(`/compras/reportes/erp?${periodQs}`),
+  });
+  const tiemposQ = useQuery({
+    queryKey: ['reportes', 'tiempos-aprobacion'],
+    queryFn: () => api.get<TiemposReport>('/compras/reportes/tiempos-aprobacion'),
+  });
+  const erp = erpQ.data;
+  const tiempos = tiemposQ.data;
 
   const resumen = resumenQ.data;
   const rq = rqQ.data;
@@ -669,8 +760,143 @@ export default function ReportesComprasPage() {
         )}
       </Section>
 
+      {/* SAP + Maximo por periodo (sprint 2026-09-22, B2) */}
+      <Section title="SAP Business One — órdenes y solicitudes en el periodo" note="montos por moneda, nunca sumados entre monedas">
+        {erpQ.isError ? (
+          <p className="text-sm text-red-600">No se pudo cargar el reporte de los ERPs.</p>
+        ) : !erp ? (
+          <Empty />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div>
+              <p className="text-sm font-medium text-[#424846] mb-2">Órdenes por estatus</p>
+              <ErpPie data={erp.sap.ordenes.por_estatus} labelOf={sapStatusLabel} />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-[#424846] mb-2">Solicitudes por estatus</p>
+              <ErpPie data={erp.sap.solicitudes.por_estatus} labelOf={sapStatusLabel} />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-[#424846]">Órdenes por mes</p>
+              <ErpMonths serie={erp.sap.ordenes.serie_mensual} />
+            </div>
+            <div className="lg:col-span-3 space-y-2">
+              <p className="text-sm font-medium text-[#424846]">Top proveedores por monto (OC)</p>
+              {erp.sap.top_proveedores.length === 0 ? (
+                <Empty />
+              ) : (
+                erp.sap.top_proveedores.map((row) => (
+                  <HBar
+                    key={`${row.proveedor}-${row.currency}`}
+                    label={row.proveedor}
+                    value={row.monto}
+                    max={Math.max(...erp.sap.top_proveedores.map((r) => r.monto), 1)}
+                    display={`${formatMoney(row.monto, row.currency)} · ${row.count}`}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </Section>
+
+      <Section title="Maximo — órdenes y contratos en el periodo" note="vista vigente (última revisión); estatus en español">
+        {erpQ.isError ? (
+          <p className="text-sm text-red-600">No se pudo cargar el reporte de los ERPs.</p>
+        ) : !erp ? (
+          <Empty />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div>
+              <p className="text-sm font-medium text-[#424846] mb-2">Órdenes por estatus</p>
+              <ErpPie data={erp.maximo.ordenes.por_estatus} labelOf={maximoStatusLabel} />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-[#424846] mb-2">Solicitudes / contratos por estatus</p>
+              <ErpPie data={erp.maximo.contratos.por_estatus} labelOf={maximoStatusLabel} />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-[#424846]">Órdenes por mes</p>
+              <ErpMonths serie={erp.maximo.ordenes.serie_mensual} />
+            </div>
+            <div className="lg:col-span-3 space-y-2">
+              <p className="text-sm font-medium text-[#424846]">Top proveedores por monto (OC)</p>
+              {erp.maximo.top_proveedores.length === 0 ? (
+                <Empty />
+              ) : (
+                erp.maximo.top_proveedores.map((row) => (
+                  <HBar
+                    key={`${row.proveedor}-${row.currency}`}
+                    label={row.proveedor}
+                    value={row.monto}
+                    max={Math.max(...erp.maximo.top_proveedores.map((r) => r.monto), 1)}
+                    display={`${formatMoney(row.monto, row.currency)} · ${row.count}`}
+                    color="bg-[#222D59]"
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </Section>
+
+      {/* Tiempos de aprobación SAP + Maximo (sprint 2026-09-22, B3) */}
+      <Section title="Tiempos de aprobación — SAP y Maximo" note="días naturales; 'No disponible' = sin base para calcular">
+        {tiemposQ.isError ? (
+          <p className="text-sm text-red-600">No se pudo cargar el reporte de tiempos.</p>
+        ) : !tiempos ? (
+          <Empty />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-[#424846]">Maximo</p>
+              <div className="flex gap-4 flex-wrap text-sm text-gray-700">
+                <span>OC (WAPPR → APPR): <strong>{tiempos.maximo.ordenes.promedio_dias === null ? 'No disponible' : `${tiempos.maximo.ordenes.promedio_dias} días`}</strong> ({tiempos.maximo.ordenes.total})</span>
+                <span>Contratos: <strong>{tiempos.maximo.contratos.promedio_dias === null ? 'No disponible' : `${tiempos.maximo.contratos.promedio_dias} días`}</strong> ({tiempos.maximo.contratos.total})</span>
+              </div>
+              <p className="text-xs text-gray-500">Por aprobador (usuario Maximo que aprobó la OC)</p>
+              {tiempos.maximo.ordenes_por_aprobador.length === 0 ? (
+                <Empty text="Sin aprobaciones con aprobador identificado" />
+              ) : (
+                tiempos.maximo.ordenes_por_aprobador.map((row) => (
+                  <HBar
+                    key={row.aprobador}
+                    label={row.aprobador}
+                    value={row.promedio_dias}
+                    max={Math.max(...tiempos.maximo.ordenes_por_aprobador.map((r) => r.promedio_dias), 1)}
+                    display={`${row.promedio_dias} días · ${row.total}`}
+                    color="bg-[#222D59]"
+                  />
+                ))
+              )}
+            </div>
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-[#424846]">SAP (cola de autorización)</p>
+              <div className="flex gap-4 flex-wrap text-sm text-gray-700">
+                <span>Autorizadas: <strong>{tiempos.sap.solicitudes_autorizadas.promedio_dias === null ? 'No disponible' : `${tiempos.sap.solicitudes_autorizadas.promedio_dias} días`}</strong> ({tiempos.sap.solicitudes_autorizadas.total})</span>
+                <span>Pendientes: <strong>{tiempos.sap.pendientes.total}</strong>{tiempos.sap.pendientes.dias_esperando_promedio !== null && ` · esperando ${tiempos.sap.pendientes.dias_esperando_promedio} días en promedio`}</span>
+              </div>
+              <p className="text-xs text-gray-500">Por aprobador (usuario SAP que autorizó)</p>
+              {tiempos.sap.por_aprobador.length === 0 ? (
+                <Empty text="Sin autorizaciones sincronizadas todavía" />
+              ) : (
+                tiempos.sap.por_aprobador.map((row) => (
+                  <HBar
+                    key={row.aprobador}
+                    label={row.aprobador}
+                    value={row.promedio_dias}
+                    max={Math.max(...tiempos.sap.por_aprobador.map((r) => r.promedio_dias), 1)}
+                    display={`${row.promedio_dias} días · ${row.total}`}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </Section>
+
       {/* Maximo */}
-      <Section title="Maximo — volumen en staging" note="históricos con campos vacíos = sin clasificar">
+      <Section title="Maximo — volumen" note="históricos con campos vacíos = sin clasificar">
         {maximoPendiente ? (
           <Empty text="Sincronización pendiente de activación (configuración del servidor)" />
         ) : !maximo ? (
@@ -696,7 +922,7 @@ export default function ReportesComprasPage() {
             <div className="space-y-2">
               <p className="text-sm font-medium text-[#424846]">Contratos por estatus</p>
               {maximo.contracts.por_estatus.length === 0 ? (
-                <Empty text="Sin contratos en staging" />
+                <Empty text="Sin contratos de Maximo en el periodo" />
               ) : (
                 maximo.contracts.por_estatus.map((row) => (
                   <HBar
