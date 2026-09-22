@@ -6,6 +6,8 @@ import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
 import { Supplier } from '@/types/purchases';
 import SupplierModal from '@/components/compras/SupplierModal';
+import ResultChips from '@/components/compras/ResultChips';
+import ExportExcelButton from '@/components/compras/ExportExcelButton';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface PaginatedResponse {
@@ -21,6 +23,14 @@ interface PaginatedResponse {
 }
 
 const PAGE_SIZE = 20;
+
+// Badges de SAP B1 (campos Valid / Frozen del BusinessPartner). En la práctica
+// vienen siempre juntos (no válido ⇔ congelado), así que se muestra UN solo
+// badge; "Congelado" aparece aparte solo si algún día difieren.
+const SAP_INACTIVE_HINT =
+  'Marcado en SAP como no válido/congelado (campos Valid y Frozen de SAP B1): no se le pueden hacer pedidos hasta que Compras lo reactive en SAP. Informativo; la puntuación y el bloqueo de ABENT son independientes.';
+const SAP_FROZEN_HINT =
+  'Congelado en SAP (campo Frozen de SAP B1) aunque sigue marcado como válido: no se le pueden hacer pedidos hasta que Compras lo descongele en SAP.';
 
 const Icons = {
   search: (
@@ -180,7 +190,27 @@ export default function ProveedoresPage() {
             <option value="false">Activos</option>
             <option value="true">Bloqueados</option>
           </select>
+          <ExportExcelButton
+            path={`/suppliers/export${(() => {
+              const qs = new URLSearchParams();
+              if (search) qs.set('search', search);
+              if (blockedFilter) qs.set('is_blocked', blockedFilter);
+              const s = qs.toString();
+              return s ? `?${s}` : '';
+            })()}`}
+            filename={`proveedores_${new Date().toISOString().slice(0, 10)}.xlsx`}
+            disabled={isLoading || suppliers.length === 0}
+          />
         </div>
+        <div className="mt-3">
+          <ResultChips filteredTotal={meta?.total} loading={isLoading} />
+        </div>
+        <p className="mt-3 text-xs text-gray-500">
+          <span className="inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded bg-[#222D59]/10 text-[#222D59] mr-1">SAP</span>
+          sincronizado desde SAP B1 (datos básicos de solo lectura).{' '}
+          <span className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-gray-200 text-gray-600 mx-1">Inactivo en SAP</span>
+          = SAP lo tiene como no válido/congelado: no se le pueden hacer pedidos hasta que Compras lo reactive en SAP. La puntuación y el bloqueo de ABENT son independientes.
+        </p>
       </div>
 
       {/* Table */}
@@ -220,15 +250,15 @@ export default function ProveedoresPage() {
                         {supplier.sap_valid === false && (
                           <span
                             className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-gray-200 text-gray-600"
-                            title="Marcado como no vigente en SAP (informativo)"
+                            title={SAP_INACTIVE_HINT}
                           >
                             Inactivo en SAP
                           </span>
                         )}
-                        {supplier.sap_frozen === true && (
+                        {supplier.sap_frozen === true && supplier.sap_valid !== false && (
                           <span
                             className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-700"
-                            title="Congelado en SAP (informativo)"
+                            title={SAP_FROZEN_HINT}
                           >
                             Congelado en SAP
                           </span>
