@@ -44,6 +44,8 @@ const EMPTY_FORM = {
   start_date: '',
   end_date: '',
   total_amount: '',
+  consumed_amount: '',
+  external_link: '',
   currency: 'MXN',
   buyer_profile_id: '',
   responsible_user_email: '',
@@ -125,6 +127,11 @@ function ContractModalBody({
             contract.total_amount === null
               ? ''
               : String(contract.total_amount),
+          consumed_amount:
+            contract.consumed_amount === null || contract.consumed_amount === undefined
+              ? ''
+              : String(contract.consumed_amount),
+          external_link: contract.external_link ?? '',
           currency: contract.currency ?? 'MXN',
           buyer_profile_id: contract.buyer_profile_id ?? '',
           responsible_user_email: contract.responsible_user_email ?? '',
@@ -169,6 +176,9 @@ function ContractModalBody({
     end_date: formData.end_date,
     total_amount:
       formData.total_amount === '' ? undefined : Number(formData.total_amount),
+    consumed_amount:
+      formData.consumed_amount === '' ? undefined : Number(formData.consumed_amount),
+    external_link: formData.external_link.trim() || undefined,
     currency: formData.currency.trim() || undefined,
     buyer_profile_id: formData.buyer_profile_id || undefined,
     responsible_user_email: formData.responsible_user_email.trim() || undefined,
@@ -378,7 +388,32 @@ function ContractModalBody({
                   <Field label="Servicio" value={view.service_description} />
                   <Field label="Proveedor" value={dash(view.supplier?.legal_name)} />
                   <Field label="Vigencia" value={`${formatDate(view.start_date)} – ${formatDate(view.end_date)}`} />
-                  <Field label="Monto total" value={formatMoney(view.total_amount, view.currency)} />
+                  <Field label="Monto total" value={view.total_amount === null ? 'No disponible' : formatMoney(view.total_amount, view.currency)} />
+                  <Field label="Consumido" value={view.consumed_amount === null || view.consumed_amount === undefined ? 'No disponible' : formatMoney(view.consumed_amount, view.currency)} />
+                  <Field
+                    label="Saldo"
+                    value={
+                      view.balance_amount === null || view.balance_amount === undefined ? (
+                        'No disponible'
+                      ) : (
+                        <span className={view.balance_amount < 0 ? 'font-semibold text-red-600' : ''}>
+                          {formatMoney(view.balance_amount, view.currency)}
+                        </span>
+                      )
+                    }
+                  />
+                  <Field
+                    label="Expediente (link)"
+                    value={
+                      view.external_link ? (
+                        <a href={view.external_link} target="_blank" rel="noopener noreferrer" className="text-[#52AF32] hover:underline break-all">
+                          Abrir expediente
+                        </a>
+                      ) : (
+                        '—'
+                      )
+                    }
+                  />
                   <Field label="Comprador" value={dash(view.buyer?.full_name)} />
                   <Field label="Usuario responsable" value={dash(view.responsible_user_name)} />
                   <Field label="Email responsable" value={dash(view.responsible_user_email)} />
@@ -539,6 +574,32 @@ function ContractModalBody({
                   onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
                   className={inputClass}
                   maxLength={10}
+                />
+              </div>
+            </div>
+
+            {/* B4: consumido capturado por Compras (el % automatico depende del ERP) y link del expediente */}
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Monto consumido</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.consumed_amount}
+                  onChange={(e) => setFormData({ ...formData, consumed_amount: e.target.value })}
+                  className={inputClass}
+                />
+                <p className="text-xs text-gray-500 mt-1">Saldo = monto total − consumido (se calcula solo)</p>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Link del expediente (SharePoint)</label>
+                <input
+                  type="url"
+                  value={formData.external_link}
+                  onChange={(e) => setFormData({ ...formData, external_link: e.target.value })}
+                  className={inputClass}
+                  placeholder="https://..."
                 />
               </div>
             </div>

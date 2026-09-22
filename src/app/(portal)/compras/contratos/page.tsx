@@ -13,6 +13,8 @@ import {
   CONTRACT_STATUS_LABELS,
 } from '@/types/purchases';
 import ContractModal from '@/components/compras/ContractModal';
+import ResultChips from '@/components/compras/ResultChips';
+import ExportExcelButton from '@/components/compras/ExportExcelButton';
 import ContractStatusBadge from '@/components/compras/ContractStatusBadge';
 import MaximoContractsTab from '@/components/compras/MaximoContractsTab';
 
@@ -53,12 +55,44 @@ const formatMoney = (amount: number | null, currency: string | null) => {
   }
 };
 
-/** Vence en < 30 dias (ambar). Vencido ya lo pinta el badge en rojo. */
+/** Días naturales de hoy (UTC) a la fecha de fin; negativo = ya venció. */
+const daysToEnd = (contract: Contract): number => {
+  const today = new Date();
+  const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  return Math.round((new Date(contract.end_date).getTime() - todayUtc) / 86_400_000);
+};
+
+/** Vence en < 30 dias (ambar). */
 const expiresSoon = (contract: Contract): boolean => {
   if (contract.status !== 'vigente') return false;
-  const days = (new Date(contract.end_date).getTime() - Date.now()) / 86_400_000;
+  const days = daysToEnd(contract);
   return days >= 0 && days < EXPIRY_WARNING_DAYS;
 };
+
+/**
+ * Línea bajo la vigencia (pedido de Ingrid 2026-09-22): rojo si ya venció
+ * (por estatus o por fecha), ámbar si vence en menos de 30 días.
+ */
+function ExpiryLine({ contract }: { contract: Contract }) {
+  const days = daysToEnd(contract);
+  if (contract.status === 'vencido' || days < 0) {
+    const ago = Math.abs(days);
+    return (
+      <p className="mt-1 text-xs font-medium text-red-600">
+        Venció el {formatDate(contract.end_date)}
+        {ago > 0 ? ` (hace ${ago} ${ago === 1 ? 'día' : 'días'})` : ' (hoy)'}
+      </p>
+    );
+  }
+  if (expiresSoon(contract)) {
+    return (
+      <p className="mt-1 text-xs font-medium text-amber-700">
+        Vence en {days} {days === 1 ? 'día' : 'días'}
+      </p>
+    );
+  }
+  return null;
+}
 
 export default function ContratosPage() {
   const { hasRole } = useAuth();
@@ -91,6 +125,11 @@ export default function ContratosPage() {
   const contracts = data?.data ?? [];
   const meta = data?.meta;
   const hasFilters = !!search || !!statusFilter || !!expiryFilter;
+  const exportQs = new URLSearchParams();
+  if (search) exportQs.set('search', search);
+  if (statusFilter) exportQs.set('status', statusFilter);
+  if (expiryFilter) exportQs.set('vence_en_dias', expiryFilter);
+  const exportPath = `/compras/contratos/export${exportQs.toString() ? `?${exportQs}` : ''}`;
 
   const openContract = (contract: Contract | null) => {
     setSelected(contract);
@@ -199,6 +238,14 @@ export default function ContratosPage() {
               </div>
             ) : (
               <>
+                <div className="flex items-center justify-between gap-3 flex-wrap px-4 py-3 border-b border-gray-100">
+                  <ResultChips filteredTotal={meta?.total} loading={isLoading} />
+                  <ExportExcelButton
+                    path={exportPath}
+                    filename={`contratos_${new Date().toISOString().slice(0, 10)}.xlsx`}
+                    disabled={contracts.length === 0}
+                  />
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-[#424846]">
@@ -209,6 +256,8 @@ export default function ContratosPage() {
                         <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Proveedor</th>
                         <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Vigencia</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Monto</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Consumido</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Saldo</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Comprador</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Responsable</th>
                         <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
@@ -225,6 +274,20 @@ export default function ContratosPage() {
                             <span className="font-mono font-medium text-[#222D59]">
                               {contract.contract_number}
                             </span>
+                            {contract.external_link && (
+                              <a
+                                href={contract.external_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                title="Abrir expediente (SharePoint) en pestaña nueva"
+                                className="ml-2 inline-flex align-middle text-[#222D59] hover:text-[#52AF32]"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                </svg>
+                              </a>
+                            )}
                             {contract.tomo && (
                               <p className="text-xs text-gray-400">{contract.tomo}</p>
                             )}
@@ -242,14 +305,30 @@ export default function ContratosPage() {
                             <span className="whitespace-nowrap">
                               {formatDate(contract.start_date)} – {formatDate(contract.end_date)}
                             </span>
-                            {expiresSoon(contract) && (
-                              <span className="ml-2 inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800">
-                                Vence pronto
-                              </span>
+                            <ExpiryLine contract={contract} />
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                            {contract.total_amount === null ? (
+                              <span className="text-gray-400 italic">No disponible</span>
+                            ) : (
+                              formatMoney(contract.total_amount, contract.currency)
                             )}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                            {formatMoney(contract.total_amount, contract.currency)}
+                            {contract.consumed_amount === null ? (
+                              <span className="text-gray-400 italic" title="Captura manual de Compras pendiente">No disponible</span>
+                            ) : (
+                              formatMoney(contract.consumed_amount, contract.currency)
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right">
+                            {contract.balance_amount === null ? (
+                              <span className="text-gray-400 italic" title="Requiere monto y consumido">No disponible</span>
+                            ) : (
+                              <span className={contract.balance_amount < 0 ? 'font-semibold text-red-600' : 'text-gray-900'}>
+                                {formatMoney(contract.balance_amount, contract.currency)}
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
                             {contract.buyer?.full_name ?? '—'}
@@ -264,7 +343,7 @@ export default function ContratosPage() {
                       ))}
                       {contracts.length === 0 && (
                         <tr>
-                          <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                          <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
                             No hay contratos que coincidan con los filtros
                           </td>
                         </tr>
