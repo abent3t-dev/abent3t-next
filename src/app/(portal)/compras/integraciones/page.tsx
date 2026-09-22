@@ -244,7 +244,7 @@ export default function IntegracionesPage() {
                         </span>
                       )}
                       <span className="text-xs text-gray-500">
-                        {status.counts[t]} en staging
+                        {status.counts[t]} registros sincronizados
                       </span>
                     </div>
                   </div>

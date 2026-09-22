@@ -179,6 +179,7 @@ export default function SapIntegrationSection() {
                 <option value="purchase_orders">Ordenes (OC)</option>
                 <option value="purchase_requests">Solicitudes de Pedido</option>
                 <option value="business_partners">Proveedores</option>
+                <option value="approval_requests">Cola de autorización</option>
               </select>
               <select
                 value={mode}
@@ -229,7 +230,7 @@ export default function SapIntegrationSection() {
               <p className="text-sm text-gray-900">{status.pageSize} documentos</p>
             </div>
             {(
-              ['purchase_orders', 'purchase_requests', 'business_partners'] as const
+              ['purchase_orders', 'purchase_requests', 'business_partners', 'approval_requests'] as const
             ).map((t) => {
               const lastRun = status.lastRuns[t];
               return (
@@ -246,7 +247,7 @@ export default function SapIntegrationSection() {
                         </span>
                       )}
                       <span className="text-xs text-gray-500">
-                        {status.counts[t]} en staging
+                        {status.counts[t]} registros sincronizados
                       </span>
                     </div>
                   </div>
