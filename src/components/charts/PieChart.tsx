@@ -17,6 +17,8 @@ interface PieChartProps {
   colors?: string[];
   formatValue?: (value: number) => string;
   height?: number;
+  /** Clic en una rebanada (sprint compras A2: navegar a la tabla filtrada). */
+  onSliceClick?: (entry: Record<string, unknown>) => void;
 }
 
 // A3T Color Palette
@@ -46,6 +48,7 @@ export function PieChart({
   colors = DEFAULT_COLORS,
   formatValue,
   height = 400,
+  onSliceClick,
 }: PieChartProps) {
   const total = data.reduce((acc, item) => acc + item[dataKey], 0);
 
@@ -120,6 +123,15 @@ export function PieChart({
           }}
           animationDuration={1000}
           animationBegin={0}
+          onClick={
+            onSliceClick
+              ? (entry: unknown) => {
+                  const e = entry as { payload?: Record<string, unknown> } & Record<string, unknown>;
+                  onSliceClick(e?.payload ?? e);
+                }
+              : undefined
+          }
+          style={onSliceClick ? { cursor: 'pointer' } : undefined}
         >
           {data.map((entry, index) => (
             <Cell

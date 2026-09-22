@@ -389,6 +389,10 @@ export interface MaximoPurchaseOrder {
   requested_by: string | null;
   department: string | null;
   approved_at: string | null;
+  /** Usuario Maximo que aprobó (sprint 2026-09-22, B3); null si no aplica. */
+  approved_by: string | null;
+  /** Primer WAPPR; approved_at − waiting_approval_at = días de aprobación. */
+  waiting_approval_at: string | null;
   created_at_source: string | null;
   last_changed_at: string | null;
   last_seen_at: string;
@@ -426,6 +430,7 @@ export interface MaximoContract {
   requested_by: string | null;
   department: string | null;
   approved_at: string | null;
+  approved_by: string | null;
   created_at_source: string | null;
   contract_ref_num: string | null;
   contract_value: number | null;
@@ -538,6 +543,24 @@ export const MAXIMO_STATUS_BADGE_CLASSES: Record<string, string> = {
   CANCEL: 'bg-red-100 text-red-800',
 };
 
+/** Etiquetas en español de los estatus conocidos de Maximo (A2). */
+export const MAXIMO_STATUS_LABELS: Record<string, string> = {
+  APPR: 'Aprobada',
+  WAPPR: 'En espera de aprobación',
+  PNDREV: 'Pendiente de revisión',
+  REVISD: 'Revisada',
+  INPRG: 'En progreso',
+  COMP: 'Completada',
+  CLOSE: 'Cerrada',
+  CAN: 'Cancelada',
+  CANCEL: 'Cancelada',
+  DRAFT: 'Borrador',
+};
+
+export function maximoStatusLabel(status: string | null): string {
+  return (status && MAXIMO_STATUS_LABELS[status]) || (status ?? 'Sin estatus');
+}
+
 export function maximoStatusBadgeClass(status: string | null): string {
   return (
     (status && MAXIMO_STATUS_BADGE_CLASSES[status]) ||
@@ -608,6 +631,12 @@ export interface Contract {
   start_date: string;
   end_date: string;
   total_amount: number | null;
+  /** Consumido capturado por Compras (B4); null = "No disponible". */
+  consumed_amount: number | null;
+  /** total − consumido, calculado en backend; null si falta cualquiera. */
+  balance_amount: number | null;
+  /** Expediente en SharePoint (lo cargan ellos). */
+  external_link: string | null;
   currency: string | null;
   buyer_profile_id: string | null;
   responsible_user_email: string | null;
@@ -764,11 +793,24 @@ export type DeliveryStatus =
   | 'parcial'
   | 'entregada';
 
+export type ExpeditingSource = 'abent' | 'sap' | 'maximo';
+
+export const EXPEDITING_SOURCE_LABELS: Record<ExpeditingSource, string> = {
+  abent: 'ABENT',
+  sap: 'SAP',
+  maximo: 'Maximo',
+};
+
 export interface ExpeditingItem {
-  purchase_order_id: string;
+  /** null = OC de un ERP (solo lectura, sin acciones ni detalle). */
+  purchase_order_id: string | null;
+  source: ExpeditingSource;
+  external_key: string;
   po_number: string;
-  po_status: POStatus;
-  supplier: { id: string; legal_name: string; email: string | null } | null;
+  po_status: string | null;
+  currency: string | null;
+  requested_by: string | null;
+  supplier: { id: string | null; legal_name: string; email: string | null } | null;
   buyer: { id: string; full_name: string | null; email: string } | null;
   requisition: { id: string; rq_number: string } | null;
   amount: number | null;
@@ -877,7 +919,10 @@ export function deriveDeliveryChip(po: {
 export type SapSyncTarget =
   | 'purchase_orders'
   | 'purchase_requests'
-  | 'business_partners';
+  | 'business_partners'
+  | 'approval_requests';
+
+export type SapDocStatusKey = 'open' | 'close' | 'cancelled';
 
 export interface SapPurchaseOrder {
   id: string;
@@ -887,6 +932,11 @@ export interface SapPurchaseOrder {
   doc_due_date: string | null;
   update_date_source: string | null;
   document_status: string | null;
+  /** Estatus DERIVADO (A6): cancelled manda sobre bost_Close. null = sin re-sync. */
+  status_key: SapDocStatusKey | null;
+  cancelled: boolean | null;
+  authorization_status: string | null;
+  closing_date: string | null;
   comments: string | null;
   card_code: string | null;
   card_name: string | null;
@@ -908,6 +958,10 @@ export interface SapPurchaseRequest {
   required_date: string | null;
   update_date_source: string | null;
   document_status: string | null;
+  status_key: SapDocStatusKey | null;
+  cancelled: boolean | null;
+  authorization_status: string | null;
+  closing_date: string | null;
   comments: string | null;
   requester: string | null;
   requester_name: string | null;
@@ -990,20 +1044,127 @@ export interface SapSummaryLastRun {
   records_failed: number;
 }
 
+export interface CurrencyAmount {
+  currency: string | null;
+  total: number;
+  count: number;
+}
+
 export interface SapEntitySummary {
   total: number;
+  /** Conteo por estatus DERIVADO: 'open' | 'close' | 'cancelled'. */
   byStatus: SapStatusCount[];
   montoTotal: number;
+  /** Montos por moneda (nunca sumados entre monedas). */
+  montoPorMoneda: CurrencyAmount[];
+  /** Abiertas no canceladas ("por recibir"). */
+  abiertas: { count: number; montoPorMoneda: CurrencyAmount[] };
   linesTotal: number;
   linesClassified: number;
   docsConAhorro: number;
+  /** null = sin base ("No disponible"), nunca 0. */
+  diasPromedioGestion: number | null;
 }
 
 export interface SapSummary {
   syncEnabled: boolean;
   purchaseOrders: SapEntitySummary;
   purchaseRequests: SapEntitySummary;
-  lastSync: Record<SapSyncTarget, SapSummaryLastRun | null>;
+  approvalRequests: { total: number; pending: number };
+  lastSync: {
+    purchase_orders: SapSummaryLastRun | null;
+    purchase_requests: SapSummaryLastRun | null;
+    approval_requests: SapSummaryLastRun | null;
+  };
+}
+
+// ── Cola de autorización de SAP (B5) — solo lectura ─────────────────────
+export interface SapApprovalLine {
+  stage_code: number | null;
+  stage_name: string | null;
+  user_id: number | null;
+  user_name: string | null;
+  status: string | null; // ardPending | ardApproved | ardNotApproved
+  update_date: string | null;
+}
+
+export interface SapApprovalRequest {
+  id: string;
+  code: number;
+  template_name: string | null;
+  object_type: string | null;
+  document_kind: 'purchase_order' | 'purchase_request' | 'other';
+  is_draft: boolean | null;
+  draft_entry: number | null;
+  object_entry: number | null;
+  status: string | null; // arsPending | arsApproved | arsNotApproved | arsGenerated
+  remarks: string | null;
+  current_stage_name: string | null;
+  originator_name: string | null;
+  creation_date: string | null;
+  days_waiting: number | null;
+  doc_num: number | null;
+  doc_date: string | null;
+  doc_total: number | null;
+  currency: string | null;
+  card_name: string | null;
+  requester_name: string | null;
+  approvers: SapApprovalLine[];
+}
+
+export const SAP_APPROVAL_STATUS_LABELS: Record<string, string> = {
+  arsPending: 'Pendiente',
+  arsApproved: 'Autorizada',
+  arsNotApproved: 'Rechazada',
+  arsGenerated: 'Generada',
+};
+
+export const SAP_APPROVAL_STATUS_CLASSES: Record<string, string> = {
+  arsPending: 'bg-yellow-100 text-yellow-800',
+  arsApproved: 'bg-green-100 text-green-800',
+  arsNotApproved: 'bg-red-100 text-red-800',
+  arsGenerated: 'bg-blue-100 text-blue-800',
+};
+
+export const SAP_APPROVAL_LINE_LABELS: Record<string, string> = {
+  ardPending: 'Pendiente',
+  ardApproved: 'Autorizó',
+  ardNotApproved: 'Rechazó',
+};
+
+// ── Resumen del dashboard (A1) — GET /compras/dashboard/summary ─────────
+export interface DashboardSourceCount {
+  total: number;
+  pendientes: number;
+}
+export interface DashboardSourceOrders {
+  count: number;
+  monto_por_moneda: CurrencyAmount[];
+}
+export interface DashboardSummary {
+  solicitudes: {
+    total: number;
+    pendientes: number;
+    por_fuente: { sap: DashboardSourceCount; maximo: DashboardSourceCount; abent: DashboardSourceCount };
+  };
+  dias_gestion: {
+    sap_solicitudes: number | null;
+    sap_ordenes: number | null;
+    maximo_ordenes: number | null;
+    abent_requisiciones: number | null;
+  };
+  ordenes: {
+    total: number;
+    monto_por_moneda: CurrencyAmount[];
+    por_fuente: { sap: DashboardSourceOrders; maximo: DashboardSourceOrders; abent: DashboardSourceOrders };
+  };
+  por_recibir: {
+    total: number;
+    monto_por_moneda: CurrencyAmount[];
+    por_fuente: { sap: DashboardSourceOrders; maximo: DashboardSourceOrders; abent: DashboardSourceOrders };
+  };
+  fuentes: { sap_sync_enabled: boolean; maximo_sync_enabled: boolean };
+  generated_at: string;
 }
 
 // Estatus de documento de SAP (bost_*): etiquetas y colores conocidos;
@@ -1011,12 +1172,26 @@ export interface SapSummary {
 export const SAP_STATUS_LABELS: Record<string, string> = {
   bost_Open: 'Abierta',
   bost_Close: 'Cerrada',
+  // Estatus DERIVADOS (A6): cancelled manda sobre bost_Close
+  open: 'Abierta',
+  close: 'Cerrada',
+  cancelled: 'Cancelada',
 };
 
 export const SAP_STATUS_BADGE_CLASSES: Record<string, string> = {
   bost_Open: 'bg-green-100 text-green-800',
   bost_Close: 'bg-gray-200 text-gray-700',
+  open: 'bg-green-100 text-green-800',
+  close: 'bg-gray-200 text-gray-700',
+  cancelled: 'bg-red-100 text-red-800',
 };
+
+/** Opciones del filtro multi-estatus de SAP (A5/A6). */
+export const SAP_STATUS_OPTIONS: Array<{ value: SapDocStatusKey; label: string }> = [
+  { value: 'open', label: 'Abierta' },
+  { value: 'close', label: 'Cerrada' },
+  { value: 'cancelled', label: 'Cancelada' },
+];
 
 export function sapStatusLabel(status: string | null): string {
   return (status && SAP_STATUS_LABELS[status]) || (status ?? '—');
@@ -1028,10 +1203,19 @@ export function sapStatusBadgeClass(status: string | null): string {
   );
 }
 
+/** Estatus a mostrar de un documento SAP: el derivado si ya se sincronizó. */
+export function sapDocStatus(doc: {
+  status_key: SapDocStatusKey | null;
+  document_status: string | null;
+}): string | null {
+  return doc.status_key ?? doc.document_status;
+}
+
 export const SAP_TARGET_LABELS: Record<SapSyncTarget, string> = {
   purchase_orders: 'Ordenes (OC)',
   purchase_requests: 'Solicitudes de Pedido',
   business_partners: 'Proveedores',
+  approval_requests: 'Cola de autorización',
 };
 
 export const SAP_RUN_MODE_LABELS: Record<SapSyncRun['mode'], string> = {
