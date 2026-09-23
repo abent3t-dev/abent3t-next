@@ -21,7 +21,12 @@ import StatusMultiSelect from '@/components/compras/StatusMultiSelect';
 import { useAuth } from '@/contexts/AuthContext';
 import type { UserRole } from '@/types/auth';
 import { PURCHASE_TEAM_ROLES } from '@/types/auth';
+import { SHOW_INTERNAL_REQUISITIONS } from '@/lib/features';
 
+// Bloque 2026-09-23 (D7): la pestaña de requisiciones propias se OCULTA
+// (Ingrid: "no la vamos a ocupar"); backend y rutas intactos, bandera
+// NEXT_PUBLIC_SHOW_INTERNAL_REQUISITIONS=true la devuelve. D4: `year` y
+// `maximo_status` desde la URL (tarjeta de pendientes del dashboard).
 // Int-4 (T6): pestanas por fuente, mismo patron que /compras/ordenes.
 // Modelo "ver todos, actuar por rol" (junta 2026-09-17): la lectura —
 // pestana SAP incluida — es para cualquier autenticado; los botones de
@@ -37,7 +42,7 @@ const CREATOR_ROLES: UserRole[] = ['super_admin', ...PURCHASE_TEAM_ROLES, 'solic
 const EDITOR_ROLES: UserRole[] = ['super_admin', ...PURCHASE_TEAM_ROLES];
 
 const REQUEST_TABS: { id: RequestsTab; label: string }[] = [
-  { id: 'abent', label: 'Solicitudes ABENT' },
+  ...(SHOW_INTERNAL_REQUISITIONS ? [{ id: 'abent' as RequestsTab, label: 'Solicitudes ABENT' }] : []),
   { id: 'sap_pr', label: 'Solicitudes SAP' },
   { id: 'maximo_pr', label: 'Solicitudes Maximo' },
 ];
@@ -99,16 +104,22 @@ const getStatusBadgeClass = (status: RequisitionStatus) => {
 function SolicitudesPageInner({
   initialTab,
   initialStatus,
+  initialMaximoStatus,
+  initialYear,
 }: {
   initialTab: RequestsTab | null;
   initialStatus: string[];
+  initialMaximoStatus: string[];
+  initialYear: number | null;
 }) {
   const { hasRole } = useAuth();
-  const canCreate = hasRole(...CREATOR_ROLES);
+  const canCreate = hasRole(...CREATOR_ROLES) && SHOW_INTERNAL_REQUISITIONS;
   const canEdit = hasRole(...EDITOR_ROLES);
   // null = el usuario no ha elegido pestana: se abre la primera con datos
   // (A7 extra — Ingrid entraba y veia la tabla ABENT vacia).
-  const [userTab, setUserTab] = useState<RequestsTab | null>(initialTab);
+  const [userTab, setUserTab] = useState<RequestsTab | null>(
+    initialTab === 'abent' && !SHOW_INTERNAL_REQUISITIONS ? null : initialTab,
+  );
   const visibleTabs = REQUEST_TABS;
   const [search, setSearch] = useState('');
   const [statuses, setStatuses] = useState<string[]>(
@@ -139,7 +150,8 @@ function SolicitudesPageInner({
   const meta = data?.meta;
   const hasFilters = !!search || statuses.length > 0 || !!typeFilter;
   const abentEmpty = data !== undefined && meta?.total === 0 && !hasFilters;
-  const activeTab: RequestsTab = userTab ?? (abentEmpty ? 'sap_pr' : 'abent');
+  const activeTab: RequestsTab =
+    userTab ?? (!SHOW_INTERNAL_REQUISITIONS || abentEmpty ? 'sap_pr' : 'abent');
   const chips = STATUS_OPTIONS.map((opt) => ({
     key: opt.value,
     label: opt.label,
@@ -193,13 +205,16 @@ function SolicitudesPageInner({
       </div>
 
       {activeTab === 'sap_pr' && (
-        <SapRequestsTab initialStatus={initialTab === 'sap_pr' ? initialStatus : []} />
+        <SapRequestsTab initialStatus={initialTab === 'sap_pr' ? initialStatus : []} year={initialYear} />
       )}
       {activeTab === 'maximo_pr' && (
-        <MaximoRequestsTab initialStatus={initialTab === 'maximo_pr' ? initialStatus : []} />
+        <MaximoRequestsTab
+          initialStatus={initialTab === 'maximo_pr' ? initialStatus : initialMaximoStatus}
+          year={initialYear}
+        />
       )}
 
-      {activeTab === 'abent' && (
+      {activeTab === 'abent' && SHOW_INTERNAL_REQUISITIONS && (
       <>
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow">
@@ -402,11 +417,17 @@ function SolicitudesFromUrl() {
   const tabParam = params.get('tab');
   const initialTab = TAB_IDS.includes(tabParam as RequestsTab) ? (tabParam as RequestsTab) : null;
   const initialStatus = (params.get('status') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  // D4: la tarjeta de pendientes manda SAP=open y Maximo=WAPPR,PNDREV a la vez
+  const initialMaximoStatus = (params.get('maximo_status') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const yearParam = Number(params.get('year'));
+  const initialYear = Number.isInteger(yearParam) && yearParam > 2000 ? yearParam : null;
   return (
     <SolicitudesPageInner
-      key={`${initialTab ?? ''}|${initialStatus.join(',')}`}
+      key={`${initialTab ?? ''}|${initialStatus.join(',')}|${initialMaximoStatus.join(',')}|${initialYear ?? ''}`}
       initialTab={initialTab}
       initialStatus={initialStatus}
+      initialMaximoStatus={initialMaximoStatus}
+      initialYear={initialYear}
     />
   );
 }

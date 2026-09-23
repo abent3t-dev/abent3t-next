@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { PURCHASE_ADMIN_ROLES } from '@/types/auth';
 import type { PaginatedResponse } from '@/types/pagination';
 import {
+  MAXIMO_NO_STATUS_HINT,
   MAXIMO_STATUS_BADGE_CLASSES,
   MaximoContract,
   MaximoSummary,
@@ -26,7 +27,24 @@ import ExportExcelButton from './ExportExcelButton';
  * fecha WAPPR = solicitud, fecha APPR = aprobacion, depto, contrato si ya lo
  * tiene), asi que GET /maximo/contracts ya sirve como listado de solicitudes.
  * Solo lectura; los dias se calculan aprobacion − solicitud (null = N/D).
+ *
+ * Bloque 2026-09-23: D2 "Sin estatus en Maximo" explicado (la OS no expone
+ * el estatus de la PR sin contrato); D7 monto de la PR (`pr_total`, "No
+ * disponible" mientras la OS no lo traiga); D6 solicitante con nombre si hay
+ * alias; D4 año.
  */
+
+const formatMoney = (amount: number | null, currency: string | null) => {
+  if (amount === null) return null;
+  try {
+    return new Intl.NumberFormat(
+      'es-MX',
+      currency ? { style: 'currency', currency } : { minimumFractionDigits: 2 },
+    ).format(amount);
+  } catch {
+    return `${amount.toLocaleString('es-MX')} ${currency ?? ''}`.trim();
+  }
+};
 
 const PAGE_SIZE = 15;
 
@@ -49,14 +67,21 @@ const daysBetween = (from: string | null, to: string | null): number | null => {
   return d < 0 ? null : d;
 };
 
-export default function MaximoRequestsTab({ initialStatus = [] }: { initialStatus?: string[] }) {
+export default function MaximoRequestsTab({
+  initialStatus = [],
+  year = null,
+}: {
+  initialStatus?: string[];
+  /** D4: año (created_at_source). */
+  year?: number | null;
+}) {
   const { hasRole } = useAuth();
   const [search, setSearch] = useState('');
   const [statuses, setStatuses] = useState<string[]>(initialStatus);
   const [page, setPage] = useState(1);
   const [detailKey, setDetailKey] = useState<string | null>(null);
 
-  const filters = { search, status: statuses };
+  const filters = { search, status: statuses, year: year ?? undefined };
   const filterQs = toQuery(filters);
   const listQs = toQuery({ page, limit: PAGE_SIZE, ...filters });
 
@@ -65,13 +90,14 @@ export default function MaximoRequestsTab({ initialStatus = [] }: { initialStatu
     queryFn: () => api.get<PaginatedResponse<MaximoContract>>(`/maximo/contracts?${listQs}`),
   });
   const summaryQ = useQuery({
-    queryKey: ['maximo', 'summary'],
-    queryFn: () => api.get<MaximoSummary>('/maximo/summary'),
+    queryKey: ['maximo', 'summary', year],
+    queryFn: () => api.get<MaximoSummary>(`/maximo/summary${year ? `?year=${year}` : ''}`),
   });
 
   const rows = data?.data ?? [];
   const meta = data?.meta;
-  const hasFilters = !!search || statuses.length > 0;
+  const hasFilters = !!search || statuses.length > 0 || !!year;
+  const sinEstatus = summaryQ.data?.contracts.byStatus.find((s) => s.status === null)?.count ?? 0;
   const canSeeIntegrations = hasRole(...PURCHASE_ADMIN_ROLES, 'executive');
   const summary = summaryQ.data?.contracts;
   const chips = (summary?.byStatus ?? [])
@@ -117,6 +143,11 @@ export default function MaximoRequestsTab({ initialStatus = [] }: { initialStatu
           onToggleStatus={toggleStatus}
           loading={isLoading}
         />
+        {sinEstatus > 0 && (
+          <p className="text-xs text-gray-600" title={MAXIMO_NO_STATUS_HINT}>
+            <strong>{sinEstatus.toLocaleString('es-MX')} sin estatus en Maximo:</strong> {MAXIMO_NO_STATUS_HINT}
+          </p>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -148,6 +179,7 @@ export default function MaximoRequestsTab({ initialStatus = [] }: { initialStatu
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">F. Solicitud</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">F. Aprobación</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Días</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase" title="Monto de la solicitud en Maximo (PR.TOTALCOST). 'No disponible' mientras la Object Structure no lo exponga">Monto</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Solicitado por</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Depto.</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Contrato</th>
@@ -169,7 +201,7 @@ export default function MaximoRequestsTab({ initialStatus = [] }: { initialStatu
                         <td className="px-4 py-3 text-center">
                           <span
                             className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${maximoStatusBadgeClass(pr.status)}`}
-                            title={pr.status ?? undefined}
+                            title={pr.status ?? MAXIMO_NO_STATUS_HINT}
                           >
                             {maximoStatusLabel(pr.status)}
                           </span>
@@ -183,7 +215,16 @@ export default function MaximoRequestsTab({ initialStatus = [] }: { initialStatu
                             <span className="text-gray-700">{days}</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{dash(pr.requested_by)}</td>
+                        <td className="px-4 py-3 text-sm text-right whitespace-nowrap">
+                          {pr.pr_total === null ? (
+                            <span className="text-gray-500 italic" title="La Object Structure de Maximo aún no expone el monto de la PR (pedido a CIISA)">No disponible</span>
+                          ) : (
+                            <span className="text-gray-900">{formatMoney(pr.pr_total, pr.currency)}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600" title={pr.requested_by ?? undefined}>
+                          {pr.requested_by_name ?? dash(pr.requested_by)}
+                        </td>
                         <td className="px-4 py-3 text-sm text-gray-600">{dash(pr.department)}</td>
                         <td className="px-4 py-3 text-sm">
                           {pr.has_contract ? (
@@ -197,7 +238,7 @@ export default function MaximoRequestsTab({ initialStatus = [] }: { initialStatu
                   })}
                   {rows.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                         No hay solicitudes de Maximo que coincidan con los filtros
                       </td>
                     </tr>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import {
@@ -176,6 +177,29 @@ export default function SapDocDetailModal({
                 <span className="text-sm text-gray-500">
                   DocEntry {doc.doc_entry}
                 </span>
+                {poDoc?.maximo_ponum && (
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full ${
+                      poDoc.maximo_po_exists ? 'bg-[#DFA922]/20 text-[#8a6a10]' : 'bg-gray-100 text-gray-700'
+                    }`}
+                    title={
+                      poDoc.maximo_po_exists
+                        ? 'OC creada en SAP por la integración desde Maximo; en los totales combinados se cuenta una sola vez'
+                        : 'Referencia a un PO de Maximo que no existe en el staging de Maximo'
+                    }
+                  >
+                    {poDoc.maximo_po_exists ? 'Migrada de Maximo' : 'Ref. Maximo'} {poDoc.maximo_ponum}
+                    {poDoc.maximo_po_exists && (
+                      <Link
+                        href={`/compras/ordenes?tab=maximo_po&search=${encodeURIComponent(poDoc.maximo_ponum)}`}
+                        className="underline hover:text-[#52AF32]"
+                        onClick={onClose}
+                      >
+                        ver en Maximo
+                      </Link>
+                    )}
+                  </span>
+                )}
                 {doc.lines_classified < doc.lines_total && (
                   <span className="inline-flex px-2.5 py-1 text-xs font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200">
                     {doc.lines_classified} de {doc.lines_total} líneas

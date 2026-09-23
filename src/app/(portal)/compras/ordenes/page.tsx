@@ -20,20 +20,28 @@ import ExpeditingModal from '@/components/compras/ExpeditingModal';
 import PurchaseOrderModal from '@/components/compras/PurchaseOrderModal';
 import MaximoOrdersTab from '@/components/compras/MaximoOrdersTab';
 import SapOrdersTab from '@/components/compras/SapOrdersTab';
+import OrdersKpiCards from '@/components/compras/OrdersKpiCards';
+import YearChips from '@/components/compras/YearChips';
 import { useAuth } from '@/contexts/AuthContext';
 import { PURCHASE_TEAM_ROLES } from '@/types/auth';
+import { SHOW_INTERNAL_REQUISITIONS } from '@/lib/features';
+import type { DashboardSummary } from '@/types/purchases';
 
 // Fase INT-5 (T6): pestanas por fuente. La pestana "Contratos Maximo" se
 // movio a /compras/contratos al implementarse §15. Int-4 agrego "Ordenes SAP".
+// Bloque 2026-09-23: D5 tarjetas de ahorro y CAPEX/OPEX arriba de las
+// pestañas; D4 filtro por año compartido (viaja desde el dashboard); D1
+// origen/PO Maximo desde la URL; D7 la pestaña ABENT se oculta por bandera.
 type OrdersTab = 'abent' | 'maximo_po' | 'sap_po';
 const TAB_IDS: OrdersTab[] = ['abent', 'maximo_po', 'sap_po'];
 const STATUS_OPTIONS = Object.entries(PO_STATUS_LABELS).map(([value, label]) => ({ value, label }));
 
 const ORDER_TABS: { id: OrdersTab; label: string }[] = [
-  { id: 'abent', label: 'Órdenes ABENT' },
-  { id: 'maximo_po', label: 'Órdenes Maximo' },
+  ...(SHOW_INTERNAL_REQUISITIONS ? [{ id: 'abent' as OrdersTab, label: 'Órdenes ABENT' }] : []),
   { id: 'sap_po', label: 'Órdenes SAP' },
+  { id: 'maximo_po', label: 'Órdenes Maximo' },
 ];
+const DEFAULT_TAB: OrdersTab = SHOW_INTERNAL_REQUISITIONS ? 'abent' : 'sap_po';
 
 interface PaginatedResponse {
   data: PurchaseOrder[];
@@ -95,16 +103,32 @@ const getStatusBadgeClass = (status: POStatus) => {
 function OrdenesPageInner({
   initialTab,
   initialStatus,
+  initialYear,
+  initialSearch,
+  initialOrigin,
 }: {
   initialTab: OrdersTab | null;
   initialStatus: string[];
+  initialYear: number | null;
+  initialSearch: string;
+  initialOrigin: 'sap' | 'maximo' | '';
 }) {
   // Modelo "ver todos, actuar por rol": crear/editar solo equipo de compras
   // (espejo de los @Roles del backend). La expeditación desde la fila queda
   // abierta: es consulta, y sus formularios se gatean dentro del modal.
   const { hasRole } = useAuth();
   const canEdit = hasRole('super_admin', ...PURCHASE_TEAM_ROLES);
-  const [activeTab, setActiveTab] = useState<OrdersTab>(initialTab ?? 'abent');
+  const [activeTab, setActiveTab] = useState<OrdersTab>(
+    initialTab && (initialTab !== 'abent' || SHOW_INTERNAL_REQUISITIONS) ? initialTab : DEFAULT_TAB,
+  );
+  // D4: año compartido por las tarjetas D5 y las pestañas SAP/Maximo
+  const [year, setYear] = useState<number | null>(initialYear);
+  const yearsQ = useQuery({
+    queryKey: ['compras', 'dashboard', 'summary', null],
+    queryFn: () => api.get<DashboardSummary>('/compras/dashboard/summary'),
+    staleTime: 5 * 60_000,
+  });
+  const years = yearsQ.data?.datos.anios ?? [];
   const [search, setSearch] = useState('');
   const [statuses, setStatuses] = useState<string[]>(
     initialTab === 'abent' ? initialStatus : [],
@@ -167,28 +191,46 @@ function OrdenesPageInner({
         )}
       </div>
 
-      {/* Tabs por fuente (T6) */}
-      <div className="flex gap-2 bg-white rounded-xl p-2 shadow">
-        {ORDER_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-              activeTab === tab.id
-                ? 'bg-[#52AF32] text-white'
-                : 'bg-white text-[#424846] border border-gray-200 hover:bg-gray-50'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* D5: ahorro acumulado y CAPEX/OPEX (SAP + Maximo, por moneda) */}
+      <OrdersKpiCards year={year} />
+
+      {/* Tabs por fuente (T6) + año (D4) */}
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-white rounded-xl p-2 shadow">
+        <div className="flex gap-2">
+          {ORDER_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-[#52AF32] text-white'
+                  : 'bg-white text-[#424846] border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        {years.length > 0 && activeTab !== 'abent' && (
+          <div className="px-2">
+            <YearChips years={years} value={year} onChange={setYear} compact />
+          </div>
+        )}
       </div>
 
       {activeTab === 'maximo_po' && (
-        <MaximoOrdersTab initialStatus={initialTab === 'maximo_po' ? initialStatus : []} />
+        <MaximoOrdersTab
+          initialStatus={initialTab === 'maximo_po' ? initialStatus : []}
+          initialSearch={initialTab === 'maximo_po' ? initialSearch : ''}
+          year={year}
+        />
       )}
       {activeTab === 'sap_po' && (
-        <SapOrdersTab initialStatus={initialTab === 'sap_po' ? initialStatus : []} />
+        <SapOrdersTab
+          initialStatus={initialTab === 'sap_po' ? initialStatus : []}
+          initialOrigin={initialTab === 'sap_po' ? initialOrigin : ''}
+          year={year}
+        />
       )}
 
       {activeTab === 'abent' && (
@@ -386,17 +428,28 @@ function OrdenesPageInner({
   );
 }
 
-/** Pestana/estatus iniciales desde la URL (?tab=sap_po&status=open); Suspense por useSearchParams. */
+/**
+ * Pestana/estatus iniciales desde la URL (?tab=sap_po&status=open&year=2025
+ * &origin=maximo&search=PO1234); Suspense por useSearchParams.
+ */
 function OrdenesFromUrl() {
   const params = useSearchParams();
   const tabParam = params.get('tab');
   const initialTab = TAB_IDS.includes(tabParam as OrdersTab) ? (tabParam as OrdersTab) : null;
   const initialStatus = (params.get('status') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const yearParam = Number(params.get('year'));
+  const initialYear = Number.isInteger(yearParam) && yearParam > 2000 ? yearParam : null;
+  const originParam = params.get('origin');
+  const initialOrigin = originParam === 'sap' || originParam === 'maximo' ? originParam : '';
+  const initialSearch = params.get('search') ?? '';
   return (
     <OrdenesPageInner
-      key={`${initialTab ?? ''}|${initialStatus.join(',')}`}
+      key={`${initialTab ?? ''}|${initialStatus.join(',')}|${initialYear ?? ''}|${initialOrigin}|${initialSearch}`}
       initialTab={initialTab}
       initialStatus={initialStatus}
+      initialYear={initialYear}
+      initialSearch={initialSearch}
+      initialOrigin={initialOrigin}
     />
   );
 }

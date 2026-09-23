@@ -53,15 +53,22 @@ const formatDate = (date: string | null) =>
     ? new Date(date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
     : '—';
 
-export default function SapRequestsTab({ initialStatus = [] }: { initialStatus?: string[] }) {
+export default function SapRequestsTab({
+  initialStatus = [],
+  year = null,
+}: {
+  initialStatus?: string[];
+  /** D4 (2026-09-23): año de doc_date (viene del dashboard). */
+  year?: number | null;
+}) {
   const { hasRole } = useAuth();
   const [search, setSearch] = useState('');
   const [statuses, setStatuses] = useState<string[]>(initialStatus);
   const [page, setPage] = useState(1);
   const [detailDocEntry, setDetailDocEntry] = useState<number | null>(null);
 
-  const filterQs = toQuery({ search, status: statuses });
-  const listQs = toQuery({ page, limit: PAGE_SIZE, search, status: statuses });
+  const filterQs = toQuery({ search, status: statuses, year: year ?? undefined });
+  const listQs = toQuery({ page, limit: PAGE_SIZE, search, status: statuses, year: year ?? undefined });
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['sap-purchase-requests', listQs],
@@ -74,7 +81,7 @@ export default function SapRequestsTab({ initialStatus = [] }: { initialStatus?:
 
   const requests = data?.data ?? [];
   const meta = data?.meta;
-  const hasFilters = !!search || statuses.length > 0;
+  const hasFilters = !!search || statuses.length > 0 || !!year;
   const canSeeIntegrations = hasRole(...PURCHASE_ADMIN_ROLES, 'executive');
   const summary = summaryQ.data?.purchaseRequests;
   const chips = SAP_STATUS_OPTIONS.map((opt) => ({

@@ -387,10 +387,13 @@ export interface MaximoPurchaseOrder {
   ab_tipocomp: string | null;
   ab_clasfpo: string | null;
   requested_by: string | null;
+  /** D6 (2026-09-23): nombre según los alias de Maximo; null = sin alias (se muestra el código). */
+  requested_by_name: string | null;
   department: string | null;
   approved_at: string | null;
   /** Usuario Maximo que aprobó (sprint 2026-09-22, B3); null si no aplica. */
   approved_by: string | null;
+  approved_by_name: string | null;
   /** Primer WAPPR; approved_at − waiting_approval_at = días de aprobación. */
   waiting_approval_at: string | null;
   created_at_source: string | null;
@@ -428,12 +431,20 @@ export interface MaximoContract {
   vendor_id: string | null;
   vendor_name: string | null;
   requested_by: string | null;
+  requested_by_name: string | null;
   department: string | null;
   approved_at: string | null;
   approved_by: string | null;
+  approved_by_name: string | null;
   created_at_source: string | null;
   contract_ref_num: string | null;
   contract_value: number | null;
+  /** D7: monto de la PR; null = la Object Structure no lo expone ("No disponible"). */
+  pr_total: number | null;
+  /** D8: consumido del contrato; null = no expuesto por la OS. */
+  consumed_value: number | null;
+  /** D8: valor − consumido; null si falta alguno (nunca 0). */
+  balance_value: number | null;
   purchview_count: number;
   has_contract: boolean;
   last_changed_at: string | null;
@@ -520,6 +531,8 @@ export interface MaximoSummaryLastRun {
 
 export interface MaximoSummary {
   syncEnabled: boolean;
+  /** D4: año aplicado (null = todo). */
+  year: number | null;
   purchaseOrders: { total: number; byStatus: MaximoStatusCount[] };
   contracts: {
     total: number;
@@ -557,8 +570,17 @@ export const MAXIMO_STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Borrador',
 };
 
+/**
+ * D2 (2026-09-23): las PR de Maximo sin contrato no traen estatus porque la
+ * Object Structure AB_CONTRATOS no expone el de la PR (pendiente CIISA) —
+ * no es un error de la plataforma, por eso se nombra explícitamente.
+ */
+export const MAXIMO_NO_STATUS_LABEL = 'Sin estatus en Maximo';
+export const MAXIMO_NO_STATUS_HINT =
+  'La Object Structure de Maximo (AB_CONTRATOS) no expone el estatus de la solicitud sin contrato; pedido a CIISA. Las pendientes (WAPPR/PNDREV) sí cuentan.';
+
 export function maximoStatusLabel(status: string | null): string {
-  return (status && MAXIMO_STATUS_LABELS[status]) || (status ?? 'Sin estatus');
+  return (status && MAXIMO_STATUS_LABELS[status]) || (status ?? MAXIMO_NO_STATUS_LABEL);
 }
 
 /** Colores de gráfica por estatus (mismo criterio que los badges). */
@@ -856,6 +878,8 @@ export interface ExpeditingItem {
   po_status: string | null;
   currency: string | null;
   requested_by: string | null;
+  /** D1: OC de SAP que nació en Maximo (se muestra una sola vez, con este badge). */
+  maximo_ponum: string | null;
   supplier: { id: string | null; legal_name: string; email: string | null } | null;
   buyer: { id: string; full_name: string | null; email: string } | null;
   requisition: { id: string; rq_number: string } | null;
@@ -1002,7 +1026,9 @@ export interface SapPurchaseOrder {
   created_by_name: string | null;
   /** PONUM de Maximo si la OC la creó la integración Maximo → SAP. */
   maximo_ponum: string | null;
-  /** Solicitante en Maximo (REQUESTEDBY de su PR). */
+  /** D1: la OC migrada existe en el staging de Maximo (se cuenta una vez en los totales). */
+  maximo_po_exists: boolean;
+  /** Solicitante en Maximo (REQUESTEDBY de su PR; nombre si hay alias, D6). */
   maximo_requested_by: string | null;
   base_request_entries: number[];
   /** Solicitantes de las solicitudes de las que nació la OC (vacío = sin solicitud). */
@@ -1137,6 +1163,10 @@ export interface SapEntitySummary {
 
 export interface SapSummary {
   syncEnabled: boolean;
+  /** D4: año aplicado (null = todo). */
+  year: number | null;
+  /** D1: OC creadas desde Maximo (NumAtCard = PONUM) y cuántas existen allá. */
+  migradas: { total: number; en_maximo: number };
   purchaseOrders: SapEntitySummary;
   purchaseRequests: SapEntitySummary;
   approvalRequests: { total: number; pending: number };
@@ -1211,6 +1241,8 @@ export interface DashboardSourceOrders {
   monto_por_moneda: CurrencyAmount[];
 }
 export interface DashboardSummary {
+  /** D4: año aplicado (null = todo). */
+  anio: number | null;
   solicitudes: {
     total: number;
     pendientes: number;
@@ -1222,33 +1254,91 @@ export interface DashboardSummary {
     maximo_ordenes: number | null;
     abent_requisiciones: number | null;
   };
+  /** D3: base del promedio de SAP OC (N visible). */
+  dias_gestion_base: {
+    sap_ordenes: { total: number; descartadas: number; definicion: string };
+  };
   ordenes: {
     total: number;
     monto_por_moneda: CurrencyAmount[];
     por_fuente: { sap: DashboardSourceOrders; maximo: DashboardSourceOrders; abent: DashboardSourceOrders };
+    /** D1: OC de SAP creadas desde Maximo; `en_maximo` = descontadas del total. */
+    migradas: { total: number; en_maximo: number };
   };
   por_recibir: {
     total: number;
     monto_por_moneda: CurrencyAmount[];
     por_fuente: { sap: DashboardSourceOrders; maximo: DashboardSourceOrders; abent: DashboardSourceOrders };
   };
+  /** D4: desde cuándo hay datos y última sincronización exitosa. */
+  datos: {
+    sap_desde: string | null;
+    maximo_desde: string | null;
+    ultima_sync: { sap: string | null; maximo: string | null };
+    anios: number[];
+  };
   fuentes: { sap_sync_enabled: boolean; maximo_sync_enabled: boolean };
   generated_at: string;
 }
+
+/** D5 — GET /compras/dashboard/ordenes-kpis: ahorro acumulado y CAPEX/OPEX. */
+export interface OrdersKpiSource {
+  documentos: number;
+  por_moneda: CurrencyAmount[];
+}
+export interface OrdersKpis {
+  anio: number | null;
+  ahorro: {
+    disponible: boolean;
+    documentos: number;
+    por_moneda: CurrencyAmount[];
+    por_fuente: { sap: OrdersKpiSource; maximo: OrdersKpiSource };
+    nota: string;
+  };
+  clasificacion: {
+    disponible: boolean;
+    capex: { por_moneda: CurrencyAmount[]; documentos: number; por_fuente: { sap: OrdersKpiSource; maximo: OrdersKpiSource } };
+    opex: { por_moneda: CurrencyAmount[]; documentos: number; por_fuente: { sap: OrdersKpiSource; maximo: OrdersKpiSource } };
+    nota: string;
+  };
+  generated_at: string;
+}
+
+/** D6 — equivalencias de usuarios de SAP/Maximo (/compras/erp-aliases). */
+export type ErpAliasSystem = 'sap' | 'maximo';
+export interface ErpAlias {
+  id: string;
+  system: ErpAliasSystem;
+  code: string;
+  display_name: string;
+  profile_id: string | null;
+  profile: { full_name: string | null; email: string } | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+export const ERP_ALIAS_SYSTEM_LABELS: Record<ErpAliasSystem, string> = {
+  sap: 'SAP',
+  maximo: 'Maximo',
+};
 
 /** GET /compras/reportes/tiempos-aprobacion */
 export interface ApprovalTimesReport {
   maximo: {
     ordenes: { promedio_dias: number | null; total: number };
-    ordenes_por_aprobador: Array<{ aprobador: string; promedio_dias: number; total: number }>;
+    /** `aprobador` = nombre (alias D6) o el usuario de Maximo; `usuario` = código. */
+    ordenes_por_aprobador: Array<{ aprobador: string; usuario: string | null; promedio_dias: number; total: number }>;
     contratos: { promedio_dias: number | null; total: number };
   };
   sap: {
+    /** D3: gestión de OC = fecha de la OC − fecha de su solicitud de pedido. */
+    gestion_oc: { promedio_dias: number | null; total: number; descartadas: number; definicion: string };
     solicitudes_autorizadas: { promedio_dias: number | null; total: number };
-    por_aprobador: Array<{ aprobador: string; promedio_dias: number; total: number }>;
+    por_aprobador: Array<{ aprobador: string; usuario: string | null; promedio_dias: number; total: number }>;
     pendientes: { total: number; dias_esperando_promedio: number | null };
     pendientes_por_aprobador: Array<{
       aprobador: string;
+      usuario: string | null;
       pendientes: number;
       dias_esperando_max: number | null;
       dias_esperando_promedio: number | null;
@@ -1259,7 +1349,14 @@ export interface ApprovalTimesReport {
     dias_esperando_max: number | null;
     dias_esperando_promedio: number | null;
   };
-  abent_niveles: Array<{ level: number; role: string; aprobadores: string[] }>;
+  /** D6: `erp_usuarios` = usuarios SAP/Maximo ligados a los perfiles del nivel; `sap_pendientes` = autorizaciones que tienen en SAP. */
+  abent_niveles: Array<{
+    level: number;
+    role: string;
+    aprobadores: string[];
+    erp_usuarios: Array<{ system: ErpAliasSystem; code: string }>;
+    sap_pendientes: number;
+  }>;
 }
 
 // Estatus de documento de SAP (bost_*): etiquetas y colores conocidos;

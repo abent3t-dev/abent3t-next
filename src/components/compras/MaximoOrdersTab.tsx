@@ -30,6 +30,8 @@ import ExportExcelButton from './ExportExcelButton';
  *
  * Sprint 2026-09-22: filtro multi-estatus (A5), chips (A4), export (B1),
  * filtro inicial desde la URL (clic en un pie del dashboard, A2).
+ * Bloque 2026-09-23: D4 año; D1 búsqueda inicial por PONUM (link desde la
+ * OC de SAP migrada); D6 solicitante con nombre si hay alias.
  */
 
 const PAGE_SIZE = 15;
@@ -69,9 +71,19 @@ const formatDate = (date: string | null) =>
     ? new Date(date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
     : '—';
 
-export default function MaximoOrdersTab({ initialStatus = [] }: { initialStatus?: string[] }) {
+export default function MaximoOrdersTab({
+  initialStatus = [],
+  initialSearch = '',
+  year = null,
+}: {
+  initialStatus?: string[];
+  /** D1: PONUM prefiltrado desde el detalle de una OC de SAP migrada. */
+  initialSearch?: string;
+  /** D4: año (created_at_source), lo controla la página de Órdenes. */
+  year?: number | null;
+}) {
   const { hasRole } = useAuth();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
   const [statuses, setStatuses] = useState<string[]>(initialStatus);
   const [clasfFilter, setClasfFilter] = useState('');
   const [approvedFrom, setApprovedFrom] = useState('');
@@ -85,6 +97,7 @@ export default function MaximoOrdersTab({ initialStatus = [] }: { initialStatus?
     ab_clasfpo: clasfFilter,
     approved_from: approvedFrom,
     approved_to: approvedTo,
+    year: year ?? undefined,
   };
   const filterQs = toQuery(filters);
   const listQs = toQuery({ page, limit: PAGE_SIZE, ...filters });
@@ -94,13 +107,13 @@ export default function MaximoOrdersTab({ initialStatus = [] }: { initialStatus?
     queryFn: () => api.get<PaginatedResponse<MaximoPurchaseOrder>>(`/maximo/purchase-orders?${listQs}`),
   });
   const summaryQ = useQuery({
-    queryKey: ['maximo', 'summary'],
-    queryFn: () => api.get<MaximoSummary>('/maximo/summary'),
+    queryKey: ['maximo', 'summary', year],
+    queryFn: () => api.get<MaximoSummary>(`/maximo/summary${year ? `?year=${year}` : ''}`),
   });
 
   const orders = data?.data ?? [];
   const meta = data?.meta;
-  const hasFilters = !!search || statuses.length > 0 || !!clasfFilter || !!approvedFrom || !!approvedTo;
+  const hasFilters = !!search || statuses.length > 0 || !!clasfFilter || !!approvedFrom || !!approvedTo || !!year;
   const canSeeIntegrations = hasRole(...PURCHASE_ADMIN_ROLES, 'executive');
   const summary = summaryQ.data?.purchaseOrders;
   const chips = (summary?.byStatus ?? [])
@@ -202,6 +215,7 @@ export default function MaximoOrdersTab({ initialStatus = [] }: { initialStatus?
                     <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase whitespace-nowrap">Estatus</th>
                     <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase whitespace-nowrap">Proveedor</th>
                     <th className="px-3 py-3 text-right text-xs font-medium text-white uppercase whitespace-nowrap">Monto</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase whitespace-nowrap">Solicitante</th>
                     <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase whitespace-nowrap">Depto.</th>
                     <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase whitespace-nowrap">Clasif.</th>
                     <th className="px-3 py-3 text-right text-xs font-medium text-white uppercase whitespace-nowrap">Ahorro</th>
@@ -231,6 +245,9 @@ export default function MaximoOrdersTab({ initialStatus = [] }: { initialStatus?
                       <td className="px-3 py-3 text-sm text-gray-900 text-right font-medium">
                         {formatMoney(po.total_cost, po.currency)}
                       </td>
+                      <td className="px-3 py-3 text-sm text-gray-700 max-w-36 truncate" title={po.requested_by ?? undefined}>
+                        {po.requested_by_name ?? dash(po.requested_by)}
+                      </td>
                       <td className="px-3 py-3 text-sm text-gray-600">{dash(po.department)}</td>
                       <td className="px-3 py-3 text-center text-sm text-gray-600">
                         {po.ab_clasfpo === null ? <NotAvailable /> : po.ab_clasfpo}
@@ -243,7 +260,7 @@ export default function MaximoOrdersTab({ initialStatus = [] }: { initialStatus?
                   ))}
                   {orders.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
                         No hay órdenes de Maximo que coincidan con los filtros
                       </td>
                     </tr>

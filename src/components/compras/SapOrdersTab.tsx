@@ -35,7 +35,39 @@ import ExportExcelButton from './ExportExcelButton';
  * y solicitante. SAP no trae solicitante en la OC: sale de la solicitud de
  * pedido de la que nació; las OC que crea la integración con Maximo traen
  * el solicitante de Maximo; si no hay ninguno, se muestra quién la capturó.
+ *
+ * Bloque 2026-09-23: D1 columna/badge "Origen" (SAP / Migrada de Maximo
+ * con su PO) + filtro de origen; D4 año (desde el dashboard o los chips).
  */
+
+const ORIGIN_OPTIONS: Array<{ value: 'sap' | 'maximo' | ''; label: string }> = [
+  { value: '', label: 'Origen: todos' },
+  { value: 'sap', label: 'Capturadas en SAP' },
+  { value: 'maximo', label: 'Migradas de Maximo' },
+];
+
+/** D1: badge de origen de la OC. */
+function OriginBadge({ po }: { po: SapPurchaseOrder }) {
+  if (po.maximo_ponum === null) {
+    return <span className="inline-flex px-2 py-0.5 text-[11px] font-semibold rounded bg-[#222D59]/10 text-[#222D59]">SAP</span>;
+  }
+  const exists = po.maximo_po_exists;
+  return (
+    <span
+      className={`inline-flex flex-col items-start px-2 py-0.5 text-[11px] font-semibold rounded leading-tight ${
+        exists ? 'bg-[#DFA922]/20 text-[#8a6a10]' : 'bg-gray-100 text-gray-600'
+      }`}
+      title={
+        exists
+          ? `OC creada en SAP por la integración desde Maximo (PO ${po.maximo_ponum}). En los totales combinados se cuenta una sola vez.`
+          : `Referencia a Maximo (${po.maximo_ponum}) que no existe en el staging de Maximo: se cuenta como OC de SAP.`
+      }
+    >
+      <span>{exists ? 'Migrada de Maximo' : 'Ref. Maximo'}</span>
+      <span className="font-mono font-normal">{po.maximo_ponum}</span>
+    </span>
+  );
+}
 
 const PAGE_SIZE = 15;
 
@@ -84,11 +116,11 @@ function RequesterCell({ po }: { po: SapPurchaseOrder }) {
   }
   if (po.maximo_ponum) {
     return (
-      <div className="leading-tight max-w-40" title={`OC creada desde Maximo (${po.maximo_ponum})`}>
+      <div className="leading-tight max-w-40" title={`OC creada desde Maximo (${po.maximo_ponum}); solicitante según Maximo`}>
         <span className={`block truncate ${po.maximo_requested_by ? 'text-gray-900' : 'text-gray-500'}`}>
           {po.maximo_requested_by ?? 'Ver en Maximo'}
         </span>
-        <span className="block text-xs text-gray-500">Maximo {po.maximo_ponum}</span>
+        <span className="block text-xs text-gray-500">según Maximo</span>
       </div>
     );
   }
@@ -110,30 +142,42 @@ const formatDate = (date: string | null) =>
     ? new Date(date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
     : '—';
 
-export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: string[] }) {
+export default function SapOrdersTab({
+  initialStatus = [],
+  initialOrigin = '',
+  year = null,
+}: {
+  initialStatus?: string[];
+  /** D1: filtro inicial de origen (desde el dashboard). */
+  initialOrigin?: 'sap' | 'maximo' | '';
+  /** D4: año (lo controla la página de Órdenes). */
+  year?: number | null;
+}) {
   const { hasRole } = useAuth();
   const [search, setSearch] = useState('');
   const [statuses, setStatuses] = useState<string[]>(initialStatus);
+  const [origin, setOrigin] = useState<'sap' | 'maximo' | ''>(initialOrigin);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
   const [detailDocEntry, setDetailDocEntry] = useState<number | null>(null);
 
-  const filterQs = toQuery({ search, status: statuses, from, to });
-  const listQs = toQuery({ page, limit: PAGE_SIZE, search, status: statuses, from, to });
+  const filters = { search, status: statuses, from, to, origin, year: year ?? undefined };
+  const filterQs = toQuery(filters);
+  const listQs = toQuery({ page, limit: PAGE_SIZE, ...filters });
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['sap-purchase-orders', listQs],
     queryFn: () => api.get<PaginatedResponse<SapPurchaseOrder>>(`/sap/purchase-orders?${listQs}`),
   });
   const summaryQ = useQuery({
-    queryKey: ['sap', 'summary'],
-    queryFn: () => api.get<SapSummary>('/sap/summary'),
+    queryKey: ['sap', 'summary', year],
+    queryFn: () => api.get<SapSummary>(`/sap/summary${year ? `?year=${year}` : ''}`),
   });
 
   const orders = data?.data ?? [];
   const meta = data?.meta;
-  const hasFilters = !!search || statuses.length > 0 || !!from || !!to;
+  const hasFilters = !!search || statuses.length > 0 || !!from || !!to || !!origin || !!year;
   const canSeeIntegrations = hasRole(...PURCHASE_ADMIN_ROLES, 'executive');
   const summary = summaryQ.data?.purchaseOrders;
   const chips = SAP_STATUS_OPTIONS.map((opt) => ({
@@ -165,6 +209,16 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
             value={statuses}
             onChange={(next) => { setStatuses(next); setPage(1); }}
           />
+          <select
+            value={origin}
+            onChange={(e) => { setOrigin(e.target.value as 'sap' | 'maximo' | ''); setPage(1); }}
+            title="Origen: capturada en SAP o creada por la integración desde Maximo"
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-sm text-gray-900 bg-white"
+          >
+            {ORIGIN_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
           <input
             type="date"
             value={from}
@@ -193,6 +247,15 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
           onToggleStatus={toggleStatus}
           loading={isLoading}
         />
+        {summaryQ.data && summaryQ.data.migradas.total > 0 && (
+          <p className="text-xs text-gray-600">
+            {summaryQ.data.migradas.total.toLocaleString('es-MX')} OC creadas desde Maximo
+            {summaryQ.data.migradas.en_maximo < summaryQ.data.migradas.total
+              ? ` (${summaryQ.data.migradas.en_maximo.toLocaleString('es-MX')} existen en Maximo; el resto son referencias manuales)`
+              : ''}
+            . El export con &quot;Migradas de Maximo&quot; sirve como lista de revisión.
+          </p>
+        )}
       </div>
 
       {/* Tabla */}
@@ -221,6 +284,7 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
                 <thead className="bg-[#424846]">
                   <tr>
                     <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Número</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase" title="SAP: capturada en SAP. Migrada de Maximo: creada por la integración con el PO de Maximo">Origen</th>
                     <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Proveedor</th>
                     <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Solicitante</th>
                     <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
@@ -255,6 +319,7 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
                         <td className="px-3 py-3">
                           <span className="font-mono font-medium text-[#222D59]">{dash(po.doc_num)}</span>
                         </td>
+                        <td className="px-3 py-3"><OriginBadge po={po} /></td>
                         <td className="px-3 py-3 text-sm text-gray-900 max-w-44 truncate" title={po.card_name ?? undefined}>{dash(po.card_name)}</td>
                         <td className="px-3 py-3 text-sm">
                           <RequesterCell po={po} />
@@ -295,7 +360,7 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
                   })}
                   {orders.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
                         No hay órdenes de SAP que coincidan con los filtros
                       </td>
                     </tr>

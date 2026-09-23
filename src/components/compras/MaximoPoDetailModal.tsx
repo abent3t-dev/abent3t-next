@@ -175,10 +175,27 @@ export default function MaximoPoDetailModal({
                     )
                   }
                 />
-                <Field label="Solicitado por" value={dash(current.requested_by)} />
+                <Field
+                  label="Solicitado por"
+                  value={
+                    current.requested_by_name
+                      ? <>{current.requested_by_name} <span className="text-xs text-gray-500">({current.requested_by})</span></>
+                      : dash(current.requested_by)
+                  }
+                />
                 <Field
                   label="Fecha aprobación"
                   value={formatDate(current.approved_at)}
+                />
+                <Field
+                  label="Aprobó"
+                  value={
+                    current.approved_by === null
+                      ? '—'
+                      : current.approved_by_name
+                        ? <>{current.approved_by_name} <span className="text-xs text-gray-500">({current.approved_by})</span></>
+                        : current.approved_by
+                  }
                 />
                 <Field
                   label="Fecha en Maximo"
