@@ -101,7 +101,7 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
             type="text"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Buscar por numero o proveedor..."
+            placeholder="Buscar por número o proveedor..."
             className="flex-1 min-w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
           />
           <StatusMultiSelect
@@ -114,14 +114,14 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
             value={from}
             onChange={(e) => { setFrom(e.target.value); setPage(1); }}
             title="Fecha documento desde"
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900"
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-sm text-gray-900"
           />
           <input
             type="date"
             value={to}
             onChange={(e) => { setTo(e.target.value); setPage(1); }}
             title="Fecha documento hasta"
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900"
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-sm text-gray-900"
           />
           <ExportExcelButton
             path={`/sap/purchase-orders/export${filterQs ? `?${filterQs}` : ''}`}
@@ -151,10 +151,10 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
           </div>
         ) : orders.length === 0 && !hasFilters ? (
           <div className="p-10 text-center space-y-2">
-            <p className="text-gray-500">Aun no hay ordenes sincronizadas desde SAP</p>
+            <p className="text-gray-500">Aún no hay órdenes sincronizadas desde SAP</p>
             {canSeeIntegrations && (
               <Link href="/compras/integraciones" className="text-sm text-[#52AF32] hover:underline">
-                Ver estado de la integracion
+                Ver estado de la integración
               </Link>
             )}
           </div>
@@ -164,14 +164,14 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
               <table className="w-full">
                 <thead className="bg-[#424846]">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Numero</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Proveedor</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Monto</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">F. Documento</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">F. Entrega</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Clasif. lineas</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Ahorro</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Número</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Proveedor</th>
+                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-white uppercase">Monto</th>
+                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">F. Documento</th>
+                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">F. Entrega</th>
+                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Clasif. líneas</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-white uppercase">Ahorro</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -183,21 +183,21 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
                         onClick={() => setDetailDocEntry(po.doc_entry)}
                         className={`cursor-pointer hover:bg-[#52AF32]/5 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                       >
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-3">
                           <span className="font-mono font-medium text-[#222D59]">{dash(po.doc_num)}</span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-900 max-w-64 truncate">{dash(po.card_name)}</td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-3 py-3 text-sm text-gray-900 max-w-44 truncate" title={po.card_name ?? undefined}>{dash(po.card_name)}</td>
+                        <td className="px-3 py-3 text-center">
                           <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${sapStatusBadgeClass(status)}`}>
                             {sapStatusLabel(status)}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">
+                        <td className="px-3 py-3 text-sm text-gray-900 text-right font-medium whitespace-nowrap">
                           {formatMoney(po.doc_total, po.currency)}
                         </td>
-                        <td className="px-4 py-3 text-center text-sm text-gray-600">{formatDate(po.doc_date)}</td>
-                        <td className="px-4 py-3 text-center text-sm text-gray-600">{formatDate(po.doc_due_date)}</td>
-                        <td className="px-4 py-3 text-center text-sm">
+                        <td className="px-3 py-3 text-center text-sm text-gray-600 whitespace-nowrap">{formatDate(po.doc_date)}</td>
+                        <td className="px-3 py-3 text-center text-sm text-gray-600 whitespace-nowrap">{formatDate(po.doc_due_date)}</td>
+                        <td className="px-3 py-3 text-center text-sm whitespace-nowrap">
                           {po.lines_total === 0 ? (
                             <span className="text-gray-400">—</span>
                           ) : po.lines_classified === 0 ? (
@@ -206,7 +206,7 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
                             <span className="text-gray-700">{po.lines_classified}/{po.lines_total}</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm text-right">
+                        <td className="px-3 py-3 text-sm text-right whitespace-nowrap">
                           {po.ahorro_total === null ? (
                             <span className="text-gray-400 italic">No disponible</span>
                           ) : (
@@ -219,7 +219,7 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
                   {orders.length === 0 && (
                     <tr>
                       <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
-                        No hay ordenes de SAP que coincidan con los filtros
+                        No hay órdenes de SAP que coincidan con los filtros
                       </td>
                     </tr>
                   )}
@@ -230,11 +230,11 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
             {meta && meta.totalPages > 1 && (
               <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
                 <div className="text-sm text-gray-500">
-                  Mostrando {(meta.page - 1) * meta.limit + 1} - {Math.min(meta.page * meta.limit, meta.total)} de {meta.total}
+                  Mostrando {((meta.page - 1) * meta.limit + 1).toLocaleString('es-MX')} - {Math.min(meta.page * meta.limit, meta.total).toLocaleString('es-MX')} de {meta.total.toLocaleString('es-MX')}
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setPage(page - 1)} disabled={!meta.hasPrev} className="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Anterior</button>
-                  <span className="text-sm text-gray-700">Pagina {meta.page} de {meta.totalPages}</span>
+                  <span className="text-sm text-gray-700">Página {meta.page} de {meta.totalPages}</span>
                   <button onClick={() => setPage(page + 1)} disabled={!meta.hasNext} className="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Siguiente</button>
                 </div>
               </div>

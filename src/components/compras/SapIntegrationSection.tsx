@@ -116,7 +116,7 @@ export default function SapIntegrationSection() {
       );
       if (res.runs.length > 0) {
         notify.success(
-          `Sincronizacion SAP aceptada: ${res.runs.map((r) => SAP_TARGET_LABELS[r.target]).join(', ')}`,
+          `Sincronización SAP aceptada: ${res.runs.map((r) => SAP_TARGET_LABELS[r.target]).join(', ')}`,
         );
       }
       for (const conflict of res.conflicts) {
@@ -129,7 +129,7 @@ export default function SapIntegrationSection() {
         notify.error('Ya hay una corrida en curso para ese objetivo');
       } else if (err instanceof ApiError && err.status === 503) {
         notify.info(
-          'Sincronizacion de SAP pendiente de activacion (configuracion del servidor)',
+          'Sincronización de SAP pendiente de activación (configuración del servidor)',
         );
       } else {
         notify.error(err instanceof Error ? err.message : 'Error al sincronizar');
@@ -156,8 +156,8 @@ export default function SapIntegrationSection() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <p className="text-sm text-blue-800">
-            Sincronizacion de SAP pendiente de activacion (configuracion del
-            servidor). Los datos apareceran aqui en cuanto se habilite.
+            Sincronización de SAP pendiente de activación (configuración del
+            servidor). Los datos aparecerán aquí en cuanto se habilite.
           </p>
         </div>
       )}
@@ -166,7 +166,7 @@ export default function SapIntegrationSection() {
       <div className="bg-white p-6 rounded-lg shadow">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <h3 className="text-lg font-semibold text-[#424846]">
-            SAP Business One — estado de la sincronizacion
+            SAP Business One — estado de la sincronización
           </h3>
           {isAdmin && (
             <div className="flex items-center gap-2">
@@ -176,7 +176,7 @@ export default function SapIntegrationSection() {
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900 bg-white"
               >
                 <option value="all">Todo</option>
-                <option value="purchase_orders">Ordenes (OC)</option>
+                <option value="purchase_orders">{SAP_TARGET_LABELS.purchase_orders}</option>
                 <option value="purchase_requests">Solicitudes de Pedido</option>
                 <option value="business_partners">Proveedores</option>
                 <option value="approval_requests">Cola de autorización</option>
@@ -187,7 +187,7 @@ export default function SapIntegrationSection() {
                 title="auto = incremental si ya hay datos"
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900 bg-white"
               >
-                <option value="auto">Modo automatico</option>
+                <option value="auto">Modo automático</option>
                 <option value="incremental">Incremental</option>
                 <option value="full">Completa</option>
               </select>
@@ -196,8 +196,8 @@ export default function SapIntegrationSection() {
                 disabled={!enabled || triggering}
                 title={
                   enabled
-                    ? 'Disparar sincronizacion manual'
-                    : 'Sincronizacion pendiente de activacion (configuracion del servidor)'
+                    ? 'Disparar sincronización manual'
+                    : 'Sincronización pendiente de activación (configuración del servidor)'
                 }
                 className="px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#52AF32]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
@@ -218,7 +218,7 @@ export default function SapIntegrationSection() {
             <div>
               <p className="text-xs text-gray-500 uppercase">Habilitada</p>
               <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${status.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700'}`}>
-                {status.enabled ? 'Si' : 'No'}
+                {status.enabled ? 'Sí' : 'No'}
               </span>
             </div>
             <div>
@@ -226,7 +226,7 @@ export default function SapIntegrationSection() {
               <p className="text-sm text-gray-900">cada {status.intervalMinutes} min</p>
             </div>
             <div className="md:col-span-2">
-              <p className="text-xs text-gray-500 uppercase">Tamano de pagina</p>
+              <p className="text-xs text-gray-500 uppercase">Tamaño de página</p>
               <p className="text-sm text-gray-900">{status.pageSize} documentos</p>
             </div>
             {(
@@ -247,7 +247,7 @@ export default function SapIntegrationSection() {
                         </span>
                       )}
                       <span className="text-xs text-gray-500">
-                        {status.counts[t]} registros sincronizados
+                        {status.counts[t].toLocaleString('es-MX')} registros sincronizados
                       </span>
                     </div>
                   </div>
@@ -258,13 +258,16 @@ export default function SapIntegrationSection() {
                         {SAP_RUN_MODE_LABELS[lastRun.mode]}
                       </span>
                       <span>{formatDateTime(lastRun.started_at)}</span>
-                      <span className="text-xs text-gray-400">
+                      <span
+                        className="text-xs text-gray-500"
+                        title="insertados / actualizados / sin cambio / fallidos"
+                      >
                         +{lastRun.records_inserted} / ~{lastRun.records_updated} /
                         ={lastRun.records_unchanged} / !{lastRun.records_failed}
                       </span>
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-400">Sin corridas registradas</p>
+                    <p className="text-sm text-gray-500">Sin corridas registradas</p>
                   )}
                 </div>
               );
@@ -287,7 +290,7 @@ export default function SapIntegrationSection() {
           </div>
         ) : runs.length === 0 ? (
           <p className="px-6 py-8 text-center text-gray-500">
-            Aun no hay corridas de sincronizacion
+            Aún no hay corridas de sincronización
           </p>
         ) : (
           <>
@@ -295,14 +298,14 @@ export default function SapIntegrationSection() {
               <table className="w-full">
                 <thead className="bg-[#424846]">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Objetivo</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Disparo</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Modo</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Inicio</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Duracion</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estado</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase" title="descargados / insertados / actualizados / sin cambio / fallidos">Registros</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Detalle</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Objetivo</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Disparo</th>
+                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Modo</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Inicio</th>
+                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Duración</th>
+                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Estado</th>
+                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase" title="descargados / insertados / actualizados / sin cambio / fallidos">Registros</th>
+                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Detalle</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -326,7 +329,7 @@ export default function SapIntegrationSection() {
             {runsMeta && runsMeta.totalPages > 1 && (
               <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
                 <div className="text-sm text-gray-500">
-                  Pagina {runsMeta.page} de {runsMeta.totalPages} ({runsMeta.total} corridas)
+                  Página {runsMeta.page} de {runsMeta.totalPages} ({runsMeta.total} corridas)
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -369,28 +372,28 @@ function SapRunRow({
   return (
     <>
       <tr className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-        <td className="px-4 py-3 text-sm text-gray-900">
+        <td className="px-3 py-3 text-sm text-gray-900">
           {SAP_TARGET_LABELS[run.target]}
         </td>
-        <td className="px-4 py-3 text-sm text-gray-600">
-          {run.triggered_by === 'cron' ? 'Automatico' : 'Manual'}
+        <td className="px-3 py-3 text-sm text-gray-600">
+          {run.triggered_by === 'cron' ? 'Automático' : 'Manual'}
         </td>
-        <td className="px-4 py-3 text-center text-sm text-gray-600">
+        <td className="px-3 py-3 text-center text-sm text-gray-600">
           {SAP_RUN_MODE_LABELS[run.mode]}
         </td>
-        <td className="px-4 py-3 text-sm text-gray-600">
-          {formatDateTime(run.started_at)}
+        <td className="px-3 py-3 text-sm text-gray-600 whitespace-pre">
+          {formatDateTime(run.started_at).replace(', ', '\n')}
         </td>
-        <td className="px-4 py-3 text-center text-sm text-gray-600">
+        <td className="px-3 py-3 text-center text-sm text-gray-600">
           {formatDuration(run.started_at, run.finished_at)}
         </td>
-        <td className="px-4 py-3 text-center">
+        <td className="px-3 py-3 text-center">
           <RunBadge status={run.status} />
         </td>
-        <td className="px-4 py-3 text-center text-sm text-gray-600 font-mono whitespace-nowrap">
+        <td className="px-3 py-3 text-center text-sm text-gray-600 font-mono whitespace-nowrap">
           {run.records_fetched} / +{run.records_inserted} / ~{run.records_updated} / ={run.records_unchanged} / !{run.records_failed}
         </td>
-        <td className="px-4 py-3 text-center">
+        <td className="px-3 py-3 text-center">
           {hasDetail && (
             <button
               onClick={onToggle}

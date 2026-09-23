@@ -30,9 +30,9 @@ const TAB_IDS: OrdersTab[] = ['abent', 'maximo_po', 'sap_po'];
 const STATUS_OPTIONS = Object.entries(PO_STATUS_LABELS).map(([value, label]) => ({ value, label }));
 
 const ORDER_TABS: { id: OrdersTab; label: string }[] = [
-  { id: 'abent', label: 'Ordenes ABENT' },
-  { id: 'maximo_po', label: 'Ordenes Maximo' },
-  { id: 'sap_po', label: 'Ordenes SAP' },
+  { id: 'abent', label: 'Órdenes ABENT' },
+  { id: 'maximo_po', label: 'Órdenes Maximo' },
+  { id: 'sap_po', label: 'Órdenes SAP' },
 ];
 
 interface PaginatedResponse {
@@ -87,6 +87,7 @@ const getStatusBadgeClass = (status: POStatus) => {
     orange: 'bg-orange-100 text-orange-800',
     green: 'bg-green-100 text-green-800',
     red: 'bg-red-100 text-red-800',
+    indigo: 'bg-indigo-100 text-indigo-800',
   };
   return colorMap[PO_STATUS_COLORS[status]] || 'bg-gray-100 text-gray-800';
 };
@@ -147,8 +148,8 @@ function OrdenesPageInner({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#424846]">Ordenes de Compra (PO)</h1>
-          <p className="text-gray-500">Gestiona las ordenes de compra emitidas</p>
+          <h1 className="text-2xl font-bold text-[#424846]">Órdenes de Compra (PO)</h1>
+          <p className="text-gray-500">Gestiona las órdenes de compra emitidas</p>
         </div>
         {activeTab === 'abent' && canEdit && (
           <button
@@ -206,7 +207,7 @@ function OrdenesPageInner({
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              placeholder="Buscar por numero de PO..."
+              placeholder="Buscar por número de PO..."
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
             />
           </div>
@@ -324,7 +325,7 @@ function OrdenesPageInner({
                 {orders.length === 0 && (
                   <tr>
                     <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
-                      No hay ordenes de compra que coincidan con los filtros
+                      No hay órdenes de compra que coincidan con los filtros
                     </td>
                   </tr>
                 )}
@@ -346,7 +347,7 @@ function OrdenesPageInner({
                     {Icons.chevronLeft}
                   </button>
                   <span className="text-sm text-gray-700">
-                    Pagina {meta.page} de {meta.totalPages}
+                    Página {meta.page} de {meta.totalPages}
                   </span>
                   <button
                     onClick={() => setPage(page + 1)}

@@ -234,10 +234,10 @@ export const SIDEBAR_NAV: NavItem[] = [
       { label: 'Solicitudes (RQ)', href: '/compras/solicitudes', icon: 'file-text', roles: ROLE_PRIORITY },
       { label: 'Aprobaciones', href: '/compras/aprobaciones', icon: 'check-circle', roles: ROLE_PRIORITY },
       // §16: comite semanal con cadena de aprobacion
-      { label: 'Comite', href: '/compras/comite', icon: 'landmark', roles: ROLE_PRIORITY },
-      { label: 'Ordenes (PO)', href: '/compras/ordenes', icon: 'clipboard', roles: ROLE_PRIORITY },
+      { label: 'Comité', href: '/compras/comite', icon: 'landmark', roles: ROLE_PRIORITY },
+      { label: 'Órdenes (PO)', href: '/compras/ordenes', icon: 'clipboard', roles: ROLE_PRIORITY },
       // Expeditación: seguimiento de entregas
-      { label: 'Expeditacion', href: '/compras/expeditacion', icon: 'truck', roles: ROLE_PRIORITY },
+      { label: 'Expeditación', href: '/compras/expeditacion', icon: 'truck', roles: ROLE_PRIORITY },
       // §15: repositorio documental de contratos, consulta para todos
       { label: 'Contratos', href: '/compras/contratos', icon: 'file-check', roles: ROLE_PRIORITY },
       { label: 'Proveedores', href: '/compras/proveedores', icon: 'truck', roles: ROLE_PRIORITY },
@@ -313,7 +313,7 @@ export const SIDEBAR_NAV: NavItem[] = [
 export const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: 'Super Administrador',
   admin_rh: 'Administrador RRHH',
-  jefe_area: 'Jefe de Area',
+  jefe_area: 'Jefe de Área',
   director: 'Director',
   colaborador: 'Colaborador',
   collaborator: 'Colaborador',
@@ -321,7 +321,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   // Roles de Compras
   comprador: 'Comprador',
   coordinador_compras: 'Coordinador de Compras',
-  lider_procura: 'Lider de Procura',
+  lider_procura: 'Líder de Procura',
   aprobador_nivel_1: 'Aprobador Nivel 1',
   aprobador_nivel_2: 'Aprobador Nivel 2',
   aprobador_nivel_3: 'Aprobador Nivel 3',

@@ -97,9 +97,9 @@ export default function ComitePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#424846]">Comite de Compras</h1>
+          <h1 className="text-2xl font-bold text-[#424846]">Comité de Compras</h1>
           <p className="text-gray-500">
-            Sesiones semanales con cadena de aprobacion y trazabilidad
+            Sesiones semanales con cadena de aprobación y trazabilidad
           </p>
         </div>
         {canEdit && (
@@ -110,7 +110,7 @@ export default function ComitePage() {
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Nuevo Comite
+            Nuevo Comité
           </button>
         )}
       </div>
@@ -118,10 +118,9 @@ export default function ComitePage() {
       {/* Aviso discreto: mapeo pendiente de confirmar (regla 1 de la fase) */}
       {isAdmin && unconfirmed.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
-          La cadena de aprobacion tiene {unconfirmed.length} nivel(es) sin
-          confirmar con Ingrid (Gilberto vs David; Felix:
-          director_general/cfo). El flujo opera con el mapeo propuesto; al
-          confirmarse se actualiza por datos, sin deploy.
+          La cadena de aprobación tiene {unconfirmed.length}{' '}
+          {unconfirmed.length === 1 ? 'nivel pendiente' : 'niveles pendientes'} de
+          confirmar; mientras tanto, el flujo opera con la asignación propuesta.
         </div>
       )}
 
@@ -135,7 +134,7 @@ export default function ComitePage() {
               setSearch(e.target.value);
               setPage(1);
             }}
-            placeholder="Buscar por numero o titulo..."
+            placeholder="Buscar por número o título..."
             disabled={onlyMine}
             className="flex-1 min-w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"
           />
@@ -177,10 +176,10 @@ export default function ComitePage() {
           </div>
         ) : committees.length === 0 && !hasFilters ? (
           <div className="p-10 text-center space-y-2">
-            <p className="text-gray-500">Aun no hay comites registrados</p>
+            <p className="text-gray-500">Aún no hay comités registrados</p>
             {canEdit && (
-              <p className="text-sm text-gray-400">
-                Usa &quot;Nuevo Comite&quot; para crear la primera sesion
+              <p className="text-sm text-gray-500">
+                Usa &quot;Nuevo Comité&quot; para crear la primera sesión
               </p>
             )}
           </div>
@@ -190,10 +189,10 @@ export default function ComitePage() {
               <table className="w-full">
                 <thead className="bg-[#424846]">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Numero</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Titulo</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Número</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Título</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Fecha</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Version</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Versión</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Autor</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Acciones</th>
@@ -252,8 +251,8 @@ export default function ComitePage() {
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                         {onlyMine
-                          ? 'No tienes comites esperando tu aprobacion'
-                          : 'No hay comites que coincidan con los filtros'}
+                          ? 'No tienes comités esperando tu aprobación'
+                          : 'No hay comités que coincidan con los filtros'}
                       </td>
                     </tr>
                   )}
@@ -276,7 +275,7 @@ export default function ComitePage() {
                     Anterior
                   </button>
                   <span className="text-sm text-gray-700">
-                    Pagina {meta.page} de {meta.totalPages}
+                    Página {meta.page} de {meta.totalPages}
                   </span>
                   <button
                     onClick={() => setPage(page + 1)}

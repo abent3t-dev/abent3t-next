@@ -124,7 +124,7 @@ export default function MaximoContractsTab({ initialStatus = [] }: { initialStat
           <select
             value={hasContractFilter}
             onChange={(e) => { setHasContractFilter(e.target.value); setPage(1); }}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900 bg-white"
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#52AF32] text-gray-900 bg-white"
           >
             <option value="">Con y sin contrato</option>
             <option value="true">Con contrato</option>
@@ -157,10 +157,10 @@ export default function MaximoContractsTab({ initialStatus = [] }: { initialStat
           </div>
         ) : contracts.length === 0 && !hasFilters ? (
           <div className="p-10 text-center space-y-2">
-            <p className="text-gray-500">Aun no hay datos sincronizados desde Maximo</p>
+            <p className="text-gray-500">Aún no hay datos sincronizados desde Maximo</p>
             {canSeeIntegrations && (
               <Link href="/compras/integraciones" className="text-sm text-[#52AF32] hover:underline">
-                Ver estado de la integracion
+                Ver estado de la integración
               </Link>
             )}
           </div>
@@ -197,14 +197,14 @@ export default function MaximoContractsTab({ initialStatus = [] }: { initialStat
                           {contract.has_contract ? (
                             <span className="font-mono text-gray-900">{dash(contract.contractnum)}</span>
                           ) : (
-                            <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
+                            <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap bg-gray-100 text-gray-600">
                               Sin contrato
                             </span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span
-                            className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${maximoStatusBadgeClass(contract.status)}`}
+                            className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full whitespace-nowrap ${maximoStatusBadgeClass(contract.status)}`}
                             title={contract.status ?? undefined}
                           >
                             {maximoStatusLabel(contract.status)}
@@ -217,7 +217,9 @@ export default function MaximoContractsTab({ initialStatus = [] }: { initialStat
                         <td className="px-4 py-3 text-center text-sm text-gray-600">{dash(contract.currency)}</td>
                         <td className="px-4 py-3 text-center text-sm text-gray-600">
                           <span className="whitespace-nowrap">
-                            {formatDate(contract.start_date)} – {formatDate(contract.end_date)}
+                            {!contract.start_date && !contract.end_date
+                              ? '—'
+                              : `${formatDate(contract.start_date)} – ${formatDate(contract.end_date)}`}
                           </span>
                           {expiresSoon(contract.end_date) && (
                             <span className="ml-2 inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800">
@@ -253,7 +255,7 @@ export default function MaximoContractsTab({ initialStatus = [] }: { initialStat
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setPage(page - 1)} disabled={!meta.hasPrev} className="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Anterior</button>
-                  <span className="text-sm text-gray-700">Pagina {meta.page} de {meta.totalPages}</span>
+                  <span className="text-sm text-gray-700">Página {meta.page} de {meta.totalPages}</span>
                   <button onClick={() => setPage(page + 1)} disabled={!meta.hasNext} className="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Siguiente</button>
                 </div>
               </div>

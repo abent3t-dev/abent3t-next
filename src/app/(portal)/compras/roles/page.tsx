@@ -99,8 +99,8 @@ export default function ComprasRolesPage() {
       <div>
         <h1 className="text-2xl font-bold text-[#424846]">Roles de Compras</h1>
         <p className="text-gray-500">
-          Asigna o revoca los roles del modulo de Compras. Cualquier usuario ya
-          puede consultar el modulo; el rol define que acciones puede realizar.
+          Asigna o revoca los roles del módulo de Compras. Cualquier usuario ya
+          puede consultar el módulo; el rol define qué acciones puede realizar.
         </p>
       </div>
 
@@ -144,14 +144,14 @@ export default function ComprasRolesPage() {
               {users.map((u, idx) => (
                 <tr key={u.id} className={`hover:bg-[#52AF32]/5 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                   <td className="px-4 py-3">
-                    <p className="font-medium text-gray-900">{u.full_name || '-'}</p>
+                    <p className="font-medium text-gray-900">{u.full_name || '—'}</p>
                     <p className="text-sm text-gray-500">{u.email}</p>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{u.position || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{u.department || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{u.position || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{u.department || '—'}</td>
                   <td className="px-4 py-3">
                     {u.purchase_roles.length === 0 ? (
-                      <span className="text-sm text-gray-400">Sin rol (solo consulta)</span>
+                      <span className="text-sm text-gray-500">Sin rol (solo consulta)</span>
                     ) : (
                       <div className="flex flex-wrap gap-1">
                         {u.purchase_roles.map((role) => (
@@ -182,7 +182,7 @@ export default function ComprasRolesPage() {
               {users.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                    No hay usuarios que coincidan con la busqueda
+                    No hay usuarios que coincidan con la búsqueda
                   </td>
                 </tr>
               )}
@@ -204,7 +204,7 @@ export default function ComprasRolesPage() {
                 Anterior
               </button>
               <span className="text-sm text-gray-700">
-                Pagina {meta.page} de {meta.totalPages}
+                Página {meta.page} de {meta.totalPages}
               </span>
               <button
                 onClick={() => setPage(page + 1)}

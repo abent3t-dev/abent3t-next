@@ -47,7 +47,7 @@ const dash = (value: string | number | null | undefined) =>
 
 /** Campos AB_* no expuestos por la Object Structure: null → "No disponible". */
 const NotAvailable = () => (
-  <span className="text-gray-400 italic" title={OS_FIELD_HINT}>
+  <span className="text-gray-500 italic whitespace-nowrap" title={OS_FIELD_HINT}>
     No disponible
   </span>
 );
@@ -125,8 +125,8 @@ export default function MaximoOrdersTab({ initialStatus = [] }: { initialStatus?
             type="text"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Buscar por PONUM o descripcion..."
-            className="flex-1 min-w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
+            placeholder="Buscar por PONUM o descripción..."
+            className="flex-1 min-w-48 px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
           />
           <StatusMultiSelect
             options={STATUS_OPTIONS}
@@ -136,9 +136,9 @@ export default function MaximoOrdersTab({ initialStatus = [] }: { initialStatus?
           <select
             value={clasfFilter}
             onChange={(e) => { setClasfFilter(e.target.value); setPage(1); }}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900 bg-white"
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900 bg-white"
           >
-            <option value="">Clasificacion</option>
+            <option value="">Clasificación</option>
             <option value="CAPEX">CAPEX</option>
             <option value="OPEX">OPEX</option>
           </select>
@@ -147,14 +147,14 @@ export default function MaximoOrdersTab({ initialStatus = [] }: { initialStatus?
             value={approvedFrom}
             onChange={(e) => { setApprovedFrom(e.target.value); setPage(1); }}
             title="Aprobada desde"
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900"
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900"
           />
           <input
             type="date"
             value={approvedTo}
             onChange={(e) => { setApprovedTo(e.target.value); setPage(1); }}
             title="Aprobada hasta"
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900"
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900"
           />
           <ExportExcelButton
             path={`/maximo/purchase-orders/export${filterQs ? `?${filterQs}` : ''}`}
@@ -180,14 +180,14 @@ export default function MaximoOrdersTab({ initialStatus = [] }: { initialStatus?
           </div>
         ) : isError ? (
           <div className="p-8 text-center text-red-600">
-            No se pudieron cargar las ordenes de Maximo. Intenta de nuevo.
+            No se pudieron cargar las órdenes de Maximo. Intenta de nuevo.
           </div>
         ) : orders.length === 0 && !hasFilters ? (
           <div className="p-10 text-center space-y-2">
-            <p className="text-gray-500">Aun no hay datos sincronizados desde Maximo</p>
+            <p className="text-gray-500">Aún no hay datos sincronizados desde Maximo</p>
             {canSeeIntegrations && (
               <Link href="/compras/integraciones" className="text-sm text-[#52AF32] hover:underline">
-                Ver estado de la integracion
+                Ver estado de la integración
               </Link>
             )}
           </div>
@@ -197,15 +197,15 @@ export default function MaximoOrdersTab({ initialStatus = [] }: { initialStatus?
               <table className="w-full">
                 <thead className="bg-[#424846]">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">PONUM</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Descripcion</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Proveedor</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Monto</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Depto.</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Clasif.</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Ahorro</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">F. Aprob.</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase whitespace-nowrap">PONUM</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase whitespace-nowrap">Descripción</th>
+                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase whitespace-nowrap">Estatus</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase whitespace-nowrap">Proveedor</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-white uppercase whitespace-nowrap">Monto</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase whitespace-nowrap">Depto.</th>
+                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase whitespace-nowrap">Clasif.</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-white uppercase whitespace-nowrap">Ahorro</th>
+                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase whitespace-nowrap">F. Aprob.</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -215,36 +215,36 @@ export default function MaximoOrdersTab({ initialStatus = [] }: { initialStatus?
                       onClick={() => setDetailPonum(po.ponum)}
                       className={`cursor-pointer hover:bg-[#52AF32]/5 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                     >
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3">
                         <span className="font-mono font-medium text-[#222D59]">{po.ponum}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900 max-w-64 truncate">{dash(po.description)}</td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-3 py-3 text-sm text-gray-900 max-w-36 truncate" title={po.description ?? undefined}>{dash(po.description)}</td>
+                      <td className="px-3 py-3 text-center">
                         <span
-                          className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${maximoStatusBadgeClass(po.status)}`}
+                          className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full whitespace-nowrap ${maximoStatusBadgeClass(po.status)}`}
                           title={po.status ?? undefined}
                         >
                           {maximoStatusLabel(po.status)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{dash(po.vendor_name)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">
+                      <td className="px-3 py-3 text-sm text-gray-900">{dash(po.vendor_name)}</td>
+                      <td className="px-3 py-3 text-sm text-gray-900 text-right font-medium">
                         {formatMoney(po.total_cost, po.currency)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{dash(po.department)}</td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-600">
+                      <td className="px-3 py-3 text-sm text-gray-600">{dash(po.department)}</td>
+                      <td className="px-3 py-3 text-center text-sm text-gray-600">
                         {po.ab_clasfpo === null ? <NotAvailable /> : po.ab_clasfpo}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 text-right">
+                      <td className="px-3 py-3 text-sm text-gray-600 text-right">
                         {po.ab_ahorro === null ? <NotAvailable /> : formatMoney(po.ab_ahorro, po.currency)}
                       </td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-600">{formatDate(po.approved_at)}</td>
+                      <td className="px-3 py-3 text-center text-sm text-gray-600 whitespace-nowrap">{formatDate(po.approved_at)}</td>
                     </tr>
                   ))}
                   {orders.length === 0 && (
                     <tr>
                       <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
-                        No hay ordenes de Maximo que coincidan con los filtros
+                        No hay órdenes de Maximo que coincidan con los filtros
                       </td>
                     </tr>
                   )}
@@ -259,7 +259,7 @@ export default function MaximoOrdersTab({ initialStatus = [] }: { initialStatus?
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setPage(page - 1)} disabled={!meta.hasPrev} className="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Anterior</button>
-                  <span className="text-sm text-gray-700">Pagina {meta.page} de {meta.totalPages}</span>
+                  <span className="text-sm text-gray-700">Página {meta.page} de {meta.totalPages}</span>
                   <button onClick={() => setPage(page + 1)} disabled={!meta.hasNext} className="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Siguiente</button>
                 </div>
               </div>

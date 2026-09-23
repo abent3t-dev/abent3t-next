@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import {
   MaximoContractDetail,
   maximoStatusBadgeClass,
+  maximoStatusLabel,
 } from '@/types/purchases';
 
 /**
@@ -71,7 +72,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 const NotAvailable = () => (
   <span
     className="text-gray-400 italic"
-    title="La Object Structure de Maximo aun no expone este campo (ajuste pendiente con CIISA)"
+    title="La Object Structure de Maximo aún no expone este campo (ajuste pendiente con CIISA)"
   >
     No disponible
   </span>
@@ -135,8 +136,11 @@ export default function MaximoContractDetailModal({
             <>
               {/* Cabecera */}
               <div className="flex items-center gap-3 flex-wrap">
-                <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${maximoStatusBadgeClass(current.status)}`}>
-                  {dash(current.status)}
+                <span
+                  className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${maximoStatusBadgeClass(current.status)}`}
+                  title={current.status ?? undefined}
+                >
+                  {maximoStatusLabel(current.status)}
                 </span>
                 {!current.has_contract && (
                   <span className="inline-flex px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
@@ -144,7 +148,7 @@ export default function MaximoContractDetailModal({
                   </span>
                 )}
                 <span className="text-sm text-gray-500">
-                  PR {dash(current.prnum)} · Revision {dash(current.revisionnum)} ·
+                  {current.prnum || 'PR —'} · Revisión {dash(current.revisionnum)} ·
                   PURCHVIEW: {current.purchview_count}
                 </span>
               </div>
@@ -169,17 +173,17 @@ export default function MaximoContractDetailModal({
                 <Field label="Solicitado por" value={dash(current.requested_by)} />
                 <Field label="Ref. contrato" value={dash(current.contract_ref_num)} />
                 <Field label="Valor contrato" value={formatMoney(current.contract_value, current.currency)} />
-                <Field label="Fecha aprobacion" value={formatDate(current.approved_at)} />
+                <Field label="Fecha aprobación"value={formatDate(current.approved_at)} />
                 <Field label="Fecha en Maximo" value={formatDate(current.created_at_source)} />
               </div>
 
               {/* Lineas del contrato (derivadas de raw.CONTRACTLINE) */}
               <div>
                 <h4 className="text-sm font-semibold text-[#424846] mb-2">
-                  Lineas ({data.lines.length})
+                  Líneas ({data.lines.length})
                 </h4>
                 {data.lines.length === 0 ? (
-                  <p className="text-sm text-gray-500">Sin lineas en el registro de Maximo</p>
+                  <p className="text-sm text-gray-500">Sin líneas en el registro de Maximo</p>
                 ) : (
                   <div className="border border-gray-200 rounded-lg overflow-hidden">
                     <table className="w-full text-sm">
@@ -187,7 +191,7 @@ export default function MaximoContractDetailModal({
                         <tr>
                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descripcion</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descripción</th>
                           <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Cantidad</th>
                           <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Costo unit.</th>
                         </tr>
@@ -221,8 +225,11 @@ export default function MaximoContractDetailModal({
                   <ol className="space-y-1">
                     {data.statusHistory.map((entry, idx) => (
                       <li key={idx} className="flex items-center gap-3 text-sm">
-                        <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${maximoStatusBadgeClass(entry.status)}`}>
-                          {dash(entry.status)}
+                        <span
+                          className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${maximoStatusBadgeClass(entry.status)}`}
+                          title={entry.status ?? undefined}
+                        >
+                          {maximoStatusLabel(entry.status)}
                         </span>
                         <span className="text-gray-500">{formatDateTime(entry.changedAt)}</span>
                       </li>
@@ -243,7 +250,7 @@ export default function MaximoContractDetailModal({
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rev.</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Contrato</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Estatus</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ultimo cambio</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Último cambio</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -252,8 +259,11 @@ export default function MaximoContractDetailModal({
                           <td className="px-3 py-2">{dash(rev.revisionnum)}</td>
                           <td className="px-3 py-2">{dash(rev.contractnum)}</td>
                           <td className="px-3 py-2">
-                            <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${maximoStatusBadgeClass(rev.status)}`}>
-                              {dash(rev.status)}
+                            <span
+                              className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap ${maximoStatusBadgeClass(rev.status)}`}
+                              title={rev.status ?? undefined}
+                            >
+                              {maximoStatusLabel(rev.status)}
                             </span>
                           </td>
                           <td className="px-3 py-2 text-gray-500">
@@ -292,7 +302,7 @@ export default function MaximoContractDetailModal({
           )}
         </div>
 
-        <div className="flex justify-end px-6 py-4 border-t bg-gray-50">
+        <div className="flex justify-end px-6 py-4 border-t border-gray-200 bg-gray-50">
           <button
             type="button"
             onClick={onClose}

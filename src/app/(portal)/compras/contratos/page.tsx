@@ -80,7 +80,7 @@ function ExpiryLine({ contract }: { contract: Contract }) {
     return (
       <p className="mt-1 text-xs font-medium text-red-600">
         Venció el {formatDate(contract.end_date)}
-        {ago > 0 ? ` (hace ${ago} ${ago === 1 ? 'día' : 'días'})` : ' (hoy)'}
+        {' '}<span className="whitespace-nowrap">{ago > 0 ? `(hace ${ago} ${ago === 1 ? 'día' : 'días'})` : '(hoy)'}</span>
       </p>
     );
   }
@@ -190,7 +190,7 @@ export default function ContratosPage() {
                   setSearch(e.target.value);
                   setPage(1);
                 }}
-                placeholder="Buscar por numero, servicio o proveedor..."
+                placeholder="Buscar por número, servicio o proveedor..."
                 className="flex-1 min-w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
               />
               <select
@@ -215,8 +215,8 @@ export default function ContratosPage() {
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900 bg-white"
               >
                 <option value="">Cualquier vigencia</option>
-                <option value="30">Vence en 30 dias</option>
-                <option value="7">Vence en 7 dias</option>
+                <option value="30">Vence en 30 días</option>
+                <option value="7">Vence en 7 días</option>
               </select>
             </div>
           </div>
@@ -229,7 +229,7 @@ export default function ContratosPage() {
               </div>
             ) : contracts.length === 0 && !hasFilters ? (
               <div className="p-10 text-center space-y-2">
-                <p className="text-gray-500">Aun no hay contratos registrados</p>
+                <p className="text-gray-500">Aún no hay contratos registrados</p>
                 {canEdit && (
                   <p className="text-sm text-gray-400">
                     Usa &quot;Nuevo Contrato&quot; para dar de alta el primero
@@ -250,17 +250,17 @@ export default function ContratosPage() {
                   <table className="w-full">
                     <thead className="bg-[#424846]">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Numero</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Número</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Tipo</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Servicio</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Proveedor</th>
                         <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Vigencia</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Monto</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Consumido</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Saldo</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Comprador</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Responsable</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -295,7 +295,10 @@ export default function ContratosPage() {
                           <td className="px-4 py-3 text-sm text-gray-600">
                             {CONTRACT_DOCUMENT_TYPE_LABELS[contract.document_type]}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-900 max-w-64 truncate">
+                          <td
+                            className="px-4 py-3 text-sm text-gray-900 max-w-48 truncate"
+                            title={contract.service_description}
+                          >
                             {contract.service_description}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900">
@@ -307,23 +310,26 @@ export default function ContratosPage() {
                             </span>
                             <ExpiryLine contract={contract} />
                           </td>
+                          <td className="px-4 py-3 text-center">
+                            <ContractStatusBadge status={contract.status} />
+                          </td>
                           <td className="px-4 py-3 text-sm text-gray-900 text-right">
                             {contract.total_amount === null ? (
-                              <span className="text-gray-400 italic">No disponible</span>
+                              <span className="text-gray-500 italic text-xs whitespace-nowrap">No disponible</span>
                             ) : (
                               formatMoney(contract.total_amount, contract.currency)
                             )}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900 text-right">
                             {contract.consumed_amount === null ? (
-                              <span className="text-gray-400 italic" title="Captura manual de Compras pendiente">No disponible</span>
+                              <span className="text-gray-500 italic text-xs whitespace-nowrap" title="Captura manual de Compras pendiente">No disponible</span>
                             ) : (
                               formatMoney(contract.consumed_amount, contract.currency)
                             )}
                           </td>
                           <td className="px-4 py-3 text-sm text-right">
                             {contract.balance_amount === null ? (
-                              <span className="text-gray-400 italic" title="Requiere monto y consumido">No disponible</span>
+                              <span className="text-gray-500 italic text-xs whitespace-nowrap" title="Requiere monto y consumido">No disponible</span>
                             ) : (
                               <span className={contract.balance_amount < 0 ? 'font-semibold text-red-600' : 'text-gray-900'}>
                                 {formatMoney(contract.balance_amount, contract.currency)}
@@ -335,9 +341,6 @@ export default function ContratosPage() {
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
                             {contract.responsible_user_name ?? '—'}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <ContractStatusBadge status={contract.status} />
                           </td>
                         </tr>
                       ))}
@@ -368,7 +371,7 @@ export default function ContratosPage() {
                         Anterior
                       </button>
                       <span className="text-sm text-gray-700">
-                        Pagina {meta.page} de {meta.totalPages}
+                        Página {meta.page} de {meta.totalPages}
                       </span>
                       <button
                         onClick={() => setPage(page + 1)}

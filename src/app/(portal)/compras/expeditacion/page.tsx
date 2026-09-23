@@ -247,7 +247,7 @@ export default function ExpeditacionPage() {
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {item.buyer?.full_name ?? item.requested_by ?? '—'}
                       </td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-600">
+                      <td className="px-4 py-3 text-center text-sm text-gray-600 whitespace-nowrap">
                         {formatDate(item.effective_expected_date)}
                       </td>
                       <td className="px-4 py-3 text-center text-sm">
@@ -295,7 +295,7 @@ export default function ExpeditacionPage() {
                     Anterior
                   </button>
                   <span className="text-sm text-gray-700">
-                    Pagina {meta.page} de {meta.totalPages}
+                    Página {meta.page} de {meta.totalPages}
                   </span>
                   <button
                     onClick={() => setPage(page + 1)}

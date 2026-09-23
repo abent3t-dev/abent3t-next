@@ -130,10 +130,10 @@ export default function MaximoRequestsTab({ initialStatus = [] }: { initialStatu
           </div>
         ) : rows.length === 0 && !hasFilters ? (
           <div className="p-10 text-center space-y-2">
-            <p className="text-gray-500">Aun no hay solicitudes sincronizadas desde Maximo</p>
+            <p className="text-gray-500">Aún no hay solicitudes sincronizadas desde Maximo</p>
             {canSeeIntegrations && (
               <Link href="/compras/integraciones" className="text-sm text-[#52AF32] hover:underline">
-                Ver estado de la integracion
+                Ver estado de la integración
               </Link>
             )}
           </div>
@@ -146,8 +146,8 @@ export default function MaximoRequestsTab({ initialStatus = [] }: { initialStatu
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">PR</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">F. Solicitud</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">F. Aprobacion</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Dias</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">F. Aprobación</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Días</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Solicitado por</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Depto.</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Contrato</th>
@@ -178,7 +178,7 @@ export default function MaximoRequestsTab({ initialStatus = [] }: { initialStatu
                         <td className="px-4 py-3 text-center text-sm text-gray-600">{formatDate(pr.approved_at)}</td>
                         <td className="px-4 py-3 text-center text-sm">
                           {days === null ? (
-                            <span className="text-gray-400 italic" title="Sin fecha de solicitud o de aprobacion en Maximo">N/D</span>
+                            <span className="text-gray-500 italic" title="Sin fecha de solicitud o de aprobación en Maximo">N/D</span>
                           ) : (
                             <span className="text-gray-700">{days}</span>
                           )}
@@ -213,7 +213,7 @@ export default function MaximoRequestsTab({ initialStatus = [] }: { initialStatu
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setPage(page - 1)} disabled={!meta.hasPrev} className="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Anterior</button>
-                  <span className="text-sm text-gray-700">Pagina {meta.page} de {meta.totalPages}</span>
+                  <span className="text-sm text-gray-700">Página {meta.page} de {meta.totalPages}</span>
                   <button onClick={() => setPage(page + 1)} disabled={!meta.hasNext} className="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Siguiente</button>
                 </div>
               </div>

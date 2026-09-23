@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import {
   MaximoPurchaseOrderDetail,
   maximoStatusBadgeClass,
+  maximoStatusLabel,
 } from '@/types/purchases';
 
 /**
@@ -93,7 +94,7 @@ export default function MaximoPoDetailModal({
         <div className="bg-[#424846] px-6 py-4 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-white">
-              Orden Maximo {ponum}
+              Orden de compra Maximo {ponum}
             </h3>
             <p className="text-gray-300 text-sm">
               Datos sincronizados desde IBM Maximo (solo lectura)
@@ -123,16 +124,19 @@ export default function MaximoPoDetailModal({
             <>
               {/* Cabecera de la revision actual */}
               <div className="flex items-center gap-3">
-                <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${maximoStatusBadgeClass(current.status)}`}>
-                  {dash(current.status)}
+                <span
+                  className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${maximoStatusBadgeClass(current.status)}`}
+                  title={current.status ?? undefined}
+                >
+                  {maximoStatusLabel(current.status)}
                 </span>
                 <span className="text-sm text-gray-500">
-                  Revision {dash(current.revisionnum)} · Sitio {dash(current.siteid)}
+                  Revisión {dash(current.revisionnum)} · Sitio {dash(current.siteid)}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <Field label="Descripcion" value={dash(current.description)} />
+                <Field label="Descripción" value={dash(current.description)} />
                 <Field label="Proveedor" value={dash(current.vendor_name)} />
                 <Field label="ID Proveedor" value={dash(current.vendor_id)} />
                 <Field
@@ -142,7 +146,7 @@ export default function MaximoPoDetailModal({
                 <Field label="Moneda" value={dash(current.currency)} />
                 <Field label="Departamento" value={dash(current.department)} />
                 <Field
-                  label="Clasificacion"
+                  label="Clasificación"
                   value={
                     current.ab_clasfpo === null ? (
                       <NotAvailable />
@@ -173,7 +177,7 @@ export default function MaximoPoDetailModal({
                 />
                 <Field label="Solicitado por" value={dash(current.requested_by)} />
                 <Field
-                  label="Fecha aprobacion"
+                  label="Fecha aprobación"
                   value={formatDate(current.approved_at)}
                 />
                 <Field
@@ -194,7 +198,7 @@ export default function MaximoPoDetailModal({
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rev.</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Sitio</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Estatus</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ultimo cambio</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Último cambio</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -203,8 +207,11 @@ export default function MaximoPoDetailModal({
                           <td className="px-3 py-2">{dash(rev.revisionnum)}</td>
                           <td className="px-3 py-2">{dash(rev.siteid)}</td>
                           <td className="px-3 py-2">
-                            <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${maximoStatusBadgeClass(rev.status)}`}>
-                              {dash(rev.status)}
+                            <span
+                              className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${maximoStatusBadgeClass(rev.status)}`}
+                              title={rev.status ?? undefined}
+                            >
+                              {maximoStatusLabel(rev.status)}
                             </span>
                           </td>
                           <td className="px-3 py-2 text-gray-500">
@@ -243,7 +250,7 @@ export default function MaximoPoDetailModal({
           )}
         </div>
 
-        <div className="flex justify-end px-6 py-4 border-t bg-gray-50">
+        <div className="flex justify-end px-6 py-4 border-t border-gray-200 bg-gray-50">
           <button
             type="button"
             onClick={onClose}

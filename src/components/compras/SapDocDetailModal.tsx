@@ -7,6 +7,7 @@ import {
   SapDocumentLine,
   SapPurchaseOrderDetail,
   SapPurchaseRequestDetail,
+  sapDocStatus,
   sapStatusBadgeClass,
   sapStatusLabel,
 } from '@/types/purchases';
@@ -57,7 +58,7 @@ const formatDate = (date: string | null) =>
 
 /** "No disponible" en gris: el dato aun no se captura en el ERP. */
 function NoDisponible() {
-  return <span className="text-gray-400 italic">No disponible</span>;
+  return <span className="text-gray-500 italic">No disponible</span>;
 }
 
 function udfText(value: string | null) {
@@ -144,8 +145,8 @@ export default function SapDocDetailModal({
             <>
               {/* Cabecera */}
               <div className="flex items-center gap-3">
-                <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${sapStatusBadgeClass(doc.document_status)}`}>
-                  {sapStatusLabel(doc.document_status)}
+                <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${sapStatusBadgeClass(sapDocStatus(doc))}`}>
+                  {sapStatusLabel(sapDocStatus(doc))}
                 </span>
                 <span className="text-sm text-gray-500">
                   DocEntry {doc.doc_entry}
@@ -176,7 +177,10 @@ export default function SapDocDetailModal({
                 />
                 <Field label="Moneda" value={dash(doc.currency)} />
                 <Field label="Fecha documento" value={formatDate(doc.doc_date)} />
-                <Field label="Fecha compromiso" value={formatDate(doc.doc_due_date)} />
+                <Field
+                  label={isPo ? 'Fecha entrega' : 'Fecha compromiso'}
+                  value={formatDate(doc.doc_due_date)}
+                />
                 {!isPo && (
                   <Field
                     label="Fecha requerida"
@@ -211,7 +215,9 @@ export default function SapDocDetailModal({
                     <tbody className="divide-y divide-gray-100">
                       {lines.map((line, idx) => (
                         <tr key={`${line.lineNum ?? idx}`}>
-                          <td className="px-3 py-2 text-gray-500">{dash(line.lineNum)}</td>
+                          <td className="px-3 py-2 text-gray-500">
+                            {line.lineNum === null ? '—' : line.lineNum + 1}
+                          </td>
                           <td className="px-3 py-2 font-mono text-xs">{dash(line.itemCode)}</td>
                           <td className="px-3 py-2 max-w-56 truncate" title={line.itemDescription ?? undefined}>
                             {dash(line.itemDescription)}
@@ -271,7 +277,7 @@ export default function SapDocDetailModal({
           )}
         </div>
 
-        <div className="flex justify-end px-6 py-4 border-t bg-gray-50">
+        <div className="flex justify-end px-6 py-4 border-t border-gray-200 bg-gray-50">
           <button
             type="button"
             onClick={onClose}

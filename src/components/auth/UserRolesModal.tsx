@@ -137,7 +137,7 @@ export default function UserRolesModal({
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-2 px-6 py-3 border-t bg-gray-50">
+          <div className="flex justify-end gap-2 px-6 py-3 border-t border-gray-200 bg-gray-50">
             <button
               type="button"
               onClick={onClose}
@@ -213,8 +213,13 @@ function ModuleSection({
                 <span className="text-sm font-medium text-green-900">
                   {ROLE_LABELS[a.role] ?? a.role}
                 </span>
-                <span className="text-xs text-green-700/70 ml-2">
-                  asignado {new Date(a.granted_at).toLocaleDateString('es-MX')}
+                <span className="text-xs text-green-700 ml-2">
+                  asignado{' '}
+                  {new Date(a.granted_at).toLocaleDateString('es-MX', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
                 </span>
               </div>
               {canRevoke(a.role) ? (
@@ -228,7 +233,7 @@ function ModuleSection({
                 </button>
               ) : (
                 <span
-                  className="text-xs text-gray-400"
+                  className="text-xs text-gray-500"
                   title="No tienes permiso para gestionar este rol"
                 >
                   Solo lectura

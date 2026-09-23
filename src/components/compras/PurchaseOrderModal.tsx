@@ -271,7 +271,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, purchaseOrder }: P
                   value={formData.po_number}
                   onChange={(e) => setFormData({ ...formData, po_number: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 font-mono"
-                  placeholder="PO-2026-00001 (auto si vacio)"
+                  placeholder="PO-2026-00001 (auto si vacío)"
                 />
               </div>
               <div>
@@ -281,7 +281,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, purchaseOrder }: P
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value as POStatus })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+                  className="w-full h-[42px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
                 >
                   {PO_STATUS_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -298,7 +298,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, purchaseOrder }: P
               <select
                 value={formData.requisition_id}
                 onChange={(e) => handleRequisitionChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+                className="w-full h-[42px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
               >
                 <option value="">Sin requisición asociada</option>
                 {requisitions.map((rq) => (
@@ -318,7 +318,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, purchaseOrder }: P
               <select
                 value={formData.supplier_id}
                 onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+                className="w-full h-[42px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
                 required
               >
                 <option value="">Seleccionar proveedor...</option>
@@ -339,7 +339,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, purchaseOrder }: P
                 <select
                   value={formData.purchase_type_id}
                   onChange={(e) => setFormData({ ...formData, purchase_type_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+                  className="w-full h-[42px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
                 >
                   <option value="">Seleccionar...</option>
                   {purchaseTypes?.map((pt) => (
@@ -354,7 +354,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, purchaseOrder }: P
                     <select
                       value={formData.contract_id}
                       onChange={(e) => setFormData({ ...formData, contract_id: e.target.value })}
-                      className="w-full px-3 py-2 border border-orange-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+                      className="w-full h-[42px] px-3 py-2 border border-orange-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
                     >
                       <option value="">
                         {formData.supplier_id
@@ -377,7 +377,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, purchaseOrder }: P
                 <select
                   value={formData.buyer_id}
                   onChange={(e) => setFormData({ ...formData, buyer_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+                  className="w-full h-[42px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
                 >
                   <option value="">Sin asignar</option>
                   {buyers.map((b) => (
@@ -396,7 +396,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, purchaseOrder }: P
                 <select
                   value={formData.expense_type}
                   onChange={(e) => setFormData({ ...formData, expense_type: e.target.value as ExpenseType })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+                  className="w-full h-[42px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
                 >
                   <option value="OPEX">OPEX</option>
                   <option value="CAPEX">CAPEX</option>
@@ -427,7 +427,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, purchaseOrder }: P
                 <select
                   value={formData.currency}
                   onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+                  className="w-full h-[42px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
                 >
                   <option value="MXN">MXN</option>
                   <option value="USD">USD</option>

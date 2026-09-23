@@ -216,7 +216,7 @@ function SolicitudesPageInner({
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              placeholder="Buscar por numero de RQ o descripcion..."
+              placeholder="Buscar por número de RQ o descripción..."
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
             />
           </div>
@@ -226,7 +226,6 @@ function SolicitudesPageInner({
             options={STATUS_OPTIONS}
             value={statuses}
             onChange={(next) => { setStatuses(next); setPage(1); }}
-            placeholder="Todos los estados"
           />
 
           {/* Type Filter */}
@@ -236,7 +235,7 @@ function SolicitudesPageInner({
               setTypeFilter(e.target.value as ExpenseType | '');
               setPage(1);
             }}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
           >
             <option value="">CAPEX/OPEX</option>
             {Object.entries(EXPENSE_TYPE_LABELS).map(([value, label]) => (
@@ -268,12 +267,12 @@ function SolicitudesPageInner({
               <thead className="bg-[#424846]">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">No. RQ</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Descripcion</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Descripción</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Solicitante</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Tipo</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Monto Est.</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Dias</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estado</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Días</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Acciones</th>
                 </tr>
               </thead>
@@ -362,7 +361,7 @@ function SolicitudesPageInner({
                     {Icons.chevronLeft}
                   </button>
                   <span className="text-sm text-gray-700">
-                    Pagina {meta.page} de {meta.totalPages}
+                    Página {meta.page} de {meta.totalPages}
                   </span>
                   <button
                     onClick={() => setPage(page + 1)}

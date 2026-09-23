@@ -142,15 +142,14 @@ export default function SapApprovalsTab() {
               <table className="w-full">
                 <thead className="bg-[#424846]">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Documento</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Descripción</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Solicitante</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Monto</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Etapa</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Aprobadores</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Fecha</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Días</th>
+                    <th className="px-2.5 py-3 text-left text-xs font-medium text-white uppercase">Documento</th>
+                    <th className="px-2.5 py-3 text-left text-xs font-medium text-white uppercase">Descripción</th>
+                    <th className="px-2.5 py-3 text-left text-xs font-medium text-white uppercase">Solicitante</th>
+                    <th className="px-2.5 py-3 text-right text-xs font-medium text-white uppercase">Monto</th>
+                    <th className="px-2.5 py-3 text-left text-xs font-medium text-white uppercase">Etapa</th>
+                    <th className="px-2.5 py-3 text-left text-xs font-medium text-white uppercase">Aprobadores</th>
+                    <th className="px-2.5 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
+                    <th className="px-2.5 py-3 text-center text-xs font-medium text-white uppercase">Fecha</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -160,26 +159,26 @@ export default function SapApprovalsTab() {
                       onClick={() => setExpanded(expanded === r.code ? null : r.code)}
                       className={`cursor-pointer hover:bg-[#52AF32]/5 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                     >
-                      <td className="px-4 py-3">
+                      <td className="px-2.5 py-3">
                         <p className="font-mono font-medium text-[#222D59]">{dash(r.doc_num)}</p>
                         <p className="text-xs text-gray-500">{KIND_LABELS[r.document_kind]}{r.is_draft ? ' · borrador' : ''}</p>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900 max-w-64">
+                      <td className="px-2.5 py-3 text-sm text-gray-900 max-w-44">
                         <p className="truncate" title={r.remarks ?? undefined}>{dash(r.remarks)}</p>
                         {r.card_name && <p className="text-xs text-gray-500 truncate">{r.card_name}</p>}
-                        {r.template_name && <p className="text-xs text-gray-400 truncate">{r.template_name}</p>}
+                        {r.template_name && <p className="text-xs text-gray-500 truncate">{r.template_name}</p>}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{dash(r.requester_name ?? r.originator_name)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">{formatMoney(r.doc_total, r.currency)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{dash(r.current_stage_name)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
+                      <td className="px-2.5 py-3 text-sm text-gray-900">{dash(r.requester_name ?? r.originator_name)}</td>
+                      <td className="px-2.5 py-3 text-sm text-gray-900 text-right font-medium">{formatMoney(r.doc_total, r.currency)}</td>
+                      <td className="px-2.5 py-3 text-sm text-gray-600">{dash(r.current_stage_name)}</td>
+                      <td className="px-2.5 py-3 text-sm text-gray-600">
                         <div className="flex flex-wrap gap-1">
                           {r.approvers.length === 0 && <span className="text-gray-400">—</span>}
                           {r.approvers.map((a, i) => (
                             <span
                               key={i}
                               title={`${a.stage_name ?? ''} · ${SAP_APPROVAL_LINE_LABELS[a.status ?? ''] ?? a.status ?? ''}${a.update_date ? ` · ${formatDate(a.update_date)}` : ''}`}
-                              className={`inline-flex px-2 py-0.5 text-xs rounded-full ${
+                              className={`inline-flex px-2 py-0.5 text-xs leading-tight rounded-md ${
                                 a.status === 'ardApproved'
                                   ? 'bg-green-100 text-green-800'
                                   : a.status === 'ardNotApproved'
@@ -192,24 +191,20 @@ export default function SapApprovalsTab() {
                           ))}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-2.5 py-3 text-center">
                         <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${SAP_APPROVAL_STATUS_CLASSES[r.status ?? ''] ?? 'bg-gray-100 text-gray-700'}`}>
                           {SAP_APPROVAL_STATUS_LABELS[r.status ?? ''] ?? dash(r.status)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-600">{formatDate(r.creation_date)}</td>
-                      <td className="px-4 py-3 text-center text-sm">
-                        {r.days_waiting === null ? (
-                          <span className="text-gray-400">—</span>
-                        ) : (
-                          <span className={r.days_waiting >= 7 ? 'font-medium text-red-600' : 'text-gray-700'}>{r.days_waiting}</span>
-                        )}
+                      <td className="px-2.5 py-3 text-center text-sm text-gray-600">
+                        {formatDate(r.creation_date)}
+                        {r.days_waiting !== null && <p className={`text-xs whitespace-nowrap ${r.days_waiting >= 7 ? 'font-medium text-red-600' : 'text-gray-500'}`}>{r.days_waiting} {r.days_waiting === 1 ? 'día' : 'días'}</p>}
                       </td>
                     </tr>
                   ))}
                   {rows.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                         No hay solicitudes de autorización que coincidan con los filtros
                       </td>
                     </tr>

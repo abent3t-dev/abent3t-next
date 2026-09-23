@@ -22,6 +22,7 @@ function ApprovalTabs({
   setTab: (t: ApprovalsTab) => void;
   showAbent: boolean;
 }) {
+  if (!showAbent) return null;
   const tabs: Array<{ id: ApprovalsTab; label: string }> = [
     { id: 'sap', label: 'Pendientes de autorización (SAP)' },
     ...(showAbent ? [{ id: 'abent' as const, label: 'Mi bandeja (flujo ABENT)' }] : []),
@@ -102,7 +103,7 @@ export default function AprobacionesPage() {
       api.post('/approvals/approve', { requisition_id: requisitionId }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['approvals'] });
-      notify.success('Requisicion aprobada correctamente');
+      notify.success('Requisición aprobada correctamente');
     },
     onError: (err: Error) => {
       notify.error(err.message || 'Error al aprobar');
@@ -119,7 +120,7 @@ export default function AprobacionesPage() {
       qc.invalidateQueries({ queryKey: ['approvals'] });
       setRejectingId(null);
       setRejectReason('');
-      notify.success('Requisicion rechazada');
+      notify.success('Requisición rechazada');
     },
     onError: (err: Error) => {
       notify.error(err.message || 'Error al rechazar');
@@ -127,7 +128,7 @@ export default function AprobacionesPage() {
   });
 
   const handleApprove = async (requisitionId: string) => {
-    const confirmed = await notify.confirm('Aprobar esta requisicion?');
+    const confirmed = await notify.confirm('¿Aprobar esta requisición?');
     if (!confirmed) return;
     approveMutation.mutate(requisitionId);
   };
@@ -150,7 +151,7 @@ export default function AprobacionesPage() {
         <div>
           <h1 className="text-2xl font-bold text-[#424846]">Panel de Aprobaciones</h1>
           <p className="text-gray-500">
-            Lo que falta autorizar en SAP y, para la cadena de aprobacion, la bandeja del flujo propio
+            Lo que falta autorizar en SAP y, para la cadena de aprobación, la bandeja del flujo propio
           </p>
         </div>
         <ApprovalTabs tab="sap" setTab={setTab} showAbent={isApprover} />
@@ -164,7 +165,7 @@ export default function AprobacionesPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-[#424846]">Panel de Aprobaciones</h1>
-        <p className="text-gray-500">Requisiciones pendientes de tu aprobacion</p>
+        <p className="text-gray-500">Requisiciones pendientes de tu aprobación</p>
       </div>
       <ApprovalTabs tab="abent" setTab={setTab} showAbent />
 
@@ -254,7 +255,7 @@ export default function AprobacionesPage() {
 
                 {/* Workflow Timeline */}
                 <div className="mt-4 pt-4 border-t border-gray-200">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Flujo de Aprobacion:</p>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Flujo de Aprobación:</p>
                   <div className="flex items-center gap-2">
                     {[1, 2, 3, 4].map((level) => {
                       const levelApproval = approval.workflow?.approvals?.find((a) => a.level === level);
@@ -313,7 +314,7 @@ export default function AprobacionesPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-bold text-[#424846]">Rechazar Requisicion</h2>
+              <h2 className="text-lg font-bold text-[#424846]">Rechazar Requisición</h2>
               <button onClick={() => setRejectingId(null)} className="p-1 text-gray-400 hover:text-gray-600">
                 {Icons.x}
               </button>
@@ -327,7 +328,7 @@ export default function AprobacionesPage() {
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 rows={4}
-                placeholder="Indica el motivo por el cual se rechaza esta requisicion..."
+                placeholder="Indica el motivo por el cual se rechaza esta requisición..."
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-gray-900 placeholder:text-gray-400"
               />
             </div>

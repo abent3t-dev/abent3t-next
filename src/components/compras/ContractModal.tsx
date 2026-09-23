@@ -217,7 +217,7 @@ function ContractModalBody({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.contract_number.trim()) {
-      notify.error('El numero de contrato es obligatorio');
+      notify.error('El número de contrato es obligatorio');
       return;
     }
     if (!formData.supplier_id) {
@@ -225,7 +225,7 @@ function ContractModalBody({
       return;
     }
     if (!formData.service_description.trim()) {
-      notify.error('La descripcion del servicio es obligatoria');
+      notify.error('La descripción del servicio es obligatoria');
       return;
     }
     if (!formData.start_date || !formData.end_date) {
@@ -296,7 +296,7 @@ function ContractModalBody({
       </div>
       {documents.length === 0 ? (
         <p className="text-sm text-gray-500">
-          Este contrato aun no tiene PDF cargado
+          Este contrato aún no tiene PDF cargado
         </p>
       ) : (
         <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -304,8 +304,8 @@ function ContractModalBody({
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Archivo</th>
-                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Version</th>
-                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Tamano</th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Versión</th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Tamaño</th>
                 <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Vigente</th>
                 <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Acciones</th>
               </tr>
@@ -325,7 +325,7 @@ function ContractModalBody({
                       </span>
                     ) : (
                       <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-500">
-                        Historico
+                        Histórico
                       </span>
                     )}
                   </td>
@@ -427,7 +427,7 @@ function ContractModalBody({
               </div>
             )}
           </div>
-          <div className="flex justify-end px-6 py-4 border-t bg-gray-50">
+          <div className="flex justify-end px-6 py-4 border-t border-gray-200 bg-gray-50">
             <button
               type="button"
               onClick={onClose}
@@ -460,7 +460,7 @@ function ContractModalBody({
           <div className="px-6 py-4 space-y-4">
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Numero de contrato *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Número de contrato *</label>
                 <input
                   type="text"
                   value={formData.contract_number}
@@ -515,6 +515,12 @@ function ContractModalBody({
                   required
                 >
                   <option value="">Seleccionar proveedor...</option>
+                  {/* El catalogo solo trae 100 proveedores: si el actual no viene, se muestra igual */}
+                  {contract?.supplier && !suppliers.some((s) => s.id === contract.supplier_id) && (
+                    <option value={contract.supplier_id}>
+                      {contract.supplier.legal_name} ({contract.supplier.tax_id})
+                    </option>
+                  )}
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.id}>{s.legal_name} ({s.tax_id})</option>
                   ))}
@@ -653,13 +659,13 @@ function ContractModalBody({
             {documentsSection}
             {!isEditing && (
               <p className="text-xs text-gray-500">
-                El PDF se sube despues de guardar: crea el contrato y vuelvelo a
+                El PDF se sube después de guardar: crea el contrato y vuélvelo a
                 abrir para adjuntar el documento.
               </p>
             )}
           </div>
 
-          <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50">
+          <div className="sticky bottom-0 flex justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
             <button
               type="button"
               onClick={onClose}

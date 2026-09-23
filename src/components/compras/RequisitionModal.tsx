@@ -88,11 +88,11 @@ export default function RequisitionModal({ isOpen, onClose, requisition }: Requi
     mutationFn: (data: typeof formData) => api.post('/requisitions', data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['requisitions'] });
-      notify.success('Requisicion creada correctamente');
+      notify.success('Requisición creada correctamente');
       onClose();
     },
     onError: (err: Error) => {
-      notify.error(err.message || 'Error al crear requisicion');
+      notify.error(err.message || 'Error al crear requisición');
     },
   });
 
@@ -100,11 +100,11 @@ export default function RequisitionModal({ isOpen, onClose, requisition }: Requi
     mutationFn: (data: typeof formData) => api.put(`/requisitions/${requisition?.id}`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['requisitions'] });
-      notify.success('Requisicion actualizada correctamente');
+      notify.success('Requisición actualizada correctamente');
       onClose();
     },
     onError: (err: Error) => {
-      notify.error(err.message || 'Error al actualizar requisicion');
+      notify.error(err.message || 'Error al actualizar requisición');
     },
   });
 
@@ -112,7 +112,7 @@ export default function RequisitionModal({ isOpen, onClose, requisition }: Requi
     e.preventDefault();
 
     if (!formData.description.trim()) {
-      notify.error('La descripcion es requerida');
+      notify.error('La descripción es requerida');
       return;
     }
     if (!formData.requester_id) {
@@ -137,7 +137,7 @@ export default function RequisitionModal({ isOpen, onClose, requisition }: Requi
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-[#424846]">
           <h2 className="text-lg font-bold text-white">
-            {isEditing ? 'Editar Requisicion' : 'Nueva Requisicion'}
+            {isEditing ? 'Editar Requisición' : 'Nueva Requisición'}
           </h2>
           <button onClick={onClose} className="p-1 text-gray-300 hover:text-white">
             {Icons.x}
@@ -151,14 +151,14 @@ export default function RequisitionModal({ isOpen, onClose, requisition }: Requi
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  No. Requisicion
+                  No. Requisición
                 </label>
                 <input
                   type="text"
                   value={formData.rq_number}
                   onChange={(e) => setFormData({ ...formData, rq_number: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 font-mono"
-                  placeholder="RQ-2026-00001 (auto si vacio)"
+                  placeholder="RQ-2026-00001 (auto si vacío)"
                 />
               </div>
               <div>
@@ -168,7 +168,7 @@ export default function RequisitionModal({ isOpen, onClose, requisition }: Requi
                 <select
                   value={formData.expense_type}
                   onChange={(e) => setFormData({ ...formData, expense_type: e.target.value as ExpenseType })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white h-[42px]"
                 >
                   <option value="OPEX">OPEX (Operativo)</option>
                   <option value="CAPEX">CAPEX (Capital)</option>
@@ -179,14 +179,14 @@ export default function RequisitionModal({ isOpen, onClose, requisition }: Requi
             {/* Descripcion */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Descripcion *
+                Descripción *
               </label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900"
-                placeholder="Descripcion detallada de la solicitud de compra"
+                placeholder="Descripción detallada de la solicitud de compra"
               />
             </div>
 
@@ -212,7 +212,7 @@ export default function RequisitionModal({ isOpen, onClose, requisition }: Requi
                 <select
                   value={formData.department_id}
                   onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white h-[42px]"
                 >
                   <option value="">Seleccionar...</option>
                   {departments?.map((dept) => (
@@ -231,7 +231,7 @@ export default function RequisitionModal({ isOpen, onClose, requisition }: Requi
                 <select
                   value={formData.buyer_id}
                   onChange={(e) => setFormData({ ...formData, buyer_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white h-[42px]"
                 >
                   <option value="">Sin asignar</option>
                   {buyers?.map((buyer) => (
@@ -262,7 +262,7 @@ export default function RequisitionModal({ isOpen, onClose, requisition }: Requi
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Fecha de Creacion *
+                  Fecha de Creación *
                 </label>
                 <input
                   type="date"
@@ -287,14 +287,14 @@ export default function RequisitionModal({ isOpen, onClose, requisition }: Requi
             {/* Justificacion */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Justificacion
+                Justificación
               </label>
               <textarea
                 value={formData.justification}
                 onChange={(e) => setFormData({ ...formData, justification: e.target.value })}
                 rows={2}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900"
-                placeholder="Justificacion de la compra"
+                placeholder="Justificación de la compra"
               />
             </div>
           </div>
@@ -313,7 +313,7 @@ export default function RequisitionModal({ isOpen, onClose, requisition }: Requi
               disabled={isPending}
               className="px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#67B52E] disabled:opacity-50 transition-colors"
             >
-              {isPending ? 'Guardando...' : isEditing ? 'Actualizar' : 'Crear Requisicion'}
+              {isPending ? 'Guardando...' : isEditing ? 'Actualizar' : 'Crear Requisición'}
             </button>
           </div>
         </form>

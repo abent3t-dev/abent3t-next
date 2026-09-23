@@ -79,11 +79,11 @@ function CommitteeModalBody({
     onSuccess: () => {
       invalidate();
       notify.success(
-        'Comite creado. Reabrelo para subir el PPT y enviarlo a aprobacion.',
+        'Comité creado. Reábrelo para subir el PPT y enviarlo a aprobación.',
       );
       onClose();
     },
-    onError: (err: Error) => notify.error(err.message || 'Error al crear comite'),
+    onError: (err: Error) => notify.error(err.message || 'Error al crear comité'),
   });
 
   const updateMutation = useMutation({
@@ -91,18 +91,18 @@ function CommitteeModalBody({
       api.put<PurchaseCommittee>(`/compras/comite/${committee?.id}`, formData),
     onSuccess: () => {
       invalidate();
-      notify.success('Comite actualizado');
+      notify.success('Comité actualizado');
       onClose();
     },
     onError: (err: Error) =>
-      notify.error(err.message || 'Error al actualizar comite'),
+      notify.error(err.message || 'Error al actualizar comité'),
   });
 
   const submitMutation = useMutation({
     mutationFn: () => api.post(`/compras/comite/${committee?.id}/submit`, {}),
     onSuccess: () => {
       refresh();
-      notify.success('Comite enviado a aprobacion (nivel 1 notificado)');
+      notify.success('Comité enviado a aprobación (nivel 1 notificado)');
       onClose();
     },
     onError: (err: Error) => notify.error(err.message || 'Error al enviar'),
@@ -111,11 +111,11 @@ function CommitteeModalBody({
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title.trim()) {
-      notify.error('El titulo es obligatorio');
+      notify.error('El título es obligatorio');
       return;
     }
     if (!formData.committee_date) {
-      notify.error('La fecha del comite es obligatoria');
+      notify.error('La fecha del comité es obligatoria');
       return;
     }
     if (isEditing) updateMutation.mutate();
@@ -129,7 +129,7 @@ function CommitteeModalBody({
       return;
     }
     if (file.size > MAX_FILE_BYTES) {
-      notify.error(`"${file.name}": excede el maximo de 30MB`);
+      notify.error(`"${file.name}": excede el máximo de 30MB`);
       return;
     }
     setUploading(true);
@@ -147,7 +147,7 @@ function CommitteeModalBody({
         const err = (await res.json().catch(() => ({}))) as { message?: string };
         throw new Error(err.message || 'Error al subir el documento');
       }
-      notify.success('Documento de la version cargado');
+      notify.success('Documento de la versión cargado');
       refresh();
     } catch (err) {
       notify.error(err instanceof Error ? err.message : 'Error al subir');
@@ -167,7 +167,7 @@ function CommitteeModalBody({
       await api.post(`/compras/comite/${committee.id}/versions`, {
         external_link: externalLink,
       });
-      notify.success('Link externo registrado como documento de la version');
+      notify.success('Link externo registrado como documento de la versión');
       setExternalLink('');
       refresh();
     } catch (err) {
@@ -195,7 +195,7 @@ function CommitteeModalBody({
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-[#424846]">
           <div>
             <h2 className="text-lg font-bold text-white">
-              {isEditing ? committee.committee_number : 'Nuevo Comite'}
+              {isEditing ? committee.committee_number : 'Nuevo Comité'}
             </h2>
             {isEditing && (
               <span className={`inline-flex px-2 py-0.5 mt-1 text-xs font-medium rounded-full ${COMMITTEE_STATUS_CLASSES[committee.status]}`}>
@@ -216,7 +216,7 @@ function CommitteeModalBody({
             {/* Metadata */}
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha del comite *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha del comité *</label>
                 <input
                   type="date"
                   value={formData.committee_date}
@@ -227,7 +227,7 @@ function CommitteeModalBody({
                 />
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Titulo *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Título *</label>
                 <input
                   type="text"
                   value={formData.title}
@@ -239,7 +239,7 @@ function CommitteeModalBody({
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Descripcion / agenda</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Descripción / agenda</label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -293,14 +293,14 @@ function CommitteeModalBody({
                 {(detail?.versions.length ?? 0) === 0 ? (
                   <p className="text-sm text-gray-500">
                     Sin documento: sube el PPT (o registra un link) para poder
-                    enviar a aprobacion
+                    enviar a aprobación
                   </p>
                 ) : (
                   <div className="border border-gray-200 rounded-lg overflow-hidden">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Version</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Versión</th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Documento</th>
                           <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Vigente</th>
                           <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Abrir</th>
@@ -342,14 +342,14 @@ function CommitteeModalBody({
             {isEditing && detail && (
               <div>
                 <h3 className="text-sm font-semibold text-[#424846] mb-2">
-                  Cadena de aprobacion
+                  Cadena de aprobación
                 </h3>
                 <CommitteeApprovalTimeline detail={detail} />
               </div>
             )}
           </div>
 
-          <div className="flex justify-between px-6 py-4 border-t bg-gray-50">
+          <div className="flex justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
             <button
               type="button"
               onClick={onClose}
@@ -364,14 +364,14 @@ function CommitteeModalBody({
                     type="button"
                     disabled={submitMutation.isPending}
                     onClick={() => submitMutation.mutate()}
-                    title="Requiere el documento de la version"
+                    title="Requiere el documento de la versión"
                     className="px-4 py-2 bg-[#222D59] text-white rounded-lg hover:bg-[#222D59]/90 disabled:opacity-50"
                   >
                     {submitMutation.isPending
                       ? 'Enviando...'
                       : committee.status === 'rechazado'
-                        ? 'Reenviar a aprobacion'
-                        : 'Enviar a aprobacion'}
+                        ? 'Reenviar a aprobación'
+                        : 'Enviar a aprobación'}
                   </button>
                 )}
                 <button
@@ -379,7 +379,7 @@ function CommitteeModalBody({
                   disabled={isPending}
                   className="px-4 py-2 bg-[#52AF32] text-white rounded-lg hover:bg-[#52AF32]/90 disabled:opacity-50"
                 >
-                  {isPending ? 'Guardando...' : isEditing ? 'Guardar cambios' : 'Crear comite'}
+                  {isPending ? 'Guardando...' : isEditing ? 'Guardar cambios' : 'Crear comité'}
                 </button>
               </div>
             )}

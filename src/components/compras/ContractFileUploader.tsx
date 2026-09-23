@@ -32,7 +32,7 @@ export default function ContractFileUploader({
       return;
     }
     if (file.size > MAX_PDF_BYTES) {
-      notify.error(`"${file.name}": excede el tamano maximo de 20MB`);
+      notify.error(`"${file.name}": excede el tamaño máximo de 20MB`);
       return;
     }
 
@@ -52,7 +52,7 @@ export default function ContractFileUploader({
         };
         throw new Error(err.message || `Error al subir "${file.name}"`);
       }
-      notify.success('PDF subido como nueva version vigente');
+      notify.success('PDF subido como nueva versión vigente');
       onUploaded();
     } catch (err) {
       notify.error(err instanceof Error ? err.message : 'Error al subir el PDF');
@@ -80,7 +80,7 @@ export default function ContractFileUploader({
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
         </svg>
-        {uploading ? 'Subiendo PDF...' : 'Subir nueva version (PDF)'}
+        {uploading ? 'Subiendo PDF...' : 'Subir nueva versión (PDF)'}
       </button>
     </div>
   );

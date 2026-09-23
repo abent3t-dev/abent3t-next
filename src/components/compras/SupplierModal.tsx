@@ -98,7 +98,7 @@ export default function SupplierModal({ isOpen, onClose, supplier }: SupplierMod
     e.preventDefault();
 
     if (!formData.legal_name.trim()) {
-      notify.error('La razon social es requerida');
+      notify.error('La razón social es requerida');
       return;
     }
     if (!formData.tax_id.trim()) {
@@ -149,9 +149,9 @@ export default function SupplierModal({ isOpen, onClose, supplier }: SupplierMod
             {isSap && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
                 Proveedor sincronizado desde SAP ({supplier?.external_id}). Los
-                datos basicos son de solo lectura y se actualizan
-                automaticamente; aqui solo se editan los campos propios de
-                ABENT (nombre comercial, direccion y contacto interno).
+                datos básicos son de solo lectura y se actualizan
+                automáticamente; aquí solo se editan los campos propios de
+                ABENT (nombre comercial, dirección y contacto interno).
               </div>
             )}
             {/* Datos Fiscales */}
@@ -160,14 +160,14 @@ export default function SupplierModal({ isOpen, onClose, supplier }: SupplierMod
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Razon Social *
+                    Razón Social *
                   </label>
                   <input
                     type="text"
                     value={formData.legal_name}
                     onChange={(e) => setFormData({ ...formData, legal_name: e.target.value })}
                     disabled={isSap}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 disabled:bg-gray-100! disabled:text-gray-600! disabled:cursor-not-allowed"
                     placeholder="Nombre legal completo"
                   />
                 </div>
@@ -192,7 +192,7 @@ export default function SupplierModal({ isOpen, onClose, supplier }: SupplierMod
                     value={formData.tax_id}
                     onChange={(e) => setFormData({ ...formData, tax_id: e.target.value.toUpperCase() })}
                     disabled={isSap}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 font-mono disabled:bg-gray-100 disabled:text-gray-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 font-mono disabled:bg-gray-100! disabled:text-gray-600! disabled:cursor-not-allowed"
                     placeholder="ABC123456XYZ"
                     maxLength={13}
                   />
@@ -213,33 +213,33 @@ export default function SupplierModal({ isOpen, onClose, supplier }: SupplierMod
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     disabled={isSap}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 disabled:bg-gray-100! disabled:text-gray-600! disabled:cursor-not-allowed"
                     placeholder="contacto@empresa.com"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Telefono
+                    Teléfono
                   </label>
                   <input
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     disabled={isSap}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 disabled:bg-gray-100! disabled:text-gray-600! disabled:cursor-not-allowed"
                     placeholder="55-1234-5678"
                   />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Direccion
+                    Dirección
                   </label>
                   <input
                     type="text"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900"
-                    placeholder="Calle, numero, colonia, ciudad"
+                    placeholder="Calle, número, colonia, ciudad"
                   />
                 </div>
               </div>
@@ -258,8 +258,8 @@ export default function SupplierModal({ isOpen, onClose, supplier }: SupplierMod
                     value={formData.contact_name}
                     onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
                     disabled={isSap}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 disabled:bg-gray-100 disabled:text-gray-500"
-                    placeholder="Juan Perez"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 disabled:bg-gray-100! disabled:text-gray-600! disabled:cursor-not-allowed"
+                    placeholder="Juan Pérez"
                   />
                 </div>
                 <div>
@@ -276,7 +276,7 @@ export default function SupplierModal({ isOpen, onClose, supplier }: SupplierMod
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Telefono
+                    Teléfono
                   </label>
                   <input
                     type="tel"

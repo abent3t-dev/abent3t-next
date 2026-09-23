@@ -126,7 +126,7 @@ export default function ProveedoresPage() {
   };
 
   const handleUnblock = async (id: string) => {
-    const confirmed = await notify.confirm('Desbloquear este proveedor?');
+    const confirmed = await notify.confirm('¿Desbloquear este proveedor?');
     if (!confirmed) return;
     unblockMutation.mutate(id);
   };
@@ -146,8 +146,8 @@ export default function ProveedoresPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-[#424846]">Catalogo de Proveedores</h1>
-          <p className="text-gray-500">Gestiona los proveedores de la organizacion</p>
+          <h1 className="text-2xl font-bold text-[#424846]">Catálogo de Proveedores</h1>
+          <p className="text-gray-500">Gestiona los proveedores de la organización</p>
         </div>
         {canManage && (
           <button
@@ -220,25 +220,26 @@ export default function ProveedoresPage() {
             <div className="w-8 h-8 border-4 border-[#52AF32] border-t-transparent rounded-full animate-spin mx-auto" />
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-[#424846]">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Proveedor</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">RFC</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Contacto</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Moneda</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Puntuacion</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estado</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Acciones</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Proveedor</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">RFC</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Contacto</th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Moneda</th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Puntuación</th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Estado</th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {suppliers.map((supplier, idx) => (
                 <tr key={supplier.id} className={`hover:bg-[#52AF32]/5 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium text-gray-900">{supplier.legal_name}</p>
+                        <p className="text-sm font-medium text-gray-900">{supplier.legal_name}</p>
                         {supplier.source === 'sap' && (
                           <span
                             className="inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded bg-[#222D59]/10 text-[#222D59]"
@@ -269,23 +270,32 @@ export default function ProveedoresPage() {
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm font-mono text-gray-600">{supplier.tax_id}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <p className="text-gray-900">{supplier.contact_name || '-'}</p>
-                    <p className="text-gray-500">{supplier.contact_email || supplier.email || '-'}</p>
+                  <td className="px-3 py-3 text-sm font-mono text-gray-600">{supplier.tax_id}</td>
+                  <td className="px-3 py-3 text-sm">
+                    <p className="text-gray-900">{supplier.contact_name || <span className="text-gray-400">—</span>}</p>
+                    <p className="text-gray-500">{supplier.contact_email || supplier.email || '—'}</p>
                   </td>
-                  <td className="px-4 py-3 text-center text-sm text-gray-600">
-                    {supplier.currency === '##' ? 'Multi' : (supplier.currency ?? '-')}
+                  <td className="px-3 py-3 text-center text-sm text-gray-600">
+                    {supplier.currency === '##' ? 'Multi' : (supplier.currency ?? '—')}
                   </td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <span className={`font-bold ${getScoreColor(supplier.performance_score)}`}>
-                        {supplier.performance_score}
-                      </span>
-                      <span className={getScoreColor(supplier.performance_score)}>{Icons.star}</span>
-                    </div>
+                  <td className="px-3 py-3 text-center">
+                    {(() => {
+                      // performance_score es DEFAULT 0 en BD (Prisma lo serializa como
+                      // string): 0 = nunca evaluado, no una calificación reprobatoria.
+                      const score = Number(supplier.performance_score);
+                      return score > 0 ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <span className={`font-bold ${getScoreColor(score)}`}>
+                            {supplier.performance_score}
+                          </span>
+                          <span className={getScoreColor(score)}>{Icons.star}</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-500 whitespace-nowrap">Sin evaluar</span>
+                      );
+                    })()}
                   </td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="px-3 py-3 text-center">
                     <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${
                       supplier.is_blocked
                         ? 'bg-red-100 text-red-800'
@@ -294,12 +304,12 @@ export default function ProveedoresPage() {
                       {supplier.is_blocked ? 'Bloqueado' : 'Activo'}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     {canManage ? (
-                      <div className="flex items-center justify-center gap-2">
+                      <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => handleEdit(supplier)}
-                          className="p-2 text-[#52AF32] hover:bg-[#52AF32]/10 rounded-lg transition-colors"
+                          className="p-1.5 text-[#52AF32] hover:bg-[#52AF32]/10 rounded-lg transition-colors"
                           title="Editar"
                         >
                           {Icons.edit}
@@ -307,7 +317,7 @@ export default function ProveedoresPage() {
                         {supplier.is_blocked ? (
                           <button
                             onClick={() => handleUnblock(supplier.id)}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                             title="Desbloquear"
                           >
                             {Icons.check}
@@ -315,7 +325,7 @@ export default function ProveedoresPage() {
                         ) : (
                           <button
                             onClick={() => handleBlock(supplier.id)}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                             title="Bloquear"
                           >
                             {Icons.ban}
@@ -337,6 +347,7 @@ export default function ProveedoresPage() {
               )}
             </tbody>
           </table>
+          </div>
         )}
         {meta && meta.totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
@@ -353,7 +364,7 @@ export default function ProveedoresPage() {
                 Anterior
               </button>
               <span className="text-sm text-gray-700">
-                Pagina {meta.page} de {meta.totalPages}
+                Página {meta.page} de {meta.totalPages}
               </span>
               <button
                 onClick={() => setPage(page + 1)}

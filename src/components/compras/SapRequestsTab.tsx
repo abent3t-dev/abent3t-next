@@ -96,7 +96,7 @@ export default function SapRequestsTab({ initialStatus = [] }: { initialStatus?:
             type="text"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Buscar por numero o solicitante..."
+            placeholder="Buscar por número o solicitante..."
             className="flex-1 min-w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
           />
           <StatusMultiSelect
@@ -131,10 +131,10 @@ export default function SapRequestsTab({ initialStatus = [] }: { initialStatus?:
           </div>
         ) : requests.length === 0 && !hasFilters ? (
           <div className="p-10 text-center space-y-2">
-            <p className="text-gray-500">Aun no hay solicitudes sincronizadas desde SAP</p>
+            <p className="text-gray-500">Aún no hay solicitudes sincronizadas desde SAP</p>
             {canSeeIntegrations && (
               <Link href="/compras/integraciones" className="text-sm text-[#52AF32] hover:underline">
-                Ver estado de la integracion
+                Ver estado de la integración
               </Link>
             )}
           </div>
@@ -144,13 +144,13 @@ export default function SapRequestsTab({ initialStatus = [] }: { initialStatus?:
               <table className="w-full">
                 <thead className="bg-[#424846]">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Numero</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Número</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Solicitante</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Monto (lineas)</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Monto (líneas)</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">F. Documento</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">F. Requerida</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Clasif. lineas</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Clasif. líneas</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -178,9 +178,9 @@ export default function SapRequestsTab({ initialStatus = [] }: { initialStatus?:
                         <td className="px-4 py-3 text-center text-sm text-gray-600">{formatDate(pr.required_date)}</td>
                         <td className="px-4 py-3 text-center text-sm">
                           {pr.lines_total === 0 ? (
-                            <span className="text-gray-400">—</span>
+                            <span className="text-gray-500">—</span>
                           ) : pr.lines_classified === 0 ? (
-                            <span className="text-gray-400 italic">Sin clasificar</span>
+                            <span className="text-gray-500 italic">Sin clasificar</span>
                           ) : (
                             <span className="text-gray-700">{pr.lines_classified}/{pr.lines_total}</span>
                           )}
@@ -206,7 +206,7 @@ export default function SapRequestsTab({ initialStatus = [] }: { initialStatus?:
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setPage(page - 1)} disabled={!meta.hasPrev} className="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Anterior</button>
-                  <span className="text-sm text-gray-700">Pagina {meta.page} de {meta.totalPages}</span>
+                  <span className="text-sm text-gray-700">Página {meta.page} de {meta.totalPages}</span>
                   <button onClick={() => setPage(page + 1)} disabled={!meta.hasNext} className="px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Siguiente</button>
                 </div>
               </div>
