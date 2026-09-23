@@ -621,7 +621,7 @@ export default function ReportesComprasPage() {
             label="Días de gestión (prom.)"
             value={diasPromedio === null ? NO_DISPONIBLE : formatDays(diasPromedio)}
             lines={diasGestion.map(([k, v]) => `${k}: ${v === null ? 'sin datos' : formatDays(v)}`)}
-            hint="SAP: de la fecha del documento al cierre, en solicitudes cerradas en el periodo. Maximo: de la solicitud a su aprobación. ABENT: días hábiles de requisiciones cerradas. Promedio simple de las fuentes con datos."
+            hint="SAP: de la fecha del documento al cierre, en solicitudes cerradas en el periodo (la gestión de OC — solicitud de pedido → OC — está en Tiempos de aprobación). Maximo: de la solicitud a su aprobación. ABENT: días hábiles de requisiciones cerradas. Promedio simple de las fuentes con datos."
             border="border-yellow-500"
           />
           <KpiCard
@@ -780,8 +780,12 @@ export default function ReportesComprasPage() {
               )}
             </div>
             <div className="space-y-3">
-              <p className="text-sm font-medium text-[#424846]">SAP — tiempo de autorización</p>
+              <p className="text-sm font-medium text-[#424846]">SAP — tiempo de autorización y gestión</p>
               <div className="flex gap-4 flex-wrap text-sm text-gray-700">
+                <span title={tiempos.sap.gestion_oc.definicion}>
+                  Gestión de OC (solicitud de pedido → OC): <strong>{formatDays(tiempos.sap.gestion_oc.promedio_dias)}</strong>
+                  {tiempos.sap.gestion_oc.total > 0 && ` (promedio de ${tiempos.sap.gestion_oc.total.toLocaleString('es-MX')} OC con solicitud)`}
+                </span>
                 <span>Autorizadas: <strong>{formatDays(tiempos.sap.solicitudes_autorizadas.promedio_dias)}</strong> ({tiempos.sap.solicitudes_autorizadas.total})</span>
                 <span>Pendientes: <strong>{tiempos.sap.pendientes.total}</strong>{tiempos.sap.pendientes.dias_esperando_promedio !== null && ` · esperando ${tiempos.sap.pendientes.dias_esperando_promedio} días en promedio`}</span>
               </div>

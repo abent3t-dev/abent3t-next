@@ -1,12 +1,18 @@
 'use client';
 
 import { formatDays } from '@/lib/compras-format';
+import { SHOW_INTERNAL_REQUISITIONS } from '@/lib/features';
 import type { ApprovalStats, ApprovalTimesReport } from '@/types/purchases';
 
 /**
  * Quién tiene detenidas las aprobaciones y desde cuándo (dashboard y
  * reportes). SAP sí dice quién tiene cada solicitud; Maximo solo registra al
  * aprobador cuando aprueba, así que de sus OC en espera solo hay conteo y días.
+ *
+ * D6 (2026-09-23): los nombres ya llegan resueltos con los alias de SAP/Maximo
+ * (Compras → Roles → Usuarios de SAP y Maximo); `usuario` conserva el código.
+ * En los niveles del flujo propio se muestran los usuarios del ERP ligados a
+ * cada aprobador y sus autorizaciones pendientes en SAP.
  */
 
 const LEVEL_LABELS: Record<number, string> = {
@@ -45,8 +51,10 @@ export function SapPendingApprovers({ tiempos }: { tiempos: ApprovalTimesReport 
                 const esperando = row.dias_esperando_max;
                 const retrasado = esperando !== null && promedio !== null && esperando > promedio;
                 return (
-                  <tr key={row.aprobador}>
-                    <td className="px-3 py-2 text-gray-900 font-medium">{row.aprobador}</td>
+                  <tr key={row.usuario ?? row.aprobador}>
+                    <td className="px-3 py-2 text-gray-900 font-medium" title={row.usuario && row.usuario !== row.aprobador ? `Usuario SAP: ${row.usuario}` : undefined}>
+                      {row.aprobador}
+                    </td>
                     <td className="px-3 py-2 text-right text-gray-900 tabular-nums">{row.pendientes}</td>
                     <td className={`px-3 py-2 text-right tabular-nums font-semibold ${retrasado ? 'text-red-700' : 'text-gray-900'}`}>
                       {esperando === null ? 'Sin fecha' : dayCount(esperando)}
@@ -106,24 +114,42 @@ export function AbentLevels({
         {niveles.map((nivel) => {
           const s = stats?.[nivel.level];
           const total = s?.total ?? 0;
+          const erp = nivel.erp_usuarios ?? [];
           return (
             <div key={nivel.level} className="p-3 bg-gray-50 rounded-lg border border-gray-100">
               <p className="text-sm font-medium text-[#424846]">{LEVEL_LABELS[nivel.level] ?? `Nivel ${nivel.level}`}</p>
-              <p className="text-2xl font-bold text-[#424846] tabular-nums">{total}</p>
-              <p className="text-xs text-gray-600">
-                {total === 1 ? 'aprobación' : 'aprobaciones'} ·{' '}
-                {total > 0 && s ? `promedio ${formatDays(s.average_time_days)}` : 'promedio sin datos'}
-              </p>
+              {SHOW_INTERNAL_REQUISITIONS ? (
+                <>
+                  <p className="text-2xl font-bold text-[#424846] tabular-nums">{total}</p>
+                  <p className="text-xs text-gray-600">
+                    {total === 1 ? 'aprobación' : 'aprobaciones'} ·{' '}
+                    {total > 0 && s ? `promedio ${formatDays(s.average_time_days)}` : 'promedio sin datos'}
+                  </p>
+                </>
+              ) : (
+                <p className="text-2xl font-bold text-[#424846] tabular-nums" title="Autorizaciones pendientes en SAP de los usuarios ligados a este nivel">
+                  {nivel.sap_pendientes ?? 0}
+                  <span className="ml-1 text-xs font-normal text-gray-600">pendientes en SAP</span>
+                </p>
+              )}
               <p className={`mt-2 text-xs ${nivel.aprobadores.length ? 'text-gray-800' : 'text-amber-700 font-medium'}`}>
                 {nivel.aprobadores.length ? nivel.aprobadores.join(', ') : 'Sin aprobador asignado en el sistema'}
               </p>
+              {nivel.aprobadores.length > 0 && (
+                <p className="mt-1 text-xs text-gray-500">
+                  {erp.length > 0
+                    ? `Usuarios: ${erp.map((u) => `${u.code} (${u.system === 'sap' ? 'SAP' : 'Maximo'})`).join(', ')}`
+                    : 'Sin usuario de SAP/Maximo ligado (Compras → Roles → Usuarios de SAP y Maximo)'}
+                </p>
+              )}
             </div>
           );
         })}
       </div>
       <p className="text-xs text-gray-600">
-        Estos niveles son del flujo propio de ABENT, que se llena cuando las requisiciones se capturan aquí; las de
-        SAP y Maximo se aprueban en su ERP (tabla de arriba).
+        {SHOW_INTERNAL_REQUISITIONS
+          ? 'Estos niveles son del flujo propio de ABENT, que se llena cuando las requisiciones se capturan aquí; las de SAP y Maximo se aprueban en su ERP (tabla de arriba).'
+          : 'Niveles de aprobación de Compras. Las autorizaciones se hacen en SAP y Maximo; al ligar el usuario del ERP de cada aprobador se muestran aquí sus pendientes.'}
         {sinAsignar > 0 &&
           ` ${sinAsignar === 1 ? 'Un nivel no tiene' : `${sinAsignar} niveles no tienen`} aprobador: se asigna en Compras → Roles.`}
       </p>

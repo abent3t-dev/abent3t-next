@@ -15,11 +15,17 @@ import {
   ExpeditingSource,
 } from '@/types/purchases';
 import ExpeditingModal from '@/components/compras/ExpeditingModal';
+import ExportExcelButton from '@/components/compras/ExportExcelButton';
+import { toQuery } from '@/lib/compras-format';
 
 /**
  * Fase Expeditación — seguimiento de entregas de POs propias: stats,
  * listado con estatus derivado, filtros, "Mis órdenes" para compradores y
  * modal de seguimiento/recepción.
+ *
+ * Bloque 2026-09-23: D9 botón "Exportar Excel" presente desde el primer
+ * render (no espera a los datos; con los mismos filtros); D1 una OC migrada
+ * de Maximo a SAP sale una vez, con badge "migrada de Maximo".
  */
 
 const PAGE_SIZE = 15;
@@ -71,6 +77,13 @@ export default function ExpeditacionPage() {
   if (statusFilter) queryParams.set('status', statusFilter);
   if (sourceFilter) queryParams.set('source', sourceFilter);
   if (onlyMine && user?.id) queryParams.set('buyer_id', user.id);
+  // D9: mismos filtros que el listado, sin paginar
+  const exportQs = toQuery({
+    search,
+    status: statusFilter,
+    source: sourceFilter,
+    buyer_id: onlyMine && user?.id ? user.id : '',
+  });
 
   const listQuery = useQuery({
     queryKey: ['expediting', search, statusFilter, sourceFilter, onlyMine, page],
@@ -170,6 +183,10 @@ export default function ExpeditacionPage() {
             <option value="sap">SAP</option>
             <option value="maximo">Maximo</option>
           </select>
+          <ExportExcelButton
+            path={`/compras/expeditacion/export${exportQs ? `?${exportQs}` : ''}`}
+            filename={`expeditacion_${new Date().toISOString().slice(0, 10)}.xlsx`}
+          />
           {canEdit && (
             <button
               type="button"
@@ -240,6 +257,14 @@ export default function ExpeditacionPage() {
                         >
                           {EXPEDITING_SOURCE_LABELS[item.source]}
                         </span>
+                        {item.source === 'sap' && item.maximo_ponum && (
+                          <span
+                            className="block mt-0.5 text-[10px] text-[#8a6a10] whitespace-nowrap"
+                            title={`OC creada en SAP desde Maximo (${item.maximo_ponum}); se muestra una sola vez, con la fecha comprometida de SAP`}
+                          >
+                            migrada de Maximo {item.maximo_ponum}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
                         {item.supplier?.legal_name ?? '—'}

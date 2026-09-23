@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import UserRolesModal from '@/components/auth/UserRolesModal';
+import ErpAliasesSection from '@/components/compras/ErpAliasesSection';
 import type { UserProfile, UserRole } from '@/types/auth';
 import { ROLE_LABELS } from '@/types/auth';
 
@@ -217,6 +218,9 @@ export default function ComprasRolesPage() {
           </div>
         )}
       </div>
+
+      {/* D6 (2026-09-23): equivalencias de usuarios de SAP y Maximo */}
+      <ErpAliasesSection />
 
       {/* Modal de gestión (acotado a compras: los otros módulos se ven como
           solo lectura y el backend rechaza cualquier intento fuera de alcance) */}
