@@ -3,9 +3,20 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { formatMoney } from '@/lib/compras-format';
+import { formatAmountLines, formatCurrencyAmount, formatDays, NO_DISPONIBLE } from '@/lib/compras-format';
+import { AbentLevels, SapPendingApprovers } from '@/components/compras/ApprovalDelays';
 import { PieChart } from '@/components/charts/PieChart';
-import { MaximoSummary, maximoStatusLabel, sapStatusLabel } from '@/types/purchases';
+import {
+  ApprovalStats,
+  ApprovalTimesReport,
+  CurrencyAmount,
+  MAXIMO_STATUS_CHART_COLORS,
+  MaximoSummary,
+  maximoStatusLabel,
+  SAP_STATUS_CHART_COLORS,
+  sapStatusLabel,
+  statusChartColors,
+} from '@/types/purchases';
 
 /**
  * Fase Reportes — datos REALES desde /compras/reportes/* (adios datos
@@ -33,6 +44,20 @@ interface Resumen {
   };
   contratos: { por_vencer_30_dias: number; valor_vigentes: number };
   proveedores: { bloqueados: number };
+  todas_las_fuentes: {
+    solicitudes: {
+      creadas: number;
+      abiertas: number;
+      por_fuente: Record<'sap' | 'maximo' | 'abent', { creadas: number; abiertas: number }>;
+    };
+    dias_gestion: { sap: number | null; maximo: number | null; abent: number | null };
+    ordenes: {
+      total: number;
+      monto_por_moneda: CurrencyAmount[];
+      por_fuente: Record<'sap' | 'maximo' | 'abent', number>;
+    };
+    contratos_por_vencer_30_dias: { total: number; por_fuente: { abent: number; maximo: number } };
+  };
 }
 
 interface RequisicionesReport {
@@ -141,18 +166,7 @@ interface ErpReport {
     top_proveedores: Array<{ proveedor: string; currency: string | null; count: number; monto: number }>;
   };
 }
-interface TiemposReport {
-  maximo: {
-    ordenes: { promedio_dias: number | null; total: number };
-    ordenes_por_aprobador: Array<{ aprobador: string; promedio_dias: number; total: number }>;
-    contratos: { promedio_dias: number | null; total: number };
-  };
-  sap: {
-    solicitudes_autorizadas: { promedio_dias: number | null; total: number };
-    por_aprobador: Array<{ aprobador: string; promedio_dias: number; total: number }>;
-    pendientes: { total: number; dias_esperando_promedio: number | null };
-  };
-}
+type TiemposReport = ApprovalTimesReport;
 
 interface AhorroReport {
   sap?: {
@@ -175,10 +189,18 @@ const formatCurrency = (amount: number) =>
     amount,
   );
 
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
 const monthLabel = (month: string) => {
   const [year, m] = month.split('-');
-  const names = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-  return `${names[Number(m) - 1]} ${year.slice(2)}`;
+  return `${MESES_CORTOS[Number(m) - 1]} ${year.slice(2)}`;
+};
+
+// Sin Date: el input "Personalizado" puede quedar vacío ('') mientras se edita.
+const fechaCorta = (s: string) => {
+  const [y, m, d] = s.split('-');
+  if (!y || !m || !d) return '—';
+  return `${Number(d)} ${MESES_CORTOS[Number(m) - 1]} ${y}`;
 };
 
 const iso = (d: Date) => d.toISOString().split('T')[0];
@@ -210,7 +232,7 @@ function Section({
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex items-baseline justify-between mb-4 gap-3 flex-wrap">
         <h3 className="text-lg font-semibold text-[#424846]">{title}</h3>
-        {note && <span className="text-xs text-gray-400">{note}</span>}
+        {note && <span className="text-xs text-gray-500">{note}</span>}
       </div>
       {children}
     </div>
@@ -228,6 +250,8 @@ function HBar({
   display,
   color = 'bg-[#52AF32]',
   highlight = false,
+  labelClassName = 'w-40',
+  displayClassName = 'w-28',
 }: {
   label: string;
   value: number;
@@ -235,17 +259,19 @@ function HBar({
   display?: string;
   color?: string;
   highlight?: boolean;
+  labelClassName?: string;
+  displayClassName?: string;
 }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
     <div className="flex items-center gap-3">
-      <div className={`w-40 text-sm truncate ${highlight ? 'text-red-700 font-medium' : 'text-gray-600'}`} title={label}>
+      <div className={`${labelClassName} text-sm truncate ${highlight ? 'text-red-700 font-medium' : 'text-gray-600'}`} title={label}>
         {label}
       </div>
       <div className="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
         <div className={`h-full ${highlight ? 'bg-red-500' : color}`} style={{ width: `${pct}%` }} />
       </div>
-      <div className="w-28 text-sm text-right text-gray-700">{display ?? value}</div>
+      <div className={`${displayClassName} text-sm text-right text-gray-700`}>{display ?? value}</div>
     </div>
   );
 }
@@ -253,57 +279,99 @@ function HBar({
 function KpiCard({
   label,
   value,
+  lines,
   sub,
+  hint,
   border,
 }: {
   label: string;
   value: string | number;
+  /** Un renglón por dato (p. ej. un monto por moneda). */
+  lines?: string[];
   sub?: string;
+  hint?: string;
   border: string;
 }) {
   return (
-    <div className={`bg-white p-4 rounded-lg shadow border-l-4 ${border}`}>
-      <p className="text-sm text-gray-500">{label}</p>
-      <p className="text-xl font-bold text-[#424846]">{value}</p>
-      {sub && <p className="text-xs text-gray-400">{sub}</p>}
+    <div className={`bg-white p-4 rounded-lg shadow border-l-4 ${border}`} title={hint}>
+      <p className="text-sm text-gray-600">{label}</p>
+      <p className="text-2xl font-bold text-[#424846] tabular-nums">{value}</p>
+      {lines && lines.length > 0 && (
+        <ul className="mt-1 space-y-0.5">
+          {lines.map((line) => (
+            <li key={line} className="text-sm text-gray-800 tabular-nums break-words">
+              {line}
+            </li>
+          ))}
+        </ul>
+      )}
+      {sub && <p className="text-xs text-gray-600 mt-1">{sub}</p>}
     </div>
   );
 }
 
-const ERP_PIE_COLORS = ['#52AF32', '#9ca3af', '#ef4444', '#222D59', '#DFA922', '#3b82f6', '#f59e0b', '#67B52E'];
+function porFuente<T>(
+  fuentes: Record<'sap' | 'maximo' | 'abent', T>,
+  valor: (v: T) => number,
+): string {
+  return `SAP ${valor(fuentes.sap).toLocaleString('es-MX')} · Maximo ${valor(fuentes.maximo).toLocaleString('es-MX')} · ABENT ${valor(fuentes.abent).toLocaleString('es-MX')}`;
+}
 
 function ErpPie({
   data,
   labelOf,
+  colorOf,
+  noun,
 }: {
   data: Array<{ status: string | null; count: number }>;
   labelOf: (s: string | null) => string;
+  colorOf: Record<string, string>;
+  noun: string;
 }) {
-  const rows = data.filter((d) => d.count > 0).map((d) => ({ name: labelOf(d.status), value: d.count }));
+  const rows = data
+    .filter((d) => d.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .map((d) => {
+      // La API manda el centinela 'sin_estatus' en vez de null.
+      const status = d.status === 'sin_estatus' ? null : d.status;
+      return { name: labelOf(status), value: d.count, status };
+    });
   if (rows.length === 0) return <Empty />;
-  return <PieChart data={rows} dataKey="value" nameKey="name" colors={ERP_PIE_COLORS} height={220} />;
+  const colors = statusChartColors(
+    rows.map((r) => r.status),
+    colorOf,
+  );
+  return <PieChart data={rows} dataKey="value" nameKey="name" colors={colors} height={200} centerCaption={noun} />;
 }
 
 function ErpMonths({ serie }: { serie: ErpSerie }) {
   const max = Math.max(...serie.meses.map((m) => m.count), 1);
   if (serie.meses.every((m) => m.count === 0)) return <Empty />;
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
       {serie.meses.map((m) => (
-        <HBar
-          key={m.month}
-          label={monthLabel(m.month)}
-          value={m.count}
-          max={max}
-          display={
-            m.count === 0
-              ? '0'
-              : m.por_moneda
+        <div key={m.month} className="flex items-start gap-3">
+          <div className="w-14 shrink-0 text-sm text-gray-600">{monthLabel(m.month)}</div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-[#52AF32]" style={{ width: `${Math.round((m.count / max) * 100)}%` }} />
+              </div>
+              <span className="w-10 shrink-0 text-right text-sm font-semibold text-gray-700 tabular-nums">{m.count}</span>
+            </div>
+            {m.count > 0 && (
+              <p className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-gray-600">
+                {m.por_moneda
                   .filter((c) => c.count > 0)
-                  .map((c) => `${c.currency} ${formatMoney(c.monto, c.currency)}`)
-                  .join(' · ') + ` · ${m.count}`
-          }
-        />
+                  .map((c) => (
+                    <span key={c.currency} className="whitespace-nowrap">
+                      {formatCurrencyAmount(c.monto, c.currency)}
+                    </span>
+                  ))}
+              </p>
+            )}
+          </div>
+        </div>
       ))}
     </div>
   );
@@ -385,12 +453,27 @@ export default function ReportesComprasPage() {
     maximoSummaryQ.data?.syncEnabled === false &&
     (maximo?.purchase_orders.por_estatus.length ?? 0) === 0;
 
-  const maxAvgLevel = aprobaciones
-    ? Math.max(
-        0,
-        ...Object.values(aprobaciones.stats).map((l) => l.average_time_days),
-      )
-    : 0;
+  const diasGestion: Array<[string, number | null]> = resumen
+    ? [
+        ['SAP', resumen.todas_las_fuentes.dias_gestion.sap],
+        ['Maximo', resumen.todas_las_fuentes.dias_gestion.maximo],
+        ['ABENT', resumen.todas_las_fuentes.dias_gestion.abent],
+      ]
+    : [];
+  const diasConBase = diasGestion.filter(([, v]) => v !== null) as Array<[string, number]>;
+  const diasPromedio =
+    diasConBase.length === 0
+      ? null
+      : Math.round((diasConBase.reduce((sum, [, v]) => sum + v, 0) / diasConBase.length) * 10) / 10;
+
+  // Captura propia de ABENT: si todo está vacío se muestra un aviso compacto
+  // al final en lugar de cuatro tarjetas "Sin datos" arriba.
+  const abentVacio =
+    !!rq &&
+    !!po &&
+    rq.serie_mensual.every((m) => m.creadas === 0 && m.cerradas === 0) &&
+    po.serie_mensual.every((m) => m.count === 0) &&
+    (!comite || comite.tiempos.byApprover.length === 0);
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -399,7 +482,7 @@ export default function ReportesComprasPage() {
         <div>
           <h1 className="text-2xl font-bold text-[#424846]">Reportes de Compras</h1>
           <p className="text-gray-500">
-            Datos reales del periodo {range.from} — {range.to}
+            Datos reales del periodo {fechaCorta(range.from)} — {fechaCorta(range.to)}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -442,50 +525,362 @@ export default function ReportesComprasPage() {
         </div>
       </div>
 
-      {/* KPIs cabecera */}
+      {/* KPIs cabecera: SAP + Maximo + registros propios */}
       {resumen && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 gap-4">
           <KpiCard
-            label="RQs del periodo"
-            value={resumen.requisiciones.creadas_en_periodo}
-            sub={`${resumen.requisiciones.abiertas_actuales} abiertas hoy`}
+            label="Solicitudes del periodo"
+            value={resumen.todas_las_fuentes.solicitudes.creadas.toLocaleString('es-MX')}
+            lines={[`${resumen.todas_las_fuentes.solicitudes.abiertas.toLocaleString('es-MX')} abiertas hoy`]}
+            sub={porFuente(resumen.todas_las_fuentes.solicitudes.por_fuente, (f) => f.creadas)}
+            hint="Solicitudes de pedido de SAP y solicitudes (PR) de Maximo creadas en el periodo, más requisiciones capturadas en ABENT."
             border="border-blue-500"
           />
           <KpiCard
             label="Días de gestión (prom.)"
-            value={resumen.requisiciones.promedio_dias_gestion ?? '—'}
-            sub="RQs cerradas en el periodo"
+            value={diasPromedio === null ? NO_DISPONIBLE : formatDays(diasPromedio)}
+            lines={diasGestion.map(([k, v]) => `${k}: ${v === null ? 'sin datos' : formatDays(v)}`)}
+            hint="SAP: de la fecha del documento al cierre, en solicitudes cerradas en el periodo. Maximo: de la solicitud a su aprobación. ABENT: días hábiles de requisiciones cerradas. Promedio simple de las fuentes con datos."
             border="border-yellow-500"
           />
           <KpiCard
-            label="POs del periodo"
-            value={resumen.ordenes.creadas_en_periodo}
-            sub={formatCurrency(resumen.ordenes.monto_total)}
+            label="Órdenes del periodo"
+            value={resumen.todas_las_fuentes.ordenes.total.toLocaleString('es-MX')}
+            lines={formatAmountLines(resumen.todas_las_fuentes.ordenes.monto_por_moneda)}
+            sub={porFuente(resumen.todas_las_fuentes.ordenes.por_fuente, (n) => n)}
+            hint="OC no canceladas de SAP y Maximo creadas en el periodo, más OC propias. Un monto por moneda: nunca se suman MXN con USD."
             border="border-[#52AF32]"
           />
           <KpiCard
-            label="Entregas pendientes"
-            value={resumen.entregas.pendientes}
-            sub={`${resumen.entregas.vencidas} vencidas`}
+            label="Entregas abiertas"
+            value={(resumen.entregas.pendientes + resumen.entregas.vencidas).toLocaleString('es-MX')}
+            lines={[
+              `${resumen.entregas.vencidas.toLocaleString('es-MX')} vencidas`,
+              `${resumen.entregas.pendientes.toLocaleString('es-MX')} en tiempo o en riesgo`,
+            ]}
+            hint="OC abiertas por recibir (SAP, Maximo y propias) según su fecha comprometida; mismo cálculo que Expeditación."
             border="border-orange-500"
           />
           <KpiCard
-            label="Contratos por vencer"
-            value={resumen.contratos.por_vencer_30_dias}
-            sub={`vigentes: ${formatCurrency(resumen.contratos.valor_vigentes)}`}
+            label="Contratos por vencer (30 días)"
+            value={resumen.todas_las_fuentes.contratos_por_vencer_30_dias.total}
+            sub={`ABENT ${resumen.todas_las_fuentes.contratos_por_vencer_30_dias.por_fuente.abent} · Maximo ${resumen.todas_las_fuentes.contratos_por_vencer_30_dias.por_fuente.maximo}`}
+            lines={resumen.contratos.valor_vigentes > 0 ? [`Vigentes: ${formatCurrencyAmount(resumen.contratos.valor_vigentes, 'MXN')}`] : undefined}
             border="border-[#222D59]"
           />
           <KpiCard
             label="Proveedores bloqueados"
             value={resumen.proveedores.bloqueados}
+            sub="bloqueados en ABENT por desempeño"
             border="border-red-500"
           />
         </div>
       )}
 
+      {/* SAP + Maximo por periodo (sprint 2026-09-22, B2) */}
+      <Section title="SAP Business One — órdenes y solicitudes en el periodo" note="montos por moneda, nunca sumados entre monedas">
+        {erpQ.isError ? (
+          <p className="text-sm text-red-600">No se pudo cargar el reporte de los ERPs.</p>
+        ) : !erp ? (
+          <Empty />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div>
+              <p className="text-sm font-medium text-[#424846] mb-2">Órdenes por estatus</p>
+              <ErpPie data={erp.sap.ordenes.por_estatus} labelOf={sapStatusLabel} colorOf={SAP_STATUS_CHART_COLORS} noun="órdenes" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-[#424846] mb-2">Solicitudes por estatus</p>
+              <ErpPie data={erp.sap.solicitudes.por_estatus} labelOf={sapStatusLabel} colorOf={SAP_STATUS_CHART_COLORS} noun="solicitudes" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-[#424846]">Órdenes por mes</p>
+              <ErpMonths serie={erp.sap.ordenes.serie_mensual} />
+            </div>
+            <div className="lg:col-span-3 space-y-2">
+              <p className="text-sm font-medium text-[#424846]">Top proveedores por monto (OC)</p>
+              {erp.sap.top_proveedores.length === 0 ? (
+                <Empty />
+              ) : (
+                erp.sap.top_proveedores.map((row) => (
+                  <HBar
+                    key={`${row.proveedor}-${row.currency}`}
+                    label={row.proveedor}
+                    value={row.monto}
+                    max={Math.max(...erp.sap.top_proveedores.filter((r) => r.currency === row.currency).map((r) => r.monto), 1)}
+                    display={`${formatCurrencyAmount(row.monto, row.currency)} · ${row.count}`}
+                    labelClassName="w-40 lg:w-72"
+                    displayClassName="w-28 lg:w-48 lg:whitespace-nowrap"
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </Section>
+
+      <Section title="Maximo — órdenes y contratos en el periodo" note="vista vigente (última revisión); estatus en español">
+        {erpQ.isError ? (
+          <p className="text-sm text-red-600">No se pudo cargar el reporte de los ERPs.</p>
+        ) : !erp ? (
+          <Empty />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div>
+              <p className="text-sm font-medium text-[#424846] mb-2">Órdenes por estatus</p>
+              <ErpPie data={erp.maximo.ordenes.por_estatus} labelOf={maximoStatusLabel} colorOf={MAXIMO_STATUS_CHART_COLORS} noun="órdenes" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-[#424846] mb-2">Solicitudes / contratos por estatus</p>
+              <ErpPie data={erp.maximo.contratos.por_estatus} labelOf={maximoStatusLabel} colorOf={MAXIMO_STATUS_CHART_COLORS} noun="solicitudes" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-[#424846]">Órdenes por mes</p>
+              <ErpMonths serie={erp.maximo.ordenes.serie_mensual} />
+            </div>
+            <div className="lg:col-span-3 space-y-2">
+              <p className="text-sm font-medium text-[#424846]">Top proveedores por monto (OC)</p>
+              {erp.maximo.top_proveedores.length === 0 ? (
+                <Empty />
+              ) : (
+                erp.maximo.top_proveedores.map((row) => (
+                  <HBar
+                    key={`${row.proveedor}-${row.currency}`}
+                    label={row.proveedor}
+                    value={row.monto}
+                    max={Math.max(...erp.maximo.top_proveedores.filter((r) => r.currency === row.currency).map((r) => r.monto), 1)}
+                    display={`${formatCurrencyAmount(row.monto, row.currency)} · ${row.count}`}
+                    color="bg-[#222D59]"
+                    labelClassName="w-40 lg:w-72"
+                    displayClassName="w-28 lg:w-48 lg:whitespace-nowrap"
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </Section>
+
+      {/* Tiempos de aprobación SAP + Maximo (sprint 2026-09-22, B3) */}
+      <Section title="Tiempos de aprobación — SAP, Maximo y ABENT" note="días naturales; 'No disponible' = sin base para calcular">
+        {tiemposQ.isError ? (
+          <p className="text-sm text-red-600">No se pudo cargar el reporte de tiempos.</p>
+        ) : !tiempos ? (
+          <Empty />
+        ) : (
+          <div className="space-y-6">
+          <div>
+            <p className="text-sm font-medium text-[#424846] mb-2">Autorizaciones pendientes en SAP — quién las tiene y desde cuándo</p>
+            <SapPendingApprovers tiempos={tiempos} />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-[#424846]">Maximo — tiempo de aprobación</p>
+              <div className="flex gap-4 flex-wrap text-sm text-gray-700">
+                <span>OC (en espera → aprobada): <strong>{formatDays(tiempos.maximo.ordenes.promedio_dias)}</strong> ({tiempos.maximo.ordenes.total})</span>
+                <span>Contratos: <strong>{formatDays(tiempos.maximo.contratos.promedio_dias)}</strong> ({tiempos.maximo.contratos.total})</span>
+              </div>
+              <p className="text-xs text-gray-500">Por aprobador (usuario Maximo que aprobó la OC)</p>
+              {tiempos.maximo.ordenes_por_aprobador.length === 0 ? (
+                <Empty text="Sin aprobaciones con aprobador identificado" />
+              ) : (
+                tiempos.maximo.ordenes_por_aprobador.map((row) => (
+                  <HBar
+                    key={row.aprobador}
+                    label={row.aprobador}
+                    value={row.promedio_dias}
+                    max={Math.max(...tiempos.maximo.ordenes_por_aprobador.map((r) => r.promedio_dias), 1)}
+                    display={`${formatDays(row.promedio_dias)} · ${row.total}`}
+                    color="bg-[#222D59]"
+                    labelClassName="w-52"
+                  />
+                ))
+              )}
+            </div>
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-[#424846]">SAP — tiempo de autorización</p>
+              <div className="flex gap-4 flex-wrap text-sm text-gray-700">
+                <span>Autorizadas: <strong>{formatDays(tiempos.sap.solicitudes_autorizadas.promedio_dias)}</strong> ({tiempos.sap.solicitudes_autorizadas.total})</span>
+                <span>Pendientes: <strong>{tiempos.sap.pendientes.total}</strong>{tiempos.sap.pendientes.dias_esperando_promedio !== null && ` · esperando ${tiempos.sap.pendientes.dias_esperando_promedio} días en promedio`}</span>
+              </div>
+              <p className="text-xs text-gray-500">Por aprobador (usuario SAP que autorizó)</p>
+              {tiempos.sap.por_aprobador.length === 0 ? (
+                <Empty text="Sin autorizaciones sincronizadas todavía" />
+              ) : (
+                tiempos.sap.por_aprobador.map((row) => (
+                  <HBar
+                    key={row.aprobador}
+                    label={row.aprobador}
+                    value={row.promedio_dias}
+                    max={Math.max(...tiempos.sap.por_aprobador.map((r) => r.promedio_dias), 1)}
+                    display={`${formatDays(row.promedio_dias)} · ${row.total}`}
+                    labelClassName="w-52"
+                  />
+                ))
+              )}
+            </div>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-[#424846] mb-2">Flujo propio ABENT — por nivel</p>
+            <AbentLevels niveles={tiempos.abent_niveles} stats={aprobaciones?.stats as ApprovalStats | undefined} />
+          </div>
+          </div>
+        )}
+      </Section>
+
+      {/* Entregas + Contratos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Section title="Desempeño de entregas" note="acumulado">
+          {!entregas ? (
+            <Empty />
+          ) : (
+            <div className="space-y-3">
+              <div className="flex gap-4 text-sm text-gray-600 flex-wrap">
+                <span><strong>En tiempo:</strong> {entregas.stats.counts.en_tiempo}</span>
+                <span><strong>En riesgo:</strong> {entregas.stats.counts.en_riesgo}</span>
+                <span className="text-red-700"><strong>Retrasadas:</strong> {entregas.stats.counts.retrasada}</span>
+                <span><strong>Entregadas:</strong> {entregas.stats.counts.entregada}</span>
+                <span><strong>Retraso prom.:</strong> {formatDays(entregas.stats.avg_delay_days)}</span>
+              </div>
+              {entregas.on_time_por_proveedor.length === 0 ? (
+                <Empty text="Aún no hay entregas completadas" />
+              ) : (
+                entregas.on_time_por_proveedor.map((row) => (
+                  <HBar
+                    key={row.proveedor}
+                    label={row.proveedor}
+                    value={row.rate}
+                    max={100}
+                    display={`${row.rate}% (${row.a_tiempo}/${row.entregadas})`}
+                    color={row.rate >= 80 ? 'bg-[#52AF32]' : row.rate >= 50 ? 'bg-amber-500' : 'bg-red-500'}
+                  />
+                ))
+              )}
+            </div>
+          )}
+        </Section>
+        <Section title="Contratos">
+          {!contratos ? (
+            <Empty />
+          ) : (
+            <div className="space-y-3">
+              <div className="flex gap-6 text-sm text-gray-600 flex-wrap">
+                <span><strong>Vigentes:</strong> {contratos.vigentes.total} ({contratos.vigentes.total > 0 && contratos.vigentes.valor_total === 0 ? 'monto no disponible' : formatCurrency(contratos.vigentes.valor_total)})</span>
+                <span><strong>Consumo prom.:</strong> {contratos.promedio_consumo_pct === null ? 'No disponible' : `${contratos.promedio_consumo_pct}%`}</span>
+              </div>
+              {contratos.por_vencer_30_dias.length === 0 ? (
+                <Empty text="Sin contratos por vencer en 30 días" />
+              ) : (
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-amber-700">Por vencer (≤30 días):</p>
+                  {contratos.por_vencer_30_dias.map((contract) => (
+                    <p key={contract.id} className="text-sm text-gray-700">
+                      <span className="font-mono">{contract.contract_number}</span>
+                      {' · '}{contract.proveedor}{' · vence '}
+                      {new Date(contract.end_date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', timeZone: 'UTC' })}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </Section>
+      </div>
+
+      {/* Ahorro */}
+      <Section
+          title="Ahorro por fuente"
+          note="fuentes no sumables entre sí"
+        >
+          {!ahorro ? (
+            <Empty />
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="border border-gray-200 rounded-lg p-3">
+                <p className="text-sm font-medium text-[#424846]">ABENT</p>
+                {ahorro.abent.disponible ? null : (
+                  <p className="text-xs text-gray-500 mt-1">
+                    No disponible: las requisiciones y órdenes de ABENT aún no registran el ahorro.
+                  </p>
+                )}
+              </div>
+              <div className="border border-gray-200 rounded-lg p-3">
+                <p className="text-sm font-medium text-[#424846]">Maximo</p>
+                {ahorro.maximo.por_moneda.length === 0 ? (
+                  <p className="text-xs text-gray-500 mt-1">Sin registros con ahorro</p>
+                ) : (
+                  ahorro.maximo.por_moneda.map((row) => (
+                    <p key={row.currency} className="text-sm text-gray-700 mt-1">
+                      <strong>{formatCurrencyAmount(row.total, row.currency)}</strong>{' '}
+                      <span className="text-xs text-gray-500">({row.registros} {row.registros === 1 ? 'PO' : 'POs'})</span>
+                    </p>
+                  ))
+                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  Sin clasificar (histórico): {ahorro.maximo.sin_clasificar} {ahorro.maximo.sin_clasificar === 1 ? 'PO' : 'POs'}
+                </p>
+              </div>
+            </div>
+          )}
+      </Section>
+
+      {/* Maximo */}
+      <Section title="Maximo — volumen" note="históricos con campos vacíos = sin clasificar">
+        {maximoPendiente ? (
+          <Empty text="Sincronización pendiente de activación (configuración del servidor)" />
+        ) : !maximo ? (
+          <Empty />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-[#424846]">Órdenes por estatus</p>
+              {maximo.purchase_orders.por_estatus.map((row) => (
+                <HBar
+                  key={row.status}
+                  label={row.status === 'sin_clasificar' ? 'Sin clasificar' : maximoStatusLabel(row.status)}
+                  value={row.count}
+                  max={Math.max(...maximo.purchase_orders.por_estatus.map((r) => r.count), 1)}
+                  color={row.status === 'sin_clasificar' ? 'bg-gray-400' : 'bg-[#52AF32]'}
+                />
+              ))}
+              <p className="text-xs text-gray-500">
+                Sin fecha de aprobación: {maximo.purchase_orders.sin_fecha_aprobacion} {maximo.purchase_orders.sin_fecha_aprobacion === 1 ? 'PO' : 'POs'}
+                (fuera de la serie mensual)
+              </p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-[#424846]">Contratos por estatus</p>
+              {maximo.contracts.por_estatus.length === 0 ? (
+                <Empty text="Sin contratos de Maximo en el periodo" />
+              ) : (
+                maximo.contracts.por_estatus.map((row) => (
+                  <HBar
+                    key={row.status}
+                    label={row.status === 'sin_clasificar' ? 'Sin clasificar' : maximoStatusLabel(row.status)}
+                    value={row.count}
+                    max={Math.max(...maximo.contracts.por_estatus.map((r) => r.count), 1)}
+                    color={row.status === 'sin_clasificar' ? 'bg-gray-400' : 'bg-[#222D59]'}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </Section>
+      {/* Captura propia de ABENT */}
+      {abentVacio ? (
+        <Section title="Registros propios de ABENT" note="requisiciones, órdenes y comité capturados en ABENT">
+          <p className="text-sm text-gray-700">
+            En este periodo todavía no hay requisiciones, órdenes ni comités capturados directamente en ABENT, así que
+            sus gráficas (creadas vs cerradas, monto adjudicado, top proveedores, tiempos del comité) aparecerán aquí en
+            cuanto el equipo empiece a capturar. Lo de SAP y Maximo ya está arriba.
+          </p>
+        </Section>
+      ) : (
+        <>
       {/* Requisiciones */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Section title="Requisiciones — creadas vs cerradas por mes">
+        <Section title="Requisiciones ABENT — creadas vs cerradas por mes">
           {!rq || rq.serie_mensual.every((m) => m.creadas === 0 && m.cerradas === 0) ? (
             <Empty />
           ) : (
@@ -520,7 +915,7 @@ export default function ReportesComprasPage() {
           )}
         </Section>
 
-        <Section title="Requisiciones — por estatus y tipo">
+        <Section title="Requisiciones ABENT — por estatus y tipo">
           {!rq || rq.por_estatus.length === 0 ? (
             <Empty />
           ) : (
@@ -548,7 +943,7 @@ export default function ReportesComprasPage() {
 
       {/* Órdenes y montos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Section title="Órdenes — monto adjudicado por mes">
+        <Section title="Órdenes ABENT — monto adjudicado por mes">
           {!po || po.serie_mensual.every((m) => m.count === 0) ? (
             <Empty />
           ) : (
@@ -574,7 +969,7 @@ export default function ReportesComprasPage() {
           )}
         </Section>
 
-        <Section title="Órdenes — top proveedores y tipo de compra">
+        <Section title="Órdenes ABENT — top proveedores y tipo de compra">
           {!po || po.top_proveedores.length === 0 ? (
             <Empty />
           ) : (
@@ -602,131 +997,8 @@ export default function ReportesComprasPage() {
         </Section>
       </div>
 
-      {/* Aprobaciones + Entregas */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Section title="Tiempos de aprobación por nivel" note="acumulado (fórmula existente)">
-          {!aprobaciones || Object.values(aprobaciones.stats).every((l) => l.total === 0) ? (
-            <Empty text="Sin aprobaciones registradas" />
-          ) : (
-            <div className="space-y-2">
-              {Object.values(aprobaciones.stats).map((level) => (
-                <HBar
-                  key={level.level}
-                  label={level.level_name}
-                  value={level.average_time_days}
-                  max={Math.max(1, maxAvgLevel)}
-                  display={`${level.average_time_days} días · ${level.approval_rate}%`}
-                  highlight={
-                    level.average_time_days === maxAvgLevel && maxAvgLevel > 0
-                  }
-                />
-              ))}
-              <p className="text-xs text-gray-400">
-                En rojo: el nivel más lento (cuello de botella)
-              </p>
-            </div>
-          )}
-        </Section>
-
-        <Section title="Desempeño de entregas" note="acumulado (fórmula existente)">
-          {!entregas ? (
-            <Empty />
-          ) : (
-            <div className="space-y-3">
-              <div className="flex gap-4 text-sm text-gray-600 flex-wrap">
-                <span><strong>En tiempo:</strong> {entregas.stats.counts.en_tiempo}</span>
-                <span><strong>En riesgo:</strong> {entregas.stats.counts.en_riesgo}</span>
-                <span className="text-red-700"><strong>Retrasadas:</strong> {entregas.stats.counts.retrasada}</span>
-                <span><strong>Entregadas:</strong> {entregas.stats.counts.entregada}</span>
-                <span><strong>Retraso prom.:</strong> {entregas.stats.avg_delay_days ?? '—'} días</span>
-              </div>
-              {entregas.on_time_por_proveedor.length === 0 ? (
-                <Empty text="Aún no hay entregas completadas" />
-              ) : (
-                entregas.on_time_por_proveedor.map((row) => (
-                  <HBar
-                    key={row.proveedor}
-                    label={row.proveedor}
-                    value={row.rate}
-                    max={100}
-                    display={`${row.rate}% (${row.a_tiempo}/${row.entregadas})`}
-                    color={row.rate >= 80 ? 'bg-[#52AF32]' : row.rate >= 50 ? 'bg-amber-500' : 'bg-red-500'}
-                  />
-                ))
-              )}
-            </div>
-          )}
-        </Section>
-      </div>
-
-      {/* Contratos + Ahorro */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Section title="Contratos">
-          {!contratos ? (
-            <Empty />
-          ) : (
-            <div className="space-y-3">
-              <div className="flex gap-6 text-sm text-gray-600 flex-wrap">
-                <span><strong>Vigentes:</strong> {contratos.vigentes.total} ({formatCurrency(contratos.vigentes.valor_total)})</span>
-                <span><strong>Consumo prom.:</strong> {contratos.promedio_consumo_pct ?? '—'}%</span>
-              </div>
-              {contratos.por_vencer_30_dias.length === 0 ? (
-                <Empty text="Sin contratos por vencer en 30 días" />
-              ) : (
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-amber-700">Por vencer (≤30 días):</p>
-                  {contratos.por_vencer_30_dias.map((contract) => (
-                    <p key={contract.id} className="text-sm text-gray-700">
-                      <span className="font-mono">{contract.contract_number}</span>
-                      {' · '}{contract.proveedor}{' · vence '}
-                      {new Date(contract.end_date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', timeZone: 'UTC' })}
-                    </p>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </Section>
-
-        <Section
-          title="Ahorro por fuente"
-          note="fuentes NO sumables entre sí (T10)"
-        >
-          {!ahorro ? (
-            <Empty />
-          ) : (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="border border-gray-200 rounded-lg p-3">
-                <p className="text-sm font-medium text-[#424846]">ABENT</p>
-                {ahorro.abent.disponible ? null : (
-                  <p className="text-xs text-gray-500 mt-1">
-                    No disponible: {ahorro.abent.motivo}
-                  </p>
-                )}
-              </div>
-              <div className="border border-gray-200 rounded-lg p-3">
-                <p className="text-sm font-medium text-[#424846]">Maximo (AB_AHORRO)</p>
-                {ahorro.maximo.por_moneda.length === 0 ? (
-                  <p className="text-xs text-gray-500 mt-1">Sin registros con ahorro</p>
-                ) : (
-                  ahorro.maximo.por_moneda.map((row) => (
-                    <p key={row.currency} className="text-sm text-gray-700 mt-1">
-                      {row.currency}: <strong>{row.total.toLocaleString('es-MX')}</strong>{' '}
-                      <span className="text-xs text-gray-400">({row.registros} POs)</span>
-                    </p>
-                  ))
-                )}
-                <p className="text-xs text-gray-400 mt-1">
-                  Sin clasificar (histórico): {ahorro.maximo.sin_clasificar} POs
-                </p>
-              </div>
-            </div>
-          )}
-        </Section>
-      </div>
-
       {/* Comité (cierra el pendiente de §16) */}
-      <Section title="Comité de Compras — tiempos por aprobador" note="acumulado (fórmula de §16)">
+      <Section title="Comité de Compras — tiempos por aprobador" note="acumulado">
         {!comite || comite.tiempos.byApprover.length === 0 ? (
           <Empty text="Sin comités con aprobaciones registradas" />
         ) : (
@@ -760,184 +1032,8 @@ export default function ReportesComprasPage() {
         )}
       </Section>
 
-      {/* SAP + Maximo por periodo (sprint 2026-09-22, B2) */}
-      <Section title="SAP Business One — órdenes y solicitudes en el periodo" note="montos por moneda, nunca sumados entre monedas">
-        {erpQ.isError ? (
-          <p className="text-sm text-red-600">No se pudo cargar el reporte de los ERPs.</p>
-        ) : !erp ? (
-          <Empty />
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div>
-              <p className="text-sm font-medium text-[#424846] mb-2">Órdenes por estatus</p>
-              <ErpPie data={erp.sap.ordenes.por_estatus} labelOf={sapStatusLabel} />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-[#424846] mb-2">Solicitudes por estatus</p>
-              <ErpPie data={erp.sap.solicitudes.por_estatus} labelOf={sapStatusLabel} />
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-[#424846]">Órdenes por mes</p>
-              <ErpMonths serie={erp.sap.ordenes.serie_mensual} />
-            </div>
-            <div className="lg:col-span-3 space-y-2">
-              <p className="text-sm font-medium text-[#424846]">Top proveedores por monto (OC)</p>
-              {erp.sap.top_proveedores.length === 0 ? (
-                <Empty />
-              ) : (
-                erp.sap.top_proveedores.map((row) => (
-                  <HBar
-                    key={`${row.proveedor}-${row.currency}`}
-                    label={row.proveedor}
-                    value={row.monto}
-                    max={Math.max(...erp.sap.top_proveedores.map((r) => r.monto), 1)}
-                    display={`${formatMoney(row.monto, row.currency)} · ${row.count}`}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-        )}
-      </Section>
-
-      <Section title="Maximo — órdenes y contratos en el periodo" note="vista vigente (última revisión); estatus en español">
-        {erpQ.isError ? (
-          <p className="text-sm text-red-600">No se pudo cargar el reporte de los ERPs.</p>
-        ) : !erp ? (
-          <Empty />
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div>
-              <p className="text-sm font-medium text-[#424846] mb-2">Órdenes por estatus</p>
-              <ErpPie data={erp.maximo.ordenes.por_estatus} labelOf={maximoStatusLabel} />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-[#424846] mb-2">Solicitudes / contratos por estatus</p>
-              <ErpPie data={erp.maximo.contratos.por_estatus} labelOf={maximoStatusLabel} />
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-[#424846]">Órdenes por mes</p>
-              <ErpMonths serie={erp.maximo.ordenes.serie_mensual} />
-            </div>
-            <div className="lg:col-span-3 space-y-2">
-              <p className="text-sm font-medium text-[#424846]">Top proveedores por monto (OC)</p>
-              {erp.maximo.top_proveedores.length === 0 ? (
-                <Empty />
-              ) : (
-                erp.maximo.top_proveedores.map((row) => (
-                  <HBar
-                    key={`${row.proveedor}-${row.currency}`}
-                    label={row.proveedor}
-                    value={row.monto}
-                    max={Math.max(...erp.maximo.top_proveedores.map((r) => r.monto), 1)}
-                    display={`${formatMoney(row.monto, row.currency)} · ${row.count}`}
-                    color="bg-[#222D59]"
-                  />
-                ))
-              )}
-            </div>
-          </div>
-        )}
-      </Section>
-
-      {/* Tiempos de aprobación SAP + Maximo (sprint 2026-09-22, B3) */}
-      <Section title="Tiempos de aprobación — SAP y Maximo" note="días naturales; 'No disponible' = sin base para calcular">
-        {tiemposQ.isError ? (
-          <p className="text-sm text-red-600">No se pudo cargar el reporte de tiempos.</p>
-        ) : !tiempos ? (
-          <Empty />
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-[#424846]">Maximo</p>
-              <div className="flex gap-4 flex-wrap text-sm text-gray-700">
-                <span>OC (WAPPR → APPR): <strong>{tiempos.maximo.ordenes.promedio_dias === null ? 'No disponible' : `${tiempos.maximo.ordenes.promedio_dias} días`}</strong> ({tiempos.maximo.ordenes.total})</span>
-                <span>Contratos: <strong>{tiempos.maximo.contratos.promedio_dias === null ? 'No disponible' : `${tiempos.maximo.contratos.promedio_dias} días`}</strong> ({tiempos.maximo.contratos.total})</span>
-              </div>
-              <p className="text-xs text-gray-500">Por aprobador (usuario Maximo que aprobó la OC)</p>
-              {tiempos.maximo.ordenes_por_aprobador.length === 0 ? (
-                <Empty text="Sin aprobaciones con aprobador identificado" />
-              ) : (
-                tiempos.maximo.ordenes_por_aprobador.map((row) => (
-                  <HBar
-                    key={row.aprobador}
-                    label={row.aprobador}
-                    value={row.promedio_dias}
-                    max={Math.max(...tiempos.maximo.ordenes_por_aprobador.map((r) => r.promedio_dias), 1)}
-                    display={`${row.promedio_dias} días · ${row.total}`}
-                    color="bg-[#222D59]"
-                  />
-                ))
-              )}
-            </div>
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-[#424846]">SAP (cola de autorización)</p>
-              <div className="flex gap-4 flex-wrap text-sm text-gray-700">
-                <span>Autorizadas: <strong>{tiempos.sap.solicitudes_autorizadas.promedio_dias === null ? 'No disponible' : `${tiempos.sap.solicitudes_autorizadas.promedio_dias} días`}</strong> ({tiempos.sap.solicitudes_autorizadas.total})</span>
-                <span>Pendientes: <strong>{tiempos.sap.pendientes.total}</strong>{tiempos.sap.pendientes.dias_esperando_promedio !== null && ` · esperando ${tiempos.sap.pendientes.dias_esperando_promedio} días en promedio`}</span>
-              </div>
-              <p className="text-xs text-gray-500">Por aprobador (usuario SAP que autorizó)</p>
-              {tiempos.sap.por_aprobador.length === 0 ? (
-                <Empty text="Sin autorizaciones sincronizadas todavía" />
-              ) : (
-                tiempos.sap.por_aprobador.map((row) => (
-                  <HBar
-                    key={row.aprobador}
-                    label={row.aprobador}
-                    value={row.promedio_dias}
-                    max={Math.max(...tiempos.sap.por_aprobador.map((r) => r.promedio_dias), 1)}
-                    display={`${row.promedio_dias} días · ${row.total}`}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-        )}
-      </Section>
-
-      {/* Maximo */}
-      <Section title="Maximo — volumen" note="históricos con campos vacíos = sin clasificar">
-        {maximoPendiente ? (
-          <Empty text="Sincronización pendiente de activación (configuración del servidor)" />
-        ) : !maximo ? (
-          <Empty />
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-[#424846]">Órdenes por estatus</p>
-              {maximo.purchase_orders.por_estatus.map((row) => (
-                <HBar
-                  key={row.status}
-                  label={row.status}
-                  value={row.count}
-                  max={Math.max(...maximo.purchase_orders.por_estatus.map((r) => r.count), 1)}
-                  color={row.status === 'sin_clasificar' ? 'bg-gray-400' : 'bg-[#52AF32]'}
-                />
-              ))}
-              <p className="text-xs text-gray-400">
-                Sin fecha de aprobación: {maximo.purchase_orders.sin_fecha_aprobacion} POs
-                (fuera de la serie mensual)
-              </p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-[#424846]">Contratos por estatus</p>
-              {maximo.contracts.por_estatus.length === 0 ? (
-                <Empty text="Sin contratos de Maximo en el periodo" />
-              ) : (
-                maximo.contracts.por_estatus.map((row) => (
-                  <HBar
-                    key={row.status}
-                    label={row.status}
-                    value={row.count}
-                    max={Math.max(...maximo.contracts.por_estatus.map((r) => r.count), 1)}
-                    color={row.status === 'sin_clasificar' ? 'bg-gray-400' : 'bg-[#222D59]'}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-        )}
-      </Section>
+        </>
+      )}
     </div>
   );
 }

@@ -4,15 +4,21 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { formatAmounts, formatDays, NO_DISPONIBLE } from '@/lib/compras-format';
+import { formatAmountLines, formatDays, NO_DISPONIBLE } from '@/lib/compras-format';
 import { PieChart } from '@/components/charts/PieChart';
+import { AbentLevels, SapPendingApprovers } from '@/components/compras/ApprovalDelays';
 import {
   ApprovalStats,
+  ApprovalTimesReport,
   DashboardSummary,
+  MAXIMO_RUN_STATUS_LABELS,
+  MAXIMO_STATUS_CHART_COLORS,
   MaximoSummary,
   maximoStatusLabel,
+  SAP_STATUS_CHART_COLORS,
   SapSummary,
   sapStatusLabel,
+  statusChartColors,
 } from '@/types/purchases';
 
 /**
@@ -46,27 +52,12 @@ const Icons = {
   ),
 };
 
-const PIE_COLORS = ['#52AF32', '#222D59', '#DFA922', '#67B52E', '#3b82f6', '#f59e0b', '#ef4444', '#74B82B', '#424846'];
-
-/** Colores fijos por estatus (mismos que los badges) para que un pie sea legible. */
-const SAP_COLORS: Record<string, string> = { open: '#52AF32', close: '#9ca3af', cancelled: '#ef4444' };
-const MAXIMO_COLORS: Record<string, string> = {
-  APPR: '#52AF32',
-  WAPPR: '#f59e0b',
-  PNDREV: '#DFA922',
-  REVISD: '#3b82f6',
-  INPRG: '#222D59',
-  COMP: '#67B52E',
-  CLOSE: '#9ca3af',
-  CAN: '#ef4444',
-  CANCEL: '#ef4444',
-};
-
 type SourceKpi = { total?: number; count?: number; pendientes?: number };
 
 function KpiCard({
   label,
   value,
+  lines,
   sub,
   hint,
   icon,
@@ -75,6 +66,8 @@ function KpiCard({
 }: {
   label: string;
   value: string | number;
+  /** Un renglón por dato (p. ej. un monto por moneda). */
+  lines?: string[];
   sub?: string;
   hint: string;
   icon: React.ReactNode;
@@ -83,17 +76,26 @@ function KpiCard({
 }) {
   return (
     <div className={`bg-white p-4 rounded-lg shadow border-l-4 ${border}`} title={hint}>
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-sm text-gray-500 flex items-center gap-1">
+          <p className="text-sm text-gray-600">
             {label}
-            <span className="text-gray-300" aria-label="Definición">ⓘ</span>
+            <span className="ml-1 text-gray-400 cursor-help" aria-label="Definición">ⓘ</span>
           </p>
           <p className="text-2xl font-bold text-[#424846] truncate">{value}</p>
-          {sub && <p className="text-xs text-gray-500 mt-1 leading-snug">{sub}</p>}
         </div>
         <div className={`${color} shrink-0`}>{icon}</div>
       </div>
+      {lines && lines.length > 0 && (
+        <ul className="mt-2 space-y-0.5">
+          {lines.map((line) => (
+            <li key={line} className="text-sm text-gray-800 tabular-nums break-words">
+              {line}
+            </li>
+          ))}
+        </ul>
+      )}
+      {sub && <p className="text-xs text-gray-600 mt-2 leading-snug">{sub}</p>}
     </div>
   );
 }
@@ -105,24 +107,31 @@ function StatusPie({
   colorOf,
   onSlice,
   emptyText,
+  noun,
 }: {
   title: string;
   data: Array<{ status: string | null; count: number }>;
   labelOf: (s: string | null) => string;
-  colorOf: (s: string | null) => string | undefined;
+  colorOf: Record<string, string>;
   onSlice: (status: string | null) => void;
   emptyText: string;
+  /** "órdenes" / "solicitudes": texto del centro y de la ayuda. */
+  noun: string;
 }) {
   const rows = data
     .filter((d) => d.count > 0)
+    .sort((a, b) => b.count - a.count)
     .map((d) => ({ key: d.status ?? 'sin_estatus', name: labelOf(d.status), value: d.count, status: d.status }));
   const total = rows.reduce((s, r) => s + r.value, 0);
-  const colors = rows.map((r, i) => colorOf(r.status) ?? PIE_COLORS[i % PIE_COLORS.length]);
+  const colors = statusChartColors(
+    rows.map((r) => r.status),
+    colorOf,
+  );
   return (
     <div className="bg-white p-6 rounded-lg shadow">
-      <div className="flex items-baseline justify-between mb-2">
+      <div className="flex items-baseline justify-between gap-3 mb-2">
         <h3 className="text-base font-semibold text-[#424846]">{title}</h3>
-        <span className="text-sm text-gray-500">{total.toLocaleString('es-MX')} en total</span>
+        <span className="shrink-0 whitespace-nowrap text-sm text-gray-600">{total.toLocaleString('es-MX')} en total</span>
       </div>
       {rows.length === 0 ? (
         <p className="text-sm text-gray-500 py-10 text-center">{emptyText}</p>
@@ -133,10 +142,13 @@ function StatusPie({
             dataKey="value"
             nameKey="name"
             colors={colors}
-            height={260}
+            height={240}
+            centerCaption={noun}
             onSliceClick={(entry) => onSlice((entry as { status: string | null }).status)}
           />
-          <p className="text-xs text-gray-400 text-center">Clic en una rebanada para ver esas órdenes</p>
+          <p className="mt-2 text-xs text-gray-600 text-center">
+            Clic en un estatus para ver esas {noun} en su tabla
+          </p>
         </>
       )}
     </div>
@@ -146,7 +158,8 @@ function StatusPie({
 const fuente = (
   s: { sap: SourceKpi; maximo: SourceKpi; abent: SourceKpi },
   key: 'total' | 'count' | 'pendientes',
-) => `SAP ${s.sap[key] ?? 0} · Maximo ${s.maximo[key] ?? 0} · ABENT ${s.abent[key] ?? 0}`;
+) =>
+  `SAP ${(s.sap[key] ?? 0).toLocaleString('es-MX')} · Maximo ${(s.maximo[key] ?? 0).toLocaleString('es-MX')} · ABENT ${(s.abent[key] ?? 0).toLocaleString('es-MX')}`;
 
 export default function ComprasDashboardPage() {
   const router = useRouter();
@@ -172,6 +185,11 @@ export default function ComprasDashboardPage() {
   const sap = sapQ.data;
   const maximo = maximoQ.data;
   const approvalStats = approvalStatsQuery.data;
+  const tiemposQ = useQuery({
+    queryKey: ['reportes', 'tiempos-aprobacion'],
+    queryFn: () => api.get<ApprovalTimesReport>('/compras/reportes/tiempos-aprobacion'),
+  });
+  const tiempos = tiemposQ.data;
 
   const goSapOrders = (status: string | null) =>
     router.push(`/compras/ordenes?tab=sap_po${status ? `&status=${status}` : ''}`);
@@ -222,7 +240,7 @@ export default function ComprasDashboardPage() {
           No se pudo cargar el resumen del dashboard. Intenta de nuevo.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5 gap-4">
           <KpiCard
             label="Solicitudes totales"
             value={summary.solicitudes.total.toLocaleString('es-MX')}
@@ -244,8 +262,8 @@ export default function ComprasDashboardPage() {
           <KpiCard
             label="Días promedio de gestión"
             value={diasPromedio === null ? NO_DISPONIBLE : formatDays(diasPromedio)}
-            sub={diasGestion.map(([k, v]) => `${k}: ${v === null ? 'N/D' : v}`).join(' · ')}
-            hint="SAP: fecha de cierre (o última actualización) − fecha del documento, de las cerradas. Maximo: aprobación − primer WAPPR de las OC aprobadas. ABENT: días hábiles de las requisiciones cerradas. Promedio simple de las fuentes con datos; N/D = sin base."
+            lines={diasGestion.map(([k, v]) => `${k}: ${v === null ? 'sin datos' : formatDays(v)}`)}
+            hint="SAP: fecha de cierre (o última actualización) − fecha del documento, de las cerradas. Maximo: aprobación − primer WAPPR de las OC aprobadas. ABENT: días hábiles de las requisiciones cerradas. Promedio simple de las fuentes con datos; 'sin datos' = no hay base para calcularlo."
             icon={Icons.clock}
             border="border-[#DFA922]"
             color="text-[#DFA922]"
@@ -253,7 +271,8 @@ export default function ComprasDashboardPage() {
           <KpiCard
             label="Órdenes de compra"
             value={summary.ordenes.total.toLocaleString('es-MX')}
-            sub={`${formatAmounts(summary.ordenes.monto_por_moneda)} · ${fuente(summary.ordenes.por_fuente, 'count')}`}
+            lines={formatAmountLines(summary.ordenes.monto_por_moneda)}
+            sub={fuente(summary.ordenes.por_fuente, 'count')}
             hint="OC no canceladas de SAP (DocTotal) + OC vigentes de Maximo (TOTALCOST) + OC propias. Montos por moneda: nunca se suman MXN con USD."
             icon={Icons.check}
             border="border-[#52AF32]"
@@ -262,8 +281,9 @@ export default function ComprasDashboardPage() {
           <KpiCard
             label="OC abiertas (por recibir)"
             value={summary.por_recibir.total.toLocaleString('es-MX')}
-            sub={`${formatAmounts(summary.por_recibir.monto_por_moneda)} · ${fuente(summary.por_recibir.por_fuente, 'count')}`}
-            hint="SAP no reporta 'en tránsito': se usan las OC abiertas (bost_Open, no canceladas). Maximo: OC en APPR o INPRG. ABENT: emitida/enviada/confirmada/en tránsito."
+            lines={formatAmountLines(summary.por_recibir.monto_por_moneda)}
+            sub={fuente(summary.por_recibir.por_fuente, 'count')}
+            hint="SAP no reporta 'en tránsito': se usan las OC abiertas (bost_Open, no canceladas). Maximo: OC en APPR o INPRG. ABENT: OC emitidas o en tránsito."
             icon={Icons.truck}
             border="border-orange-500"
             color="text-orange-500"
@@ -283,32 +303,36 @@ export default function ComprasDashboardPage() {
           title="Órdenes de compra SAP — por estatus"
           data={sap?.purchaseOrders.byStatus ?? []}
           labelOf={sapStatusLabel}
-          colorOf={(s) => (s ? SAP_COLORS[s] : undefined)}
+          colorOf={SAP_STATUS_CHART_COLORS}
           onSlice={goSapOrders}
+          noun="órdenes"
           emptyText={sap && !sap.syncEnabled ? 'Sincronización de SAP pendiente de activación' : 'Sin órdenes sincronizadas'}
         />
         <StatusPie
           title="Solicitudes de pedido SAP — por estatus"
           data={sap?.purchaseRequests.byStatus ?? []}
           labelOf={sapStatusLabel}
-          colorOf={(s) => (s ? SAP_COLORS[s] : undefined)}
+          colorOf={SAP_STATUS_CHART_COLORS}
           onSlice={goSapRequests}
+          noun="solicitudes"
           emptyText={sap && !sap.syncEnabled ? 'Sincronización de SAP pendiente de activación' : 'Sin solicitudes sincronizadas'}
         />
         <StatusPie
           title="Órdenes de compra Maximo — por estatus"
           data={maximo?.purchaseOrders.byStatus ?? []}
           labelOf={maximoStatusLabel}
-          colorOf={(s) => (s ? MAXIMO_COLORS[s] : undefined)}
+          colorOf={MAXIMO_STATUS_CHART_COLORS}
           onSlice={goMaximoOrders}
+          noun="órdenes"
           emptyText={maximo && !maximo.syncEnabled ? 'Sincronización de Maximo pendiente de activación' : 'Sin órdenes sincronizadas'}
         />
         <StatusPie
           title="Solicitudes / contratos Maximo — por estatus"
           data={maximo?.contracts.byStatus ?? []}
           labelOf={maximoStatusLabel}
-          colorOf={(s) => (s ? MAXIMO_COLORS[s] : undefined)}
+          colorOf={MAXIMO_STATUS_CHART_COLORS}
           onSlice={goMaximoRequests}
+          noun="solicitudes"
           emptyText={maximo && !maximo.syncEnabled ? 'Sincronización de Maximo pendiente de activación' : 'Sin solicitudes sincronizadas'}
         />
       </div>
@@ -320,46 +344,54 @@ export default function ComprasDashboardPage() {
             <h3 className="text-lg font-semibold text-[#424846]">SAP Business One</h3>
             {!sap.syncEnabled && (
               <span className="inline-flex px-2.5 py-1 text-xs font-medium rounded-full bg-gray-200 text-gray-700">
-                Pendiente de activacion
+                Pendiente de activación
               </span>
             )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div>
               <p className="text-sm text-gray-500">Órdenes de compra</p>
-              <p className="text-2xl font-bold text-[#424846]">{sap.purchaseOrders.total}</p>
-              <p className="text-xs text-gray-600 mt-1">{formatAmounts(sap.purchaseOrders.montoPorMoneda)}</p>
+              <p className="text-2xl font-bold text-[#424846]">{sap.purchaseOrders.total.toLocaleString('es-MX')}</p>
+              <ul className="mt-1 text-xs text-gray-600 tabular-nums">
+                {formatAmountLines(sap.purchaseOrders.montoPorMoneda).map((l) => (
+                  <li key={l}>{l}</li>
+                ))}
+              </ul>
               <p className="mt-2 text-xs text-gray-500">
                 {sap.purchaseOrders.linesClassified > 0
-                  ? `${sap.purchaseOrders.linesClassified} de ${sap.purchaseOrders.linesTotal} lineas clasificadas`
-                  : 'Clasificacion aun sin capturar en el ERP'}
+                  ? `${sap.purchaseOrders.linesClassified.toLocaleString('es-MX')} de ${sap.purchaseOrders.linesTotal.toLocaleString('es-MX')} líneas clasificadas`
+                  : 'Clasificación aún sin capturar en el ERP'}
               </p>
             </div>
             <div>
               <p className="text-sm text-gray-500">Solicitudes de pedido</p>
-              <p className="text-2xl font-bold text-[#424846]">{sap.purchaseRequests.total}</p>
-              <p className="text-xs text-gray-600 mt-1">{formatAmounts(sap.purchaseRequests.montoPorMoneda)}</p>
+              <p className="text-2xl font-bold text-[#424846]">{sap.purchaseRequests.total.toLocaleString('es-MX')}</p>
+              <ul className="mt-1 text-xs text-gray-600 tabular-nums">
+                {formatAmountLines(sap.purchaseRequests.montoPorMoneda).map((l) => (
+                  <li key={l}>{l}</li>
+                ))}
+              </ul>
               <p className="mt-2 text-xs text-gray-500">
                 Días promedio de gestión: {formatDays(sap.purchaseRequests.diasPromedioGestion)}
               </p>
             </div>
             <div>
               <p className="text-sm text-gray-500">Cola de autorización</p>
-              <p className="text-2xl font-bold text-[#424846]">{sap.approvalRequests.pending}</p>
+              <p className="text-2xl font-bold text-[#424846]">{sap.approvalRequests.pending.toLocaleString('es-MX')}</p>
               <p className="text-xs text-gray-500 mt-1">
                 pendientes de autorizar en SAP ·{' '}
-                <Link href="/compras/aprobaciones" className="text-[#52AF32] hover:underline">ver bandeja</Link>
+                <Link href="/compras/aprobaciones" className="whitespace-nowrap text-[#52AF32] hover:underline">ver bandeja</Link>
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">Ultima sincronizacion</p>
+              <p className="text-sm text-gray-500">Última sincronización</p>
               {(['purchase_orders', 'purchase_requests', 'approval_requests'] as const).map((t) => {
                 const run = sap.lastSync[t];
                 return (
                   <p key={t} className="text-sm text-gray-700 mt-1">
-                    {t === 'purchase_orders' ? 'Ordenes' : t === 'purchase_requests' ? 'Solicitudes' : 'Autorizaciones'}:{' '}
+                    {t === 'purchase_orders' ? 'Órdenes' : t === 'purchase_requests' ? 'Solicitudes' : 'Autorizaciones'}:{' '}
                     {run
-                      ? `${new Date(run.started_at).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} (${run.status})`
+                      ? `${new Date(run.started_at).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} (${MAXIMO_RUN_STATUS_LABELS[run.status as keyof typeof MAXIMO_RUN_STATUS_LABELS] ?? run.status})`
                       : 'sin corridas'}
                   </p>
                 );
@@ -376,36 +408,36 @@ export default function ComprasDashboardPage() {
             <h3 className="text-lg font-semibold text-[#424846]">Maximo</h3>
             {!maximo.syncEnabled && (
               <span className="inline-flex px-2.5 py-1 text-xs font-medium rounded-full bg-gray-200 text-gray-700">
-                Pendiente de activacion
+                Pendiente de activación
               </span>
             )}
           </div>
           {maximo.purchaseOrders.total === 0 && maximo.contracts.total === 0 && !maximo.syncEnabled ? (
             <p className="text-sm text-gray-500">
-              Sincronizacion pendiente de activacion (configuracion del servidor). Los datos de Maximo apareceran aqui en cuanto se habilite.
+              Sincronización pendiente de activación (configuración del servidor). Los datos de Maximo aparecerán aquí en cuanto se habilite.
             </p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <p className="text-sm text-gray-500">Órdenes de Maximo</p>
-                <p className="text-2xl font-bold text-[#424846]">{maximo.purchaseOrders.total}</p>
+                <p className="text-2xl font-bold text-[#424846]">{maximo.purchaseOrders.total.toLocaleString('es-MX')}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-500">Contratos de Maximo</p>
+                <p className="text-sm text-gray-500">Solicitudes / contratos de Maximo</p>
                 <p className="text-2xl font-bold text-[#424846]">
-                  {maximo.contracts.total}
-                  <span className="ml-2 text-sm font-normal text-gray-500">({maximo.contracts.withContract} con contrato)</span>
+                  {maximo.contracts.total.toLocaleString('es-MX')}
+                  <span className="ml-2 text-sm font-normal text-gray-500">({maximo.contracts.withContract.toLocaleString('es-MX')} con contrato)</span>
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-500">Ultima sincronizacion</p>
+                <p className="text-sm text-gray-500">Última sincronización</p>
                 {(['purchase_orders', 'contracts'] as const).map((t) => {
                   const run = maximo.lastSync[t];
                   return (
                     <p key={t} className="text-sm text-gray-700 mt-1">
-                      {t === 'purchase_orders' ? 'Ordenes' : 'Contratos'}:{' '}
+                      {t === 'purchase_orders' ? 'Órdenes' : 'Contratos'}:{' '}
                       {run
-                        ? `${new Date(run.started_at).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} (${run.status})`
+                        ? `${new Date(run.started_at).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} (${MAXIMO_RUN_STATUS_LABELS[run.status as keyof typeof MAXIMO_RUN_STATUS_LABELS] ?? run.status})`
                         : 'sin corridas'}
                     </p>
                   );
@@ -416,31 +448,31 @@ export default function ComprasDashboardPage() {
         </div>
       )}
 
-      {/* Tiempos de aprobación del flujo propio (ABENT) */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <div className="flex items-baseline justify-between mb-4 flex-wrap gap-2">
-          <h3 className="text-lg font-semibold text-[#424846]">Tiempos de aprobación por nivel (flujo ABENT)</h3>
+      {/* Tiempos de aprobación: quién tiene detenidas las autorizaciones + niveles ABENT */}
+      <div className="bg-white p-6 rounded-lg shadow space-y-6">
+        <div className="flex items-baseline justify-between flex-wrap gap-2">
+          <h3 className="text-lg font-semibold text-[#424846]">Tiempos de aprobación</h3>
           <Link href="/compras/reportes" className="text-sm text-[#52AF32] hover:underline">
-            Tiempos de SAP y Maximo en Reportes
+            Tiempos por aprobador en Reportes
           </Link>
         </div>
-        {!approvalStats || Object.values(approvalStats).every((l) => l.total === 0) ? (
-          <p className="text-sm text-gray-500">Sin aprobaciones registradas en el flujo propio todavía.</p>
+        {tiemposQ.isError ? (
+          <p className="text-sm text-red-600">No se pudieron cargar los tiempos de aprobación.</p>
+        ) : !tiempos ? (
+          <div className="w-6 h-6 border-4 border-[#52AF32] border-t-transparent rounded-full animate-spin" />
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Object.values(approvalStats).map((level) => (
-              <div key={level.level} className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-500 mb-1">{level.level_name}</p>
-                <p className="text-2xl font-bold text-[#424846]">{level.average_time_days} dias</p>
-                <div className="mt-2 flex items-center gap-2 text-xs">
-                  <span className="text-green-600">{level.approved} aprobadas</span>
-                  <span className="text-gray-400">|</span>
-                  <span className="text-red-600">{level.rejected} rechazadas</span>
-                </div>
-                <div className="mt-1 text-xs text-gray-500">Tasa: {level.approval_rate}%</div>
-              </div>
-            ))}
-          </div>
+          <>
+            <div>
+              <h4 className="text-sm font-semibold text-[#424846] mb-2">
+                Autorizaciones pendientes en SAP — quién las tiene y desde cuándo
+              </h4>
+              <SapPendingApprovers tiempos={tiempos} />
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-[#424846] mb-2">Flujo propio ABENT — por nivel</h4>
+              <AbentLevels niveles={tiempos.abent_niveles} stats={approvalStats} />
+            </div>
+          </>
         )}
       </div>
     </div>

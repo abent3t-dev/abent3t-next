@@ -306,8 +306,8 @@ export interface PurchaseOrderFilters {
 // ==========================================
 
 export const REQUISITION_STATUS_LABELS: Record<RequisitionStatus, string> = {
-  en_revision: 'En Revision',
-  en_aprobacion: 'En Aprobacion',
+  en_revision: 'En Revisión',
+  en_aprobacion: 'En Aprobación',
   aprobada: 'Aprobada',
   en_progreso: 'En Progreso',
   cerrada: 'Cerrada',
@@ -327,7 +327,7 @@ export const PO_STATUS_LABELS: Record<POStatus, string> = {
   borrador: 'Borrador',
   enviada: 'Enviada',
   confirmada: 'Confirmada',
-  en_transito: 'En Transito',
+  en_transito: 'En Tránsito',
   entregada_parcial: 'Entregada Parcial',
   entregada_completa: 'Entregada Completa',
   cancelada: 'Cancelada',
@@ -561,6 +561,52 @@ export function maximoStatusLabel(status: string | null): string {
   return (status && MAXIMO_STATUS_LABELS[status]) || (status ?? 'Sin estatus');
 }
 
+/** Colores de gráfica por estatus (mismo criterio que los badges). */
+export const MAXIMO_STATUS_CHART_COLORS: Record<string, string> = {
+  APPR: '#52AF32',
+  COMP: '#2f7d1c',
+  WAPPR: '#f59e0b',
+  PNDREV: '#DFA922',
+  REVISD: '#3b82f6',
+  INPRG: '#222D59',
+  CLOSE: '#9ca3af',
+  CAN: '#ef4444',
+  CANCEL: '#ef4444',
+  DRAFT: '#a78bfa',
+};
+
+export const SAP_STATUS_CHART_COLORS: Record<string, string> = {
+  open: '#52AF32',
+  bost_Open: '#52AF32',
+  close: '#9ca3af',
+  bost_Close: '#9ca3af',
+  cancelled: '#ef4444',
+};
+
+/** Estatus nulo o desconocido: gris pizarra, distinto de "Cerrada". */
+export const UNKNOWN_STATUS_CHART_COLOR = '#475569';
+
+const EXTRA_CHART_COLORS = ['#0ea5e9', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#84cc16'];
+
+/**
+ * Un color por estatus: el fijo si se conoce, gris pizarra si es nulo y, para
+ * estatus nuevos, uno de reserva que no repita un color ya usado en la gráfica.
+ */
+export function statusChartColors(
+  statuses: Array<string | null>,
+  known: Record<string, string>,
+): string[] {
+  const used = new Set<string>();
+  const fixed = statuses.map((s) => {
+    const color = s === null ? UNKNOWN_STATUS_CHART_COLOR : known[s];
+    if (color) used.add(color);
+    return color;
+  });
+  const spare = EXTRA_CHART_COLORS.filter((c) => !used.has(c));
+  let next = 0;
+  return fixed.map((c) => c ?? spare[next++ % spare.length] ?? UNKNOWN_STATUS_CHART_COLOR);
+}
+
 export function maximoStatusBadgeClass(status: string | null): string {
   return (
     (status && MAXIMO_STATUS_BADGE_CLASSES[status]) ||
@@ -583,14 +629,14 @@ export const MAXIMO_RUN_STATUS_CLASSES: Record<MaximoSyncRun['status'], string> 
 };
 
 export const MAXIMO_TARGET_LABELS: Record<MaximoSyncTarget, string> = {
-  purchase_orders: 'Ordenes (PO)',
+  purchase_orders: 'Órdenes (PO)',
   contracts: 'Contratos',
 };
 
 export const MAXIMO_TRIGGER_LABELS: Record<MaximoSyncRun['triggered_by'], string> = {
-  cron: 'Automatico',
+  cron: 'Automático',
   manual: 'Manual',
-  seed: 'Seed (dev)',
+  seed: 'Carga inicial (dev)',
 };
 
 // ==========================================
@@ -1167,6 +1213,32 @@ export interface DashboardSummary {
   generated_at: string;
 }
 
+/** GET /compras/reportes/tiempos-aprobacion */
+export interface ApprovalTimesReport {
+  maximo: {
+    ordenes: { promedio_dias: number | null; total: number };
+    ordenes_por_aprobador: Array<{ aprobador: string; promedio_dias: number; total: number }>;
+    contratos: { promedio_dias: number | null; total: number };
+  };
+  sap: {
+    solicitudes_autorizadas: { promedio_dias: number | null; total: number };
+    por_aprobador: Array<{ aprobador: string; promedio_dias: number; total: number }>;
+    pendientes: { total: number; dias_esperando_promedio: number | null };
+    pendientes_por_aprobador: Array<{
+      aprobador: string;
+      pendientes: number;
+      dias_esperando_max: number | null;
+      dias_esperando_promedio: number | null;
+    }>;
+  };
+  maximo_pendientes: {
+    total: number;
+    dias_esperando_max: number | null;
+    dias_esperando_promedio: number | null;
+  };
+  abent_niveles: Array<{ level: number; role: string; aprobadores: string[] }>;
+}
+
 // Estatus de documento de SAP (bost_*): etiquetas y colores conocidos;
 // cualquier otro valor se muestra tal cual con badge neutro.
 export const SAP_STATUS_LABELS: Record<string, string> = {
@@ -1194,7 +1266,7 @@ export const SAP_STATUS_OPTIONS: Array<{ value: SapDocStatusKey; label: string }
 ];
 
 export function sapStatusLabel(status: string | null): string {
-  return (status && SAP_STATUS_LABELS[status]) || (status ?? '—');
+  return (status && SAP_STATUS_LABELS[status]) || (status ?? 'Sin estatus');
 }
 
 export function sapStatusBadgeClass(status: string | null): string {
@@ -1212,7 +1284,7 @@ export function sapDocStatus(doc: {
 }
 
 export const SAP_TARGET_LABELS: Record<SapSyncTarget, string> = {
-  purchase_orders: 'Ordenes (OC)',
+  purchase_orders: 'Órdenes (OC)',
   purchase_requests: 'Solicitudes de Pedido',
   business_partners: 'Proveedores',
   approval_requests: 'Cola de autorización',
