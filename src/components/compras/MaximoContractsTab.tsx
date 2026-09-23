@@ -29,7 +29,14 @@ import ExportExcelButton from './ExportExcelButton';
  * en el detalle, nunca 0.
  *
  * Sprint 2026-09-22: filtro multi-estatus (A5), chips (A4), export (B1).
+ * Bloque 2026-09-23 (D8, Ingrid): valor, consumido y saldo (valor − consumido,
+ * negativo en rojo). El consumido llega null mientras AB_CONTRATOS no lo
+ * exponga (pedido a CIISA junto con MAXVOL) → "No disponible", nunca 0.
  */
+
+const NotAvailable = ({ hint }: { hint: string }) => (
+  <span className="text-gray-500 italic text-xs whitespace-nowrap" title={hint}>No disponible</span>
+);
 
 const PAGE_SIZE = 15;
 const EXPIRY_WARNING_DAYS = 30;
@@ -175,6 +182,8 @@ export default function MaximoContractsTab({ initialStatus = [] }: { initialStat
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Proveedor</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Valor contrato</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase" title="Consumido del contrato según Maximo">Consumido</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase" title="Valor − consumido">Saldo</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Moneda</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Vigencia</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Depto.</th>
@@ -214,6 +223,22 @@ export default function MaximoContractsTab({ initialStatus = [] }: { initialStat
                         <td className="px-4 py-3 text-sm text-gray-900 text-right">
                           {formatMoney(contract.contract_value, contract.currency)}
                         </td>
+                        <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                          {contract.consumed_value === null ? (
+                            <NotAvailable hint="La Object Structure de Maximo (AB_CONTRATOS) aún no expone el consumido del contrato; pedido a CIISA" />
+                          ) : (
+                            formatMoney(contract.consumed_value, contract.currency)
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right">
+                          {contract.balance_value === null ? (
+                            <NotAvailable hint="Requiere valor y consumido del contrato" />
+                          ) : (
+                            <span className={contract.balance_value < 0 ? 'font-semibold text-red-600' : 'text-gray-900'}>
+                              {formatMoney(contract.balance_value, contract.currency)}
+                            </span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-center text-sm text-gray-600">{dash(contract.currency)}</td>
                         <td className="px-4 py-3 text-center text-sm text-gray-600">
                           <span className="whitespace-nowrap">
@@ -239,7 +264,7 @@ export default function MaximoContractsTab({ initialStatus = [] }: { initialStat
                   })}
                   {contracts.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
                         No hay contratos de Maximo que coincidan con los filtros
                       </td>
                     </tr>

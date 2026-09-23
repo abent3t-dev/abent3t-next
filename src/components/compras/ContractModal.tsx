@@ -14,6 +14,7 @@ import {
 } from '@/types/purchases';
 import ContractStatusBadge from './ContractStatusBadge';
 import ContractFileUploader from './ContractFileUploader';
+import PdfViewerModal from './PdfViewerModal';
 import { usePurchaseUsers } from '@/hooks/usePurchaseUsers';
 
 /**
@@ -240,6 +241,21 @@ function ContractModalBody({
     else createMutation.mutate();
   };
 
+  // D11 (César): drill-down — el PDF se abre en un visor embebido
+  const [viewer, setViewer] = useState<{ url: string | null; title: string } | null>(null);
+  const handleView = async (doc: ContractDocument) => {
+    setViewer({ url: null, title: `${doc.file_name} (v${doc.version})` });
+    try {
+      const { url } = await api.get<{ url: string; fileName: string }>(
+        `/compras/contratos/${contract?.id}/documents/${doc.id}/download`,
+      );
+      setViewer({ url, title: `${doc.file_name} (v${doc.version})` });
+    } catch {
+      setViewer(null);
+      notify.error('No se pudo abrir el PDF');
+    }
+  };
+
   const handleDownload = async (doc: ContractDocument) => {
     try {
       const { url, fileName } = await api.get<{ url: string; fileName: string }>(
@@ -333,6 +349,14 @@ function ContractModalBody({
                     <div className="flex items-center justify-center gap-2">
                       <button
                         type="button"
+                        onClick={() => void handleView(doc)}
+                        className="text-sm text-[#222D59] hover:underline"
+                        title="Ver el PDF en el portal"
+                      >
+                        Ver
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => void handleDownload(doc)}
                         className="text-sm text-[#52AF32] hover:underline"
                       >
@@ -355,6 +379,12 @@ function ContractModalBody({
           </table>
         </div>
       )}
+      <PdfViewerModal
+        isOpen={viewer !== null}
+        onClose={() => setViewer(null)}
+        url={viewer?.url ?? null}
+        title={viewer?.title ?? 'Documento'}
+      />
     </div>
   );
 

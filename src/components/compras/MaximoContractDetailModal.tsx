@@ -170,9 +170,36 @@ export default function MaximoContractDetailModal({
                 <Field label="Vigencia inicio" value={formatDate(current.start_date)} />
                 <Field label="Vigencia fin" value={formatDate(current.end_date)} />
                 <Field label="Departamento" value={dash(current.department)} />
-                <Field label="Solicitado por" value={dash(current.requested_by)} />
+                <Field
+                  label="Solicitado por"
+                  value={
+                    current.requested_by_name
+                      ? <>{current.requested_by_name} <span className="text-xs text-gray-500">({current.requested_by})</span></>
+                      : dash(current.requested_by)
+                  }
+                />
                 <Field label="Ref. contrato" value={dash(current.contract_ref_num)} />
                 <Field label="Valor contrato" value={formatMoney(current.contract_value, current.currency)} />
+                <Field
+                  label="Consumido"
+                  value={current.consumed_value === null ? <NotAvailable /> : formatMoney(current.consumed_value, current.currency)}
+                />
+                <Field
+                  label="Saldo (valor − consumido)"
+                  value={
+                    current.balance_value === null ? (
+                      <NotAvailable />
+                    ) : (
+                      <span className={current.balance_value < 0 ? 'font-semibold text-red-600' : ''}>
+                        {formatMoney(current.balance_value, current.currency)}
+                      </span>
+                    )
+                  }
+                />
+                <Field
+                  label="Monto de la PR"
+                  value={current.pr_total === null ? <NotAvailable /> : formatMoney(current.pr_total, current.currency)}
+                />
                 <Field label="Fecha aprobación"value={formatDate(current.approved_at)} />
                 <Field label="Fecha en Maximo" value={formatDate(current.created_at_source)} />
               </div>
