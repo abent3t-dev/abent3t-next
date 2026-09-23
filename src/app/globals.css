@@ -45,11 +45,10 @@
   --color-status-pending: #f97316;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* La app solo tiene tema claro. Heredar el modo oscuro del sistema dejaba el
+   texto sin color explícito casi blanco sobre los fondos blancos. */
+:root {
+  color-scheme: light;
 }
 
 body {

@@ -21,15 +21,37 @@ export function formatMoney(amount: number | null, currency: string | null): str
   }
 }
 
+/**
+ * Un monto con su código de moneda al frente: "USD $793,023,758".
+ * Símbolo corto a propósito: en es-MX el formato largo ya antepone "USD" y
+ * se duplicaba el código.
+ */
+export function formatCurrencyAmount(amount: number | null, currency: string | null): string {
+  if (amount === null || amount === undefined) return NO_DISPONIBLE;
+  const known = currency && currency !== '##' && currency !== 'sin_moneda';
+  let number: string;
+  try {
+    number = new Intl.NumberFormat(
+      'es-MX',
+      known
+        ? { style: 'currency', currency, currencyDisplay: 'narrowSymbol', maximumFractionDigits: 0 }
+        : { maximumFractionDigits: 0 },
+    ).format(amount);
+  } catch {
+    number = amount.toLocaleString('es-MX', { maximumFractionDigits: 0 });
+  }
+  return `${known ? currency : 'Sin moneda'} ${number}`;
+}
+
+/** Un renglón por moneda → ["MXN $1,234", "USD $56"]. */
+export function formatAmountLines(list: CurrencyAmount[] | undefined | null): string[] {
+  if (!list || list.length === 0) return [NO_DISPONIBLE];
+  return list.map((a) => formatCurrencyAmount(a.total, a.currency));
+}
+
 /** Lista de montos por moneda → "MXN $1,234 · USD $56". Vacío → "No disponible". */
 export function formatAmounts(list: CurrencyAmount[] | undefined | null): string {
-  if (!list || list.length === 0) return NO_DISPONIBLE;
-  return list
-    .map((a) => {
-      const label = a.currency && a.currency !== 'sin_moneda' ? a.currency : 'Sin moneda';
-      return `${label} ${formatMoney(a.total, a.currency)}`;
-    })
-    .join(' · ');
+  return formatAmountLines(list).join(' · ');
 }
 
 export function formatDays(days: number | null | undefined): string {
