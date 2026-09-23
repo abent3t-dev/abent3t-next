@@ -30,6 +30,11 @@ import ExportExcelButton from './ExportExcelButton';
  * Sprint 2026-09-22: estatus derivado con Cancelada (A6), filtro multi
  * (A5), chips de totales (A4), export Excel (B1) y filtro inicial desde la
  * URL (clic en un pie del dashboard, A2).
+ *
+ * 2026-09-23 (Ingrid): saldo disponible (lo que falta por recibir/facturar)
+ * y solicitante. SAP no trae solicitante en la OC: sale de la solicitud de
+ * pedido de la que nació; las OC que crea la integración con Maximo traen
+ * el solicitante de Maximo; si no hay ninguno, se muestra quién la capturó.
  */
 
 const PAGE_SIZE = 15;
@@ -48,6 +53,57 @@ const formatMoney = (amount: number | null, currency: string | null) => {
     return `${amount.toLocaleString('es-MX')} ${currency ?? ''}`.trim();
   }
 };
+
+/** Saldo disponible: una cancelada no tiene; sin calcular = "No disponible". */
+function SaldoCell({ po }: { po: SapPurchaseOrder }) {
+  if (po.status_key === 'cancelled') return <span className="text-gray-400">—</span>;
+  if (po.open_total === null) return <span className="text-gray-400 italic">No disponible</span>;
+  if (po.open_total === 0) {
+    return <span className="text-gray-400">{formatMoney(0, po.currency)}</span>;
+  }
+  const pct =
+    po.doc_total && po.doc_total > 0 && po.open_total < po.doc_total
+      ? Math.round((po.open_total / po.doc_total) * 100)
+      : null;
+  return (
+    <div className="leading-tight">
+      <span className="font-medium text-gray-900">{formatMoney(po.open_total, po.currency)}</span>
+      {pct !== null && <div className="text-xs text-gray-500">{pct}% del total</div>}
+    </div>
+  );
+}
+
+function RequesterCell({ po }: { po: SapPurchaseOrder }) {
+  if (po.requester_names.length > 0) {
+    const names = po.requester_names.join(', ');
+    return (
+      <span className="block max-w-40 truncate text-gray-900" title={names}>
+        {names}
+      </span>
+    );
+  }
+  if (po.maximo_ponum) {
+    return (
+      <div className="leading-tight max-w-40" title={`OC creada desde Maximo (${po.maximo_ponum})`}>
+        <span className={`block truncate ${po.maximo_requested_by ? 'text-gray-900' : 'text-gray-500'}`}>
+          {po.maximo_requested_by ?? 'Ver en Maximo'}
+        </span>
+        <span className="block text-xs text-gray-500">Maximo {po.maximo_ponum}</span>
+      </div>
+    );
+  }
+  if (po.created_by_name) {
+    return (
+      <span
+        className="block max-w-40 truncate text-gray-500"
+        title={`Sin solicitud de pedido en SAP. Capturó la OC: ${po.created_by_name}`}
+      >
+        Capturó: {po.created_by_name}
+      </span>
+    );
+  }
+  return <span className="text-gray-400">—</span>;
+}
 
 const formatDate = (date: string | null) =>
   date
@@ -101,7 +157,7 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
             type="text"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Buscar por número o proveedor..."
+            placeholder="Número, proveedor o solicitante..."
             className="flex-1 min-w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
           />
           <StatusMultiSelect
@@ -166,12 +222,25 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
                   <tr>
                     <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Número</th>
                     <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Proveedor</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Solicitante</th>
                     <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
                     <th className="px-3 py-3 text-right text-xs font-medium text-white uppercase">Monto</th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">F. Documento</th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">F. Entrega</th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Clasif. líneas</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-white uppercase">Ahorro</th>
+                    <th
+                      className="px-3 py-3 text-right text-xs font-medium text-white uppercase whitespace-nowrap"
+                      title="Lo que falta por recibir o facturar de la OC, con IVA"
+                    >
+                      Saldo disponible
+                    </th>
+                    <th
+                      className="px-3 py-3 text-center text-xs font-medium text-white uppercase"
+                      title="Fecha del documento y, abajo, fecha de entrega"
+                    >
+                      Fechas
+                    </th>
+                    {/* En pantallas angostas van al detalle y al Excel (casi todas
+                        dicen "Sin clasificar"/"No disponible" mientras avanza la captura) */}
+                    <th className="hidden 2xl:table-cell px-3 py-3 text-center text-xs font-medium text-white uppercase">Clasif. líneas</th>
+                    <th className="hidden 2xl:table-cell px-3 py-3 text-right text-xs font-medium text-white uppercase">Ahorro</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -187,6 +256,9 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
                           <span className="font-mono font-medium text-[#222D59]">{dash(po.doc_num)}</span>
                         </td>
                         <td className="px-3 py-3 text-sm text-gray-900 max-w-44 truncate" title={po.card_name ?? undefined}>{dash(po.card_name)}</td>
+                        <td className="px-3 py-3 text-sm">
+                          <RequesterCell po={po} />
+                        </td>
                         <td className="px-3 py-3 text-center">
                           <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${sapStatusBadgeClass(status)}`}>
                             {sapStatusLabel(status)}
@@ -195,9 +267,14 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
                         <td className="px-3 py-3 text-sm text-gray-900 text-right font-medium whitespace-nowrap">
                           {formatMoney(po.doc_total, po.currency)}
                         </td>
-                        <td className="px-3 py-3 text-center text-sm text-gray-600 whitespace-nowrap">{formatDate(po.doc_date)}</td>
-                        <td className="px-3 py-3 text-center text-sm text-gray-600 whitespace-nowrap">{formatDate(po.doc_due_date)}</td>
-                        <td className="px-3 py-3 text-center text-sm whitespace-nowrap">
+                        <td className="px-3 py-3 text-sm text-right whitespace-nowrap">
+                          <SaldoCell po={po} />
+                        </td>
+                        <td className="px-3 py-3 text-center text-sm whitespace-nowrap leading-tight">
+                          <div className="text-gray-700">{formatDate(po.doc_date)}</div>
+                          <div className="text-xs text-gray-500">entrega {formatDate(po.doc_due_date)}</div>
+                        </td>
+                        <td className="hidden 2xl:table-cell px-3 py-3 text-center text-sm whitespace-nowrap">
                           {po.lines_total === 0 ? (
                             <span className="text-gray-400">—</span>
                           ) : po.lines_classified === 0 ? (
@@ -206,7 +283,7 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
                             <span className="text-gray-700">{po.lines_classified}/{po.lines_total}</span>
                           )}
                         </td>
-                        <td className="px-3 py-3 text-sm text-right whitespace-nowrap">
+                        <td className="hidden 2xl:table-cell px-3 py-3 text-sm text-right whitespace-nowrap">
                           {po.ahorro_total === null ? (
                             <span className="text-gray-400 italic">No disponible</span>
                           ) : (
@@ -218,7 +295,7 @@ export default function SapOrdersTab({ initialStatus = [] }: { initialStatus?: s
                   })}
                   {orders.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                         No hay órdenes de SAP que coincidan con los filtros
                       </td>
                     </tr>

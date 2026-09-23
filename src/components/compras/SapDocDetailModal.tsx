@@ -23,6 +23,10 @@ import {
  *
  * El acordeon "Datos crudos" solo aparece si el backend incluyo `raw`
  * (PURCHASE_ADMINS); para otros roles el campo ni siquiera viaja.
+ *
+ * 2026-09-23: en OC, saldo disponible (con IVA), solicitante (de la
+ * solicitud de pedido base) o quién la capturó, y cantidad pendiente por
+ * línea. Importes siempre en la moneda del documento.
  */
 
 interface SapDocDetailModalProps {
@@ -69,6 +73,17 @@ function udfMoney(value: number | null, currency: string | null) {
   return value === null ? <NoDisponible /> : formatMoney(value, currency);
 }
 
+const formatQty = (value: number) =>
+  value.toLocaleString('es-MX', { maximumFractionDigits: 2 });
+
+/** Cantidad pendiente de la línea: "4,500 de 19,500" o "Cerrada". */
+function pendingText(line: SapDocumentLine) {
+  if (line.lineStatus === 'close') return <span className="text-gray-400">Cerrada</span>;
+  if (line.quantity === null || line.openQuantity === null) return '—';
+  if (line.openQuantity >= line.quantity) return `${formatQty(line.quantity)} (toda)`;
+  return `${formatQty(line.openQuantity)} de ${formatQty(line.quantity)}`;
+}
+
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
@@ -105,10 +120,20 @@ export default function SapDocDetailModal({
   const prDoc = !isPo
     ? (doc as SapPurchaseRequestDetail['document'] | undefined)
     : undefined;
+  const saldo = (() => {
+    if (!poDoc) return null;
+    if (poDoc.status_key === 'cancelled') return '—';
+    if (poDoc.open_total === null) return <NoDisponible />;
+    const pct =
+      poDoc.doc_total && poDoc.doc_total > 0 && poDoc.open_total < poDoc.doc_total
+        ? ` (${Math.round((poDoc.open_total / poDoc.doc_total) * 100)}% del total)`
+        : '';
+    return `${formatMoney(poDoc.open_total, poDoc.currency)}${pct}`;
+  })();
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="bg-[#424846] px-6 py-4 flex items-center justify-between">
           <div>
@@ -164,6 +189,26 @@ export default function SapDocDetailModal({
                   <>
                     <Field label="Proveedor" value={dash(poDoc?.card_name)} />
                     <Field label="Código proveedor" value={dash(poDoc?.card_code)} />
+                    <Field
+                      label="Solicitante"
+                      value={
+                        poDoc && poDoc.requester_names.length > 0 ? (
+                          poDoc.requester_names.join(', ')
+                        ) : poDoc?.maximo_ponum ? (
+                          <>
+                            {poDoc.maximo_requested_by ?? (
+                              <span className="text-gray-500">Ver en Maximo</span>
+                            )}
+                            <span className="block text-xs text-gray-500">
+                              OC creada desde Maximo ({poDoc.maximo_ponum})
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-gray-500">Sin solicitud de pedido en SAP</span>
+                        )
+                      }
+                    />
+                    <Field label="Capturó (SAP)" value={dash(poDoc?.created_by_name)} />
                   </>
                 ) : (
                   <>
@@ -172,9 +217,10 @@ export default function SapDocDetailModal({
                   </>
                 )}
                 <Field
-                  label="Monto"
+                  label={isPo ? 'Monto (con IVA)' : 'Monto (sin IVA)'}
                   value={formatMoney(doc.doc_total, doc.currency)}
                 />
+                {isPo && <Field label="Saldo disponible" value={saldo} />}
                 <Field label="Moneda" value={dash(doc.currency)} />
                 <Field label="Fecha documento" value={formatDate(doc.doc_date)} />
                 <Field
@@ -206,7 +252,20 @@ export default function SapDocDetailModal({
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Artículo</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descripción</th>
-                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Importe</th>
+                        <th
+                          className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase"
+                          title="Importe de la línea sin IVA, en la moneda del documento"
+                        >
+                          Importe
+                        </th>
+                        {isPo && (
+                          <th
+                            className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase"
+                            title="Cantidad aún no recibida ni facturada"
+                          >
+                            Pendiente
+                          </th>
+                        )}
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Clasificación</th>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Proceso</th>
                         <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ahorro</th>
@@ -222,19 +281,22 @@ export default function SapDocDetailModal({
                           <td className="px-3 py-2 max-w-56 truncate" title={line.itemDescription ?? undefined}>
                             {dash(line.itemDescription)}
                           </td>
-                          <td className="px-3 py-2 text-right">
+                          <td className="px-3 py-2 text-right whitespace-nowrap">
                             {formatMoney(line.lineTotal, line.currency)}
                           </td>
-                          <td className="px-3 py-2">{udfText(line.clasGts)}</td>
-                          <td className="px-3 py-2">{udfText(line.procComp)}</td>
-                          <td className="px-3 py-2 text-right">
+                          {isPo && (
+                            <td className="px-3 py-2 text-right whitespace-nowrap">{pendingText(line)}</td>
+                          )}
+                          <td className="px-3 py-2 whitespace-nowrap">{udfText(line.clasGts)}</td>
+                          <td className="px-3 py-2 whitespace-nowrap">{udfText(line.procComp)}</td>
+                          <td className="px-3 py-2 text-right whitespace-nowrap">
                             {udfMoney(line.impAhorro, line.currency)}
                           </td>
                         </tr>
                       ))}
                       {lines.length === 0 && (
                         <tr>
-                          <td colSpan={7} className="px-3 py-6 text-center text-gray-500">
+                          <td colSpan={isPo ? 8 : 7} className="px-3 py-6 text-center text-gray-500">
                             El documento no trae líneas
                           </td>
                         </tr>

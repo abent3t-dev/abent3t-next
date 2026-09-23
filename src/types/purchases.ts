@@ -986,11 +986,27 @@ export interface SapPurchaseOrder {
   comments: string | null;
   card_code: string | null;
   card_name: string | null;
+  /** Total con IVA en la moneda del documento. */
   doc_total: number | null;
   currency: string | null;
   lines_total: number;
   lines_classified: number;
   ahorro_total: number | null;
+  /**
+   * Saldo disponible: lo que falta por recibir/facturar, con IVA y en la
+   * moneda del documento. null = sin calcular (sync previo).
+   */
+  open_total: number | null;
+  /** Usuario de SAP que capturó la OC (UserSign). */
+  user_sign: number | null;
+  created_by_name: string | null;
+  /** PONUM de Maximo si la OC la creó la integración Maximo → SAP. */
+  maximo_ponum: string | null;
+  /** Solicitante en Maximo (REQUESTEDBY de su PR). */
+  maximo_requested_by: string | null;
+  base_request_entries: number[];
+  /** Solicitantes de las solicitudes de las que nació la OC (vacío = sin solicitud). */
+  requester_names: string[];
   last_changed_at: string | null;
   last_seen_at: string;
 }
@@ -1024,8 +1040,15 @@ export interface SapDocumentLine {
   lineNum: number | null;
   itemCode: string | null;
   itemDescription: string | null;
+  /** Sin IVA, en la moneda del documento. */
   lineTotal: number | null;
   currency: string | null;
+  quantity: number | null;
+  /** Cantidad aún no recibida/facturada. */
+  openQuantity: number | null;
+  lineStatus: 'open' | 'close' | null;
+  /** Pendiente de la línea con IVA; 0 si está cerrada, null si no se sabe. */
+  openTotal: number | null;
   clasGts: string | null;
   impAhorro: number | null;
   procComp: string | null;
