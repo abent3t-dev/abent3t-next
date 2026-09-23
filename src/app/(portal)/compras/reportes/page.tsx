@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { formatAmountLines, formatCurrencyAmount, formatDays, NO_DISPONIBLE } from '@/lib/compras-format';
 import { AbentLevels, SapPendingApprovers } from '@/components/compras/ApprovalDelays';
+import ExportExcelButton from '@/components/compras/ExportExcelButton';
 import { PieChart } from '@/components/charts/PieChart';
 import {
   ApprovalStats,
@@ -24,6 +25,9 @@ import {
  * existentes (acumuladas); el resto respeta el periodo. El ahorro se muestra
  * POR FUENTE (T10: ABENT y Maximo no se suman) y los historicos de Maximo
  * aparecen como "sin clasificar", nunca ocultos.
+ *
+ * 2026-09-23 (Ingrid): periodo "Semana" (lunes a domingo, con navegación y
+ * comparación contra la semana anterior) y descarga del reporte en Excel.
  */
 
 // ── Tipos de las respuestas del backend ────────────────────────────────────
@@ -205,7 +209,30 @@ const fechaCorta = (s: string) => {
 
 const iso = (d: Date) => d.toISOString().split('T')[0];
 
-type Preset = 'mes' | 'trimestre' | '12m' | 'custom';
+type Preset = 'semana' | 'mes' | 'trimestre' | '12m' | 'custom';
+
+/** Fecha local (no UTC) en YYYY-MM-DD: el lunes no debe correrse de día. */
+const isoLocal = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** Semana de lunes a domingo; offset 0 = la semana en curso, -1 = la anterior. */
+function weekRange(offset: number): { from: string; to: string } {
+  const now = new Date();
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) + offset * 7);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { from: isoLocal(monday), to: isoLocal(sunday) };
+}
+
+/** Diferencia contra la semana anterior: "▲ 7 vs semana anterior (15)". */
+function versus(actual: number, anterior: number | undefined): string | undefined {
+  if (anterior === undefined) return undefined;
+  const diff = actual - anterior;
+  const arrow = diff > 0 ? '▲' : diff < 0 ? '▼' : '=';
+  const amount = diff === 0 ? '' : ` ${Math.abs(diff).toLocaleString('es-MX')}`;
+  return `${arrow}${amount} vs semana anterior (${anterior.toLocaleString('es-MX')})`;
+}
 
 function presetRange(preset: Preset): { from: string; to: string } {
   const now = new Date();
@@ -281,6 +308,7 @@ function KpiCard({
   value,
   lines,
   sub,
+  compare,
   hint,
   border,
 }: {
@@ -289,6 +317,8 @@ function KpiCard({
   /** Un renglón por dato (p. ej. un monto por moneda). */
   lines?: string[];
   sub?: string;
+  /** Comparación contra el periodo anterior (solo en "Semana"). */
+  compare?: string;
   hint?: string;
   border: string;
 }) {
@@ -296,6 +326,7 @@ function KpiCard({
     <div className={`bg-white p-4 rounded-lg shadow border-l-4 ${border}`} title={hint}>
       <p className="text-sm text-gray-600">{label}</p>
       <p className="text-2xl font-bold text-[#424846] tabular-nums">{value}</p>
+      {compare && <p className="text-xs font-medium text-[#222D59] mt-0.5">{compare}</p>}
       {lines && lines.length > 0 && (
         <ul className="mt-1 space-y-0.5">
           {lines.map((line) => (
@@ -382,13 +413,29 @@ function ErpMonths({ serie }: { serie: ErpSerie }) {
 export default function ReportesComprasPage() {
   const [preset, setPreset] = useState<Preset>('12m');
   const [customRange, setCustomRange] = useState(presetRange('12m'));
-  const range = preset === 'custom' ? customRange : presetRange(preset);
+  // Reporte semanal: por default la última semana completa
+  const [weekOffset, setWeekOffset] = useState(-1);
+  const range =
+    preset === 'custom'
+      ? customRange
+      : preset === 'semana'
+        ? weekRange(weekOffset)
+        : presetRange(preset);
   const periodQs = `from=${range.from}&to=${range.to}`;
+  const prevWeek = weekRange(weekOffset - 1);
+  const semanaEnCurso = preset === 'semana' && weekOffset === 0;
 
   const resumenQ = useQuery({
     queryKey: ['reportes', 'resumen', periodQs],
     queryFn: () => api.get<Resumen>(`/compras/reportes/resumen?${periodQs}`),
   });
+  const prevQs = `from=${prevWeek.from}&to=${prevWeek.to}`;
+  const resumenAnteriorQ = useQuery({
+    queryKey: ['reportes', 'resumen', prevQs],
+    queryFn: () => api.get<Resumen>(`/compras/reportes/resumen?${prevQs}`),
+    enabled: preset === 'semana',
+  });
+  const anterior = preset === 'semana' ? resumenAnteriorQ.data?.todas_las_fuentes : undefined;
   const rqQ = useQuery({
     queryKey: ['reportes', 'requisiciones', periodQs],
     queryFn: () =>
@@ -483,11 +530,13 @@ export default function ReportesComprasPage() {
           <h1 className="text-2xl font-bold text-[#424846]">Reportes de Compras</h1>
           <p className="text-gray-500">
             Datos reales del periodo {fechaCorta(range.from)} — {fechaCorta(range.to)}
+            {semanaEnCurso && ' (semana en curso)'}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {(
             [
+              ['semana', 'Semana'],
               ['mes', 'Este mes'],
               ['trimestre', 'Trimestre'],
               ['12m', '12 meses'],
@@ -506,6 +555,30 @@ export default function ReportesComprasPage() {
               {label}
             </button>
           ))}
+          {preset === 'semana' && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setWeekOffset(weekOffset - 1)}
+                className="px-2.5 py-1.5 text-sm rounded-lg border border-gray-200 bg-white text-[#424846] hover:bg-gray-50"
+                title="Semana anterior"
+              >
+                ‹
+              </button>
+              <span className="px-2 text-sm text-[#424846] tabular-nums whitespace-nowrap">
+                {fechaCorta(range.from)} al {fechaCorta(range.to)}
+              </span>
+              <button
+                type="button"
+                onClick={() => setWeekOffset(weekOffset + 1)}
+                disabled={weekOffset >= 0}
+                className="px-2.5 py-1.5 text-sm rounded-lg border border-gray-200 bg-white text-[#424846] hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Semana siguiente"
+              >
+                ›
+              </button>
+            </div>
+          )}
           {preset === 'custom' && (
             <>
               <input
@@ -522,6 +595,13 @@ export default function ReportesComprasPage() {
               />
             </>
           )}
+          <ExportExcelButton
+            path={`/compras/reportes/semanal/export?${periodQs}`}
+            filename={`reporte_compras_${range.from}_${range.to}.xlsx`}
+            disabled={!range.from || !range.to}
+            label={preset === 'semana' ? 'Reporte semanal' : 'Descargar reporte'}
+            title="Excel con el resumen contra el periodo anterior, las OC y solicitudes de SAP y Maximo del periodo, y las autorizaciones pendientes"
+          />
         </div>
       </div>
 
@@ -533,6 +613,7 @@ export default function ReportesComprasPage() {
             value={resumen.todas_las_fuentes.solicitudes.creadas.toLocaleString('es-MX')}
             lines={[`${resumen.todas_las_fuentes.solicitudes.abiertas.toLocaleString('es-MX')} abiertas hoy`]}
             sub={porFuente(resumen.todas_las_fuentes.solicitudes.por_fuente, (f) => f.creadas)}
+            compare={versus(resumen.todas_las_fuentes.solicitudes.creadas, anterior?.solicitudes.creadas)}
             hint="Solicitudes de pedido de SAP y solicitudes (PR) de Maximo creadas en el periodo, más requisiciones capturadas en ABENT."
             border="border-blue-500"
           />
@@ -548,6 +629,7 @@ export default function ReportesComprasPage() {
             value={resumen.todas_las_fuentes.ordenes.total.toLocaleString('es-MX')}
             lines={formatAmountLines(resumen.todas_las_fuentes.ordenes.monto_por_moneda)}
             sub={porFuente(resumen.todas_las_fuentes.ordenes.por_fuente, (n) => n)}
+            compare={versus(resumen.todas_las_fuentes.ordenes.total, anterior?.ordenes.total)}
             hint="OC no canceladas de SAP y Maximo creadas en el periodo, más OC propias. Un monto por moneda: nunca se suman MXN con USD."
             border="border-[#52AF32]"
           />

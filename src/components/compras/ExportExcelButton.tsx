@@ -15,6 +15,7 @@ interface ExportExcelButtonProps {
   filename: string;
   disabled?: boolean;
   label?: string;
+  title?: string;
 }
 
 export default function ExportExcelButton({
@@ -22,6 +23,7 @@ export default function ExportExcelButton({
   filename,
   disabled = false,
   label = 'Exportar Excel',
+  title = 'Descarga en Excel lo que ves con los filtros actuales',
 }: ExportExcelButtonProps) {
   const [busy, setBusy] = useState(false);
 
@@ -50,7 +52,7 @@ export default function ExportExcelButton({
       onClick={handleClick}
       disabled={disabled || busy}
       className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-[#52AF32] text-[#52AF32] bg-white hover:bg-[#52AF32]/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      title="Descarga en Excel lo que ves con los filtros actuales"
+      title={title}
     >
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
