@@ -392,7 +392,10 @@ export interface MaximoPurchaseOrder {
   /** E4 (2026-09-25): comprador (PURCHASEAGENT) y nombre a mostrar (alias > Maximo > usuario). */
   purchase_agent: string | null;
   purchase_agent_name: string | null;
+  /** F1: quién creó la OC (CHANGEBY del primer estatus); respaldo "Capturó". */
+  created_by: string | null;
   buyer_name: string | null;
+  buyer_kind: BuyerKind;
   department: string | null;
   approved_at: string | null;
   /** Usuario Maximo que aprobó (sprint 2026-09-22, B3); null si no aplica. */

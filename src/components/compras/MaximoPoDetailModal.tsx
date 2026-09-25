@@ -183,15 +183,25 @@ export default function MaximoPoDetailModal({
                       : dash(current.requested_by)
                   }
                 />
-                {/* E4: comprador de la OC (PURCHASEAGENT) */}
+                {/* E4: comprador de la OC (PURCHASEAGENT); F1: sin él, quien la creó */}
                 <Field
                   label="Comprador"
                   value={
-                    current.purchase_agent === null
-                      ? '—'
-                      : current.buyer_name && current.buyer_name !== current.purchase_agent
+                    current.buyer_kind === 'comprador'
+                      ? current.buyer_name !== current.purchase_agent
                         ? <>{current.buyer_name} <span className="text-xs text-gray-500">({current.purchase_agent})</span></>
                         : current.purchase_agent
+                      : <span className="text-gray-500">Sin agente de compras en Maximo</span>
+                  }
+                />
+                <Field
+                  label="Creó la OC"
+                  value={
+                    current.created_by === null
+                      ? '—'
+                      : current.buyer_kind === 'capturo' && current.buyer_name !== current.created_by
+                        ? <>{current.buyer_name} <span className="text-xs text-gray-500">({current.created_by})</span></>
+                        : current.created_by
                   }
                 />
                 <Field

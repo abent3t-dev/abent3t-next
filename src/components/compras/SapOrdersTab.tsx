@@ -183,6 +183,15 @@ function BuyerCell({ po }: { po: SapPurchaseOrder }) {
       </div>
     );
   }
+  // F1: la migrada sin agente de compras en Maximo muestra quién la creó allá
+  if (po.maximo_po_exists) {
+    return (
+      <div className="leading-tight max-w-40" title={`Sin agente de compras en Maximo: creó la OC ${po.buyer_name}`}>
+        <span className="block truncate text-gray-500">{label}</span>
+        <span className="block text-xs text-gray-500">según Maximo</span>
+      </div>
+    );
+  }
   return (
     <span
       className="block max-w-40 truncate text-gray-500"

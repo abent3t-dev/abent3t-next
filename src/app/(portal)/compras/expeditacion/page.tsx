@@ -353,7 +353,9 @@ function ExpeditacionContent() {
                               className={item.buyer_kind === 'capturo' ? 'text-gray-500' : 'text-gray-900'}
                               title={
                                 item.buyer_kind === 'capturo'
-                                  ? 'La OC de SAP no trae comprador: se muestra el usuario que la capturó'
+                                  ? item.source === 'maximo' || item.maximo_ponum
+                                    ? 'Sin agente de compras en Maximo: se muestra quién creó la OC'
+                                    : 'La OC de SAP no trae comprador: se muestra el usuario que la capturó'
                                   : undefined
                               }
                             >

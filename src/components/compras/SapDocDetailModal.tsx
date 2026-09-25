@@ -241,6 +241,11 @@ export default function SapDocDetailModal({
                             {poDoc.buyer_name}
                             <span className="block text-xs text-gray-500">según Maximo</span>
                           </>
+                        ) : poDoc?.buyer_kind === 'capturo' && poDoc.maximo_po_exists ? (
+                          <>
+                            <span className="text-gray-500">Capturó: {poDoc.buyer_name}</span>
+                            <span className="block text-xs text-gray-500">sin agente de compras en Maximo; quién creó la OC allá</span>
+                          </>
                         ) : (
                           <span className="text-gray-500">
                             {poDoc?.maximo_ponum ? 'Sin comprador en Maximo' : 'SAP no registra comprador en la OC'}

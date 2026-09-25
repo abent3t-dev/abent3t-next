@@ -12,6 +12,7 @@ import {
   MAXIMO_STATUS_BADGE_CLASSES,
   MaximoPurchaseOrder,
   MaximoSummary,
+  buyerLabel,
   maximoStatusBadgeClass,
   maximoStatusLabel,
 } from '@/types/purchases';
@@ -42,7 +43,8 @@ import type { ColumnConfigs } from '@/lib/column-filters';
  * Bloque 2026-09-23: D4 año; D1 búsqueda inicial por PONUM (link desde la
  * OC de SAP migrada); D6 solicitante con nombre si hay alias.
  * Pedidos de Ingrid 2026-09-25: E1 filtro "tipo Excel" por columna; E4
- * columna Comprador (PURCHASEAGENT con su nombre: alias > Maximo > usuario).
+ * columna Comprador (PURCHASEAGENT con su nombre: alias > Maximo > usuario);
+ * F1: sin PURCHASEAGENT (casi todas), "Capturó: …" = quien creó la OC.
  */
 
 const PAGE_SIZE = 15;
@@ -291,8 +293,17 @@ export default function MaximoOrdersTab({
                       <td className="px-3 py-3 text-sm text-gray-700 max-w-36 truncate" title={po.requested_by ?? undefined}>
                         {po.requested_by_name ?? dash(po.requested_by)}
                       </td>
-                      <td className="px-3 py-3 text-sm text-gray-700 max-w-36 truncate" title={po.purchase_agent ?? 'Sin comprador en Maximo'}>
-                        {po.buyer_name ?? <span className="text-gray-400">—</span>}
+                      <td
+                        className={`px-3 py-3 text-sm max-w-40 truncate ${po.buyer_kind === 'capturo' ? 'text-gray-500' : 'text-gray-700'}`}
+                        title={
+                          po.buyer_kind === 'comprador'
+                            ? `Agente de compras en Maximo: ${po.purchase_agent}`
+                            : po.buyer_kind === 'capturo'
+                              ? `Sin agente de compras en Maximo: creó la OC ${po.created_by}`
+                              : 'Sin comprador en Maximo'
+                        }
+                      >
+                        {buyerLabel(po) ?? <span className="text-gray-400">—</span>}
                       </td>
                       <td className="px-3 py-3 text-sm text-gray-600">{dash(po.department)}</td>
                       <td className="px-3 py-3 text-center text-sm text-gray-600">
