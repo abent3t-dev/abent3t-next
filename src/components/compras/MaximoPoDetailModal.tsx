@@ -183,6 +183,17 @@ export default function MaximoPoDetailModal({
                       : dash(current.requested_by)
                   }
                 />
+                {/* E4: comprador de la OC (PURCHASEAGENT) */}
+                <Field
+                  label="Comprador"
+                  value={
+                    current.purchase_agent === null
+                      ? '—'
+                      : current.buyer_name && current.buyer_name !== current.purchase_agent
+                        ? <>{current.buyer_name} <span className="text-xs text-gray-500">({current.purchase_agent})</span></>
+                        : current.purchase_agent
+                  }
+                />
                 <Field
                   label="Fecha aprobación"
                   value={formatDate(current.approved_at)}

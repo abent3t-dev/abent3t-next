@@ -389,6 +389,10 @@ export interface MaximoPurchaseOrder {
   requested_by: string | null;
   /** D6 (2026-09-23): nombre según los alias de Maximo; null = sin alias (se muestra el código). */
   requested_by_name: string | null;
+  /** E4 (2026-09-25): comprador (PURCHASEAGENT) y nombre a mostrar (alias > Maximo > usuario). */
+  purchase_agent: string | null;
+  purchase_agent_name: string | null;
+  buyer_name: string | null;
   department: string | null;
   approved_at: string | null;
   /** Usuario Maximo que aprobó (sprint 2026-09-22, B3); null si no aplica. */
@@ -415,6 +419,37 @@ export interface MaximoRevision {
 export interface MaximoPurchaseOrderDetail {
   current: MaximoPurchaseOrder;
   revisions: MaximoRevision[];
+}
+
+/**
+ * E2 (2026-09-25): contrato de Maximo agrupado — una fila por contrato
+ * (última revisión) con las PR que lo usan (`group=contract`).
+ */
+export interface MaximoContractGroup {
+  contractnum: string;
+  /** Clave para abrir el detalle (PR de la fila representativa). */
+  detail_key: string;
+  revisionnum: number | null;
+  status: string | null;
+  vendor_id: string | null;
+  vendor_name: string | null;
+  currency: string | null;
+  contract_value: number | null;
+  consumed_value: number | null;
+  balance_value: number | null;
+  maxvol: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  department: string | null;
+  pr_count: number;
+  prs: Array<{
+    prnum: string | null;
+    status: string | null;
+    requested_by: string | null;
+    requested_by_name: string | null;
+    created_at_source: string | null;
+    approved_at: string | null;
+  }>;
 }
 
 export interface MaximoContract {
@@ -869,6 +904,15 @@ export const EXPEDITING_SOURCE_LABELS: Record<ExpeditingSource, string> = {
   maximo: 'Maximo',
 };
 
+/** E4: `capturo` = respaldo de SAP (ninguna OC de PRD trae comprador). */
+export type BuyerKind = 'comprador' | 'capturo' | null;
+
+/** "Capturó: X" cuando el comprador es el respaldo de SAP. */
+export function buyerLabel(row: { buyer_name: string | null; buyer_kind: BuyerKind }): string | null {
+  if (!row.buyer_name) return null;
+  return row.buyer_kind === 'capturo' ? `Capturó: ${row.buyer_name}` : row.buyer_name;
+}
+
 export interface ExpeditingItem {
   /** null = OC de un ERP (solo lectura, sin acciones ni detalle). */
   purchase_order_id: string | null;
@@ -882,6 +926,13 @@ export interface ExpeditingItem {
   maximo_ponum: string | null;
   supplier: { id: string | null; legal_name: string; email: string | null } | null;
   buyer: { id: string; full_name: string | null; email: string } | null;
+  /**
+   * E4 (2026-09-25): comprador a mostrar. ABENT: el de la OC; Maximo:
+   * PURCHASEAGENT (alias o nombre); SAP migrada: el de Maximo; SAP propia:
+   * quién la capturó (`capturo`, se muestra "Capturó: …").
+   */
+  buyer_name: string | null;
+  buyer_kind: BuyerKind;
   requisition: { id: string; rq_number: string } | null;
   amount: number | null;
   expected_delivery_date: string | null;
@@ -1033,6 +1084,9 @@ export interface SapPurchaseOrder {
   base_request_entries: number[];
   /** Solicitantes de las solicitudes de las que nació la OC (vacío = sin solicitud). */
   requester_names: string[];
+  /** E4: comprador de Maximo (OC migrada) o quién la capturó (`capturo`). */
+  buyer_name: string | null;
+  buyer_kind: BuyerKind;
   last_changed_at: string | null;
   last_seen_at: string;
 }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { toQuery } from '@/lib/compras-format';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,6 +19,15 @@ import MaximoPoDetailModal from './MaximoPoDetailModal';
 import ResultChips from './ResultChips';
 import StatusMultiSelect from './StatusMultiSelect';
 import ExportExcelButton from './ExportExcelButton';
+import {
+  ActiveColumnFilters,
+  ColumnFilterProvider,
+  FilterTh,
+  facetCounts,
+  useColumnFacet,
+} from '@/components/ui/ColumnFilter';
+import { useColumnFilters } from '@/hooks/useColumnFilters';
+import type { ColumnConfigs } from '@/lib/column-filters';
 
 /**
  * Fase INT-5 (T6) — Pestana "Ordenes Maximo" dentro de /compras/ordenes.
@@ -32,6 +41,8 @@ import ExportExcelButton from './ExportExcelButton';
  * filtro inicial desde la URL (clic en un pie del dashboard, A2).
  * Bloque 2026-09-23: D4 año; D1 búsqueda inicial por PONUM (link desde la
  * OC de SAP migrada); D6 solicitante con nombre si hay alias.
+ * Pedidos de Ingrid 2026-09-25: E1 filtro "tipo Excel" por columna; E4
+ * columna Comprador (PURCHASEAGENT con su nombre: alias > Maximo > usuario).
  */
 
 const PAGE_SIZE = 15;
@@ -43,6 +54,25 @@ const STATUS_OPTIONS = Object.keys(MAXIMO_STATUS_BADGE_CLASSES).map((value) => (
   value,
   label: `${maximoStatusLabel(value)} (${value})`,
 }));
+
+const COLUMNS: ColumnConfigs = {
+  ponum: { label: 'PONUM', type: 'text' },
+  descripcion: { label: 'Descripción', type: 'text' },
+  estatus: {
+    label: 'Estatus',
+    type: 'text',
+    format: (v) => `${maximoStatusLabel(v)} (${v})`,
+    emptyLabel: 'Sin estatus en Maximo',
+  },
+  proveedor: { label: 'Proveedor', type: 'text' },
+  monto: { label: 'Monto', type: 'number' },
+  solicitante: { label: 'Solicitante', type: 'text', emptyLabel: '(Sin solicitante)' },
+  comprador: { label: 'Comprador', type: 'text', emptyLabel: '(Sin comprador)' },
+  depto: { label: 'Departamento', type: 'text' },
+  clasificacion: { label: 'Clasificación', type: 'text', emptyLabel: 'No disponible' },
+  ahorro: { label: 'Ahorro', type: 'number' },
+  aprobacion: { label: 'Fecha de aprobación', type: 'date' },
+};
 
 const dash = (value: string | number | null | undefined) =>
   value === null || value === undefined || value === '' ? '—' : String(value);
@@ -90,6 +120,7 @@ export default function MaximoOrdersTab({
   const [approvedTo, setApprovedTo] = useState('');
   const [page, setPage] = useState(1);
   const [detailPonum, setDetailPonum] = useState<string | null>(null);
+  const cf = useColumnFilters('mxPo', () => setPage(1));
 
   const filters = {
     search,
@@ -99,30 +130,39 @@ export default function MaximoOrdersTab({
     approved_to: approvedTo,
     year: year ?? undefined,
   };
-  const filterQs = toQuery(filters);
-  const listQs = toQuery({ page, limit: PAGE_SIZE, ...filters });
+  const filterQs = toQuery({ ...filters, ...cf.params });
+  const listQs = toQuery({ page, limit: PAGE_SIZE, ...filters, ...cf.params });
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['maximo-purchase-orders', listQs],
     queryFn: () => api.get<PaginatedResponse<MaximoPurchaseOrder>>(`/maximo/purchase-orders?${listQs}`),
+    // E1: la tabla anterior se queda en pantalla mientras llega la nueva
+    placeholderData: keepPreviousData,
   });
   const summaryQ = useQuery({
     queryKey: ['maximo', 'summary', year],
     queryFn: () => api.get<MaximoSummary>(`/maximo/summary${year ? `?year=${year}` : ''}`),
   });
+  // E1: chips por estatus con los demás filtros (sin el propio estatus)
+  const statusFacet = useColumnFacet(
+    '/maximo/purchase-orders/facets',
+    { ...filters, status: undefined, ...cf.params },
+    'estatus',
+  );
 
   const orders = data?.data ?? [];
   const meta = data?.meta;
-  const hasFilters = !!search || statuses.length > 0 || !!clasfFilter || !!approvedFrom || !!approvedTo || !!year;
+  const hasFilters =
+    !!search || statuses.length > 0 || !!clasfFilter || !!approvedFrom || !!approvedTo || !!year || cf.activeCount > 0;
   const canSeeIntegrations = hasRole(...PURCHASE_ADMIN_ROLES, 'executive');
   const summary = summaryQ.data?.purchaseOrders;
-  const chips = (summary?.byStatus ?? [])
-    .filter((s) => s.status !== null)
-    .map((s) => ({
-      key: s.status as string,
-      label: maximoStatusLabel(s.status),
-      count: s.count,
-      className: maximoStatusBadgeClass(s.status),
+  const chips = [...facetCounts(statusFacet.data).entries()]
+    .filter((entry): entry is [string, number] => entry[0] !== null)
+    .map(([status, count]) => ({
+      key: status,
+      label: maximoStatusLabel(status),
+      count,
+      className: maximoStatusBadgeClass(status),
     }));
   const toggleStatus = (key: string) => {
     setStatuses(statuses.includes(key) ? statuses.filter((s) => s !== key) : [...statuses, key]);
@@ -183,6 +223,7 @@ export default function MaximoOrdersTab({
           onToggleStatus={toggleStatus}
           loading={isLoading}
         />
+        <ActiveColumnFilters cf={cf} columns={COLUMNS} />
       </div>
 
       {/* Tabla */}
@@ -207,19 +248,21 @@ export default function MaximoOrdersTab({
         ) : (
           <>
             <div className="overflow-x-auto">
+              <ColumnFilterProvider value={{ cf, columns: COLUMNS, facetsPath: '/maximo/purchase-orders/facets', baseQuery: filters }}>
               <table className="w-full">
                 <thead className="bg-[#424846]">
                   <tr>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase whitespace-nowrap">PONUM</th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase whitespace-nowrap">Descripción</th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase whitespace-nowrap">Estatus</th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase whitespace-nowrap">Proveedor</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-white uppercase whitespace-nowrap">Monto</th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase whitespace-nowrap">Solicitante</th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase whitespace-nowrap">Depto.</th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase whitespace-nowrap">Clasif.</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-white uppercase whitespace-nowrap">Ahorro</th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase whitespace-nowrap">F. Aprob.</th>
+                    <FilterTh column="ponum" className="px-3 py-3">PONUM</FilterTh>
+                    <FilterTh column="descripcion" className="px-3 py-3">Descripción</FilterTh>
+                    <FilterTh column="estatus" align="center" className="px-3 py-3">Estatus</FilterTh>
+                    <FilterTh column="proveedor" className="px-3 py-3">Proveedor</FilterTh>
+                    <FilterTh column="monto" align="right" className="px-3 py-3">Monto</FilterTh>
+                    <FilterTh column="solicitante" className="px-3 py-3">Solicitante</FilterTh>
+                    <FilterTh column="comprador" className="px-3 py-3" title="Comprador de la OC en Maximo (PURCHASEAGENT)">Comprador</FilterTh>
+                    <FilterTh column="depto" className="px-3 py-3">Depto.</FilterTh>
+                    <FilterTh column="clasificacion" align="center" className="px-3 py-3">Clasif.</FilterTh>
+                    <FilterTh column="ahorro" align="right" className="px-3 py-3">Ahorro</FilterTh>
+                    <FilterTh column="aprobacion" align="center" className="px-3 py-3">F. Aprob.</FilterTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -248,6 +291,9 @@ export default function MaximoOrdersTab({
                       <td className="px-3 py-3 text-sm text-gray-700 max-w-36 truncate" title={po.requested_by ?? undefined}>
                         {po.requested_by_name ?? dash(po.requested_by)}
                       </td>
+                      <td className="px-3 py-3 text-sm text-gray-700 max-w-36 truncate" title={po.purchase_agent ?? 'Sin comprador en Maximo'}>
+                        {po.buyer_name ?? <span className="text-gray-400">—</span>}
+                      </td>
                       <td className="px-3 py-3 text-sm text-gray-600">{dash(po.department)}</td>
                       <td className="px-3 py-3 text-center text-sm text-gray-600">
                         {po.ab_clasfpo === null ? <NotAvailable /> : po.ab_clasfpo}
@@ -260,13 +306,14 @@ export default function MaximoOrdersTab({
                   ))}
                   {orders.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
                         No hay órdenes de Maximo que coincidan con los filtros
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
+              </ColumnFilterProvider>
             </div>
 
             {meta && meta.totalPages > 1 && (

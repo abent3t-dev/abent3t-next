@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { Suspense, useState } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { PURCHASE_TEAM_ROLES } from '@/types/auth';
@@ -17,12 +17,23 @@ import ResultChips from '@/components/compras/ResultChips';
 import ExportExcelButton from '@/components/compras/ExportExcelButton';
 import ContractStatusBadge from '@/components/compras/ContractStatusBadge';
 import MaximoContractsTab from '@/components/compras/MaximoContractsTab';
+import {
+  ActiveColumnFilters,
+  ColumnFilterProvider,
+  FilterTh,
+} from '@/components/ui/ColumnFilter';
+import { useColumnFilters } from '@/hooks/useColumnFilters';
+import type { ColumnConfigs } from '@/lib/column-filters';
+import { toQuery } from '@/lib/compras-format';
 
 /**
  * Fase §15 — Repositorio documental de contratos. Consulta abierta a
  * cualquier usuario autenticado; alta/edicion/subida solo PURCHASE_TEAM
  * (canEdit). La pestana "Contratos Maximo" llego aqui desde /compras/ordenes
  * (cierre de la provisionalidad T6).
+ *
+ * E1 (2026-09-25, pedido por César e Ingrid): filtro "tipo Excel" por
+ * columna en las dos pestañas (URL, total y Excel con el mismo filtro).
  */
 
 type ContractsTab = 'abent' | 'maximo';
@@ -34,6 +45,28 @@ const TABS: { id: ContractsTab; label: string }[] = [
 
 const PAGE_SIZE = 15;
 const EXPIRY_WARNING_DAYS = 30;
+
+const COLUMNS: ColumnConfigs = {
+  numero: { label: 'Número', type: 'text' },
+  tipo: {
+    label: 'Tipo',
+    type: 'text',
+    format: (v) => CONTRACT_DOCUMENT_TYPE_LABELS[v as keyof typeof CONTRACT_DOCUMENT_TYPE_LABELS] ?? v,
+  },
+  servicio: { label: 'Servicio', type: 'text' },
+  proveedor: { label: 'Proveedor', type: 'text' },
+  fin: { label: 'Fin de vigencia', type: 'date' },
+  estatus: {
+    label: 'Estatus',
+    type: 'text',
+    format: (v) => CONTRACT_STATUS_LABELS[v as ContractStatus] ?? v,
+  },
+  monto: { label: 'Monto', type: 'number' },
+  consumido: { label: 'Consumido', type: 'number' },
+  saldo: { label: 'Saldo', type: 'number' },
+  comprador: { label: 'Comprador', type: 'text', emptyLabel: '(Sin comprador)' },
+  responsable: { label: 'Responsable', type: 'text', emptyLabel: '(Sin responsable)' },
+};
 
 const formatDate = (date: string) =>
   new Date(date).toLocaleDateString('es-MX', {
@@ -94,7 +127,7 @@ function ExpiryLine({ contract }: { contract: Contract }) {
   return null;
 }
 
-export default function ContratosPage() {
+function ContratosContent() {
   const { hasRole } = useAuth();
   const canEdit = hasRole(...PURCHASE_TEAM_ROLES);
 
@@ -105,31 +138,24 @@ export default function ContratosPage() {
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [selected, setSelected] = useState<Contract | null>(null);
+  const cf = useColumnFilters('ct', () => setPage(1));
 
-  const queryParams = new URLSearchParams();
-  queryParams.set('page', page.toString());
-  queryParams.set('limit', String(PAGE_SIZE));
-  if (search) queryParams.set('search', search);
-  if (statusFilter) queryParams.set('status', statusFilter);
-  if (expiryFilter) queryParams.set('vence_en_dias', expiryFilter);
+  const baseQuery = { search, status: statusFilter, vence_en_dias: expiryFilter };
+  const listQs = toQuery({ page, limit: PAGE_SIZE, ...baseQuery, ...cf.params });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['contracts', search, statusFilter, expiryFilter, page],
-    queryFn: () =>
-      api.get<PaginatedResponse<Contract>>(
-        `/compras/contratos?${queryParams.toString()}`,
-      ),
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['contracts', listQs],
+    queryFn: () => api.get<PaginatedResponse<Contract>>(`/compras/contratos?${listQs}`),
+    // E1: la tabla anterior se queda en pantalla mientras llega la nueva
+    placeholderData: keepPreviousData,
     enabled: activeTab === 'abent',
   });
 
   const contracts = data?.data ?? [];
   const meta = data?.meta;
-  const hasFilters = !!search || !!statusFilter || !!expiryFilter;
-  const exportQs = new URLSearchParams();
-  if (search) exportQs.set('search', search);
-  if (statusFilter) exportQs.set('status', statusFilter);
-  if (expiryFilter) exportQs.set('vence_en_dias', expiryFilter);
-  const exportPath = `/compras/contratos/export${exportQs.toString() ? `?${exportQs}` : ''}`;
+  const hasFilters = !!search || !!statusFilter || !!expiryFilter || cf.activeCount > 0;
+  const exportQs = toQuery({ ...baseQuery, ...cf.params });
+  const exportPath = `/compras/contratos/export${exportQs ? `?${exportQs}` : ''}`;
 
   const openContract = (contract: Contract | null) => {
     setSelected(contract);
@@ -219,6 +245,9 @@ export default function ContratosPage() {
                 <option value="7">Vence en 7 días</option>
               </select>
             </div>
+            <div className="mt-3">
+              <ActiveColumnFilters cf={cf} columns={COLUMNS} />
+            </div>
           </div>
 
           {/* Tabla */}
@@ -227,6 +256,10 @@ export default function ContratosPage() {
               <div className="p-8 text-center">
                 <div className="w-8 h-8 border-4 border-[#52AF32] border-t-transparent rounded-full animate-spin mx-auto" />
               </div>
+            ) : isError ? (
+              <p className="p-8 text-center text-red-600">
+                No se pudieron cargar los contratos. Si aplicaste un filtro, límpialo e intenta de nuevo.
+              </p>
             ) : contracts.length === 0 && !hasFilters ? (
               <div className="p-10 text-center space-y-2">
                 <p className="text-gray-500">Aún no hay contratos registrados</p>
@@ -247,20 +280,21 @@ export default function ContratosPage() {
                   />
                 </div>
                 <div className="overflow-x-auto">
+                  <ColumnFilterProvider value={{ cf, columns: COLUMNS, facetsPath: '/compras/contratos/facets', baseQuery }}>
                   <table className="w-full">
                     <thead className="bg-[#424846]">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Número</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Tipo</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Servicio</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Proveedor</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Vigencia</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Monto</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Consumido</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Saldo</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Comprador</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Responsable</th>
+                        <FilterTh column="numero">Número</FilterTh>
+                        <FilterTh column="tipo">Tipo</FilterTh>
+                        <FilterTh column="servicio">Servicio</FilterTh>
+                        <FilterTh column="proveedor">Proveedor</FilterTh>
+                        <FilterTh column="fin" align="center" title="Filtra y ordena por el fin de la vigencia">Vigencia</FilterTh>
+                        <FilterTh column="estatus" align="center">Estatus</FilterTh>
+                        <FilterTh column="monto" align="right">Monto</FilterTh>
+                        <FilterTh column="consumido" align="right">Consumido</FilterTh>
+                        <FilterTh column="saldo" align="right">Saldo</FilterTh>
+                        <FilterTh column="comprador">Comprador</FilterTh>
+                        <FilterTh column="responsable">Responsable</FilterTh>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -353,6 +387,7 @@ export default function ContratosPage() {
                       )}
                     </tbody>
                   </table>
+                  </ColumnFilterProvider>
                 </div>
 
                 {/* Paginacion */}
@@ -399,5 +434,14 @@ export default function ContratosPage() {
         </>
       )}
     </div>
+  );
+}
+
+/** Los filtros por columna viven en la URL: useSearchParams pide Suspense. */
+export default function ContratosPage() {
+  return (
+    <Suspense fallback={null}>
+      <ContratosContent />
+    </Suspense>
   );
 }

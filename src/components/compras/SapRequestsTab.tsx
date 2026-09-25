@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { toQuery } from '@/lib/compras-format';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,6 +20,15 @@ import SapDocDetailModal from './SapDocDetailModal';
 import ResultChips from './ResultChips';
 import StatusMultiSelect from './StatusMultiSelect';
 import ExportExcelButton from './ExportExcelButton';
+import {
+  ActiveColumnFilters,
+  ColumnFilterProvider,
+  FilterTh,
+  facetCounts,
+  useColumnFacet,
+} from '@/components/ui/ColumnFilter';
+import { useColumnFilters } from '@/hooks/useColumnFilters';
+import type { ColumnConfigs } from '@/lib/column-filters';
 
 /**
  * Fase INT-4 (T6) — Pestana "Solicitudes SAP" dentro de /compras/solicitudes.
@@ -29,7 +38,17 @@ import ExportExcelButton from './ExportExcelButton';
  *
  * Sprint 2026-09-22: estatus derivado con Cancelada (A6), filtro multi
  * (A5), chips de totales (A4), export Excel (B1), filtro inicial desde URL.
+ * E1 (2026-09-25): filtro "tipo Excel" por columna (URL, chips y Excel).
  */
+
+const COLUMNS: ColumnConfigs = {
+  numero: { label: 'Número', type: 'text' },
+  solicitante: { label: 'Solicitante', type: 'text', emptyLabel: '(Sin solicitante)' },
+  estatus: { label: 'Estatus', type: 'text', format: sapStatusLabel },
+  monto: { label: 'Monto (líneas)', type: 'number' },
+  fecha: { label: 'Fecha del documento', type: 'date' },
+  requerida: { label: 'Fecha requerida', type: 'date' },
+};
 
 const PAGE_SIZE = 15;
 
@@ -66,28 +85,39 @@ export default function SapRequestsTab({
   const [statuses, setStatuses] = useState<string[]>(initialStatus);
   const [page, setPage] = useState(1);
   const [detailDocEntry, setDetailDocEntry] = useState<number | null>(null);
+  const cf = useColumnFilters('sapPr', () => setPage(1));
 
-  const filterQs = toQuery({ search, status: statuses, year: year ?? undefined });
-  const listQs = toQuery({ page, limit: PAGE_SIZE, search, status: statuses, year: year ?? undefined });
+  const baseQuery = { search, status: statuses, year: year ?? undefined };
+  const filterQs = toQuery({ ...baseQuery, ...cf.params });
+  const listQs = toQuery({ page, limit: PAGE_SIZE, ...baseQuery, ...cf.params });
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['sap-purchase-requests', listQs],
     queryFn: () => api.get<PaginatedResponse<SapPurchaseRequest>>(`/sap/purchase-requests?${listQs}`),
+    // E1: la tabla anterior se queda en pantalla mientras llega la nueva
+    placeholderData: keepPreviousData,
   });
   const summaryQ = useQuery({
     queryKey: ['sap', 'summary'],
     queryFn: () => api.get<SapSummary>('/sap/summary'),
   });
+  // E1: chips por estatus con los demás filtros (sin el propio estatus)
+  const statusFacet = useColumnFacet(
+    '/sap/purchase-requests/facets',
+    { ...baseQuery, status: undefined, ...cf.params },
+    'estatus',
+  );
+  const statusCounts = facetCounts(statusFacet.data);
 
   const requests = data?.data ?? [];
   const meta = data?.meta;
-  const hasFilters = !!search || statuses.length > 0 || !!year;
+  const hasFilters = !!search || statuses.length > 0 || !!year || cf.activeCount > 0;
   const canSeeIntegrations = hasRole(...PURCHASE_ADMIN_ROLES, 'executive');
   const summary = summaryQ.data?.purchaseRequests;
   const chips = SAP_STATUS_OPTIONS.map((opt) => ({
     key: opt.value,
     label: opt.label,
-    count: summary?.byStatus.find((s) => s.status === opt.value)?.count ?? 0,
+    count: statusCounts.get(opt.value) ?? 0,
     className: sapStatusBadgeClass(opt.value),
   }));
   const toggleStatus = (key: string) => {
@@ -125,6 +155,7 @@ export default function SapRequestsTab({
           onToggleStatus={toggleStatus}
           loading={isLoading}
         />
+        <ActiveColumnFilters cf={cf} columns={COLUMNS} />
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -148,15 +179,16 @@ export default function SapRequestsTab({
         ) : (
           <>
             <div className="overflow-x-auto">
+              <ColumnFilterProvider value={{ cf, columns: COLUMNS, facetsPath: '/sap/purchase-requests/facets', baseQuery }}>
               <table className="w-full">
                 <thead className="bg-[#424846]">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Número</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Solicitante</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Monto (líneas)</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">F. Documento</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">F. Requerida</th>
+                    <FilterTh column="numero">Número</FilterTh>
+                    <FilterTh column="solicitante">Solicitante</FilterTh>
+                    <FilterTh column="estatus" align="center">Estatus</FilterTh>
+                    <FilterTh column="monto" align="right">Monto (líneas)</FilterTh>
+                    <FilterTh column="fecha" align="center">F. Documento</FilterTh>
+                    <FilterTh column="requerida" align="center">F. Requerida</FilterTh>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Clasif. líneas</th>
                   </tr>
                 </thead>
@@ -204,6 +236,7 @@ export default function SapRequestsTab({
                   )}
                 </tbody>
               </table>
+              </ColumnFilterProvider>
             </div>
 
             {meta && meta.totalPages > 1 && (

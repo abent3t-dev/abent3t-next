@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { toQuery } from '@/lib/compras-format';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,6 +12,7 @@ import {
   SAP_STATUS_OPTIONS,
   SapPurchaseOrder,
   SapSummary,
+  buyerLabel,
   sapDocStatus,
   sapStatusBadgeClass,
   sapStatusLabel,
@@ -20,6 +21,15 @@ import SapDocDetailModal from './SapDocDetailModal';
 import ResultChips from './ResultChips';
 import StatusMultiSelect from './StatusMultiSelect';
 import ExportExcelButton from './ExportExcelButton';
+import {
+  ActiveColumnFilters,
+  ColumnFilterProvider,
+  FilterTh,
+  facetCounts,
+  useColumnFacet,
+} from '@/components/ui/ColumnFilter';
+import { useColumnFilters } from '@/hooks/useColumnFilters';
+import type { ColumnConfigs } from '@/lib/column-filters';
 
 /**
  * Fase INT-4 (T6) — Pestana "Ordenes SAP" dentro de /compras/ordenes.
@@ -34,10 +44,15 @@ import ExportExcelButton from './ExportExcelButton';
  * 2026-09-23 (Ingrid): saldo disponible (lo que falta por recibir/facturar)
  * y solicitante. SAP no trae solicitante en la OC: sale de la solicitud de
  * pedido de la que nació; las OC que crea la integración con Maximo traen
- * el solicitante de Maximo; si no hay ninguno, se muestra quién la capturó.
+ * el solicitante de Maximo.
  *
  * Bloque 2026-09-23: D1 columna/badge "Origen" (SAP / Migrada de Maximo
  * con su PO) + filtro de origen; D4 año (desde el dashboard o los chips).
+ *
+ * Pedidos de Ingrid 2026-09-25: E1 filtro "tipo Excel" por columna (URL,
+ * chips y Excel con el mismo filtro); E4 columna Comprador — SAP no tiene
+ * comprador en ninguna OC: la migrada muestra el de Maximo y las demás
+ * "Capturó: …" (antes ese respaldo vivía en Solicitante).
  */
 
 const ORIGIN_OPTIONS: Array<{ value: 'sap' | 'maximo' | ''; label: string }> = [
@@ -45,6 +60,25 @@ const ORIGIN_OPTIONS: Array<{ value: 'sap' | 'maximo' | ''; label: string }> = [
   { value: 'sap', label: 'Capturadas en SAP' },
   { value: 'maximo', label: 'Migradas de Maximo' },
 ];
+
+const ORIGIN_LABELS: Record<string, string> = {
+  sap: 'SAP',
+  maximo: 'Migrada de Maximo',
+  ref: 'Ref. Maximo (no existe allá)',
+};
+
+const COLUMNS: ColumnConfigs = {
+  numero: { label: 'Número', type: 'text' },
+  origen: { label: 'Origen', type: 'text', format: (v) => ORIGIN_LABELS[v] ?? v },
+  proveedor: { label: 'Proveedor', type: 'text' },
+  solicitante: { label: 'Solicitante', type: 'text', emptyLabel: '(Sin solicitante)' },
+  comprador: { label: 'Comprador', type: 'text', emptyLabel: '(Sin comprador)' },
+  estatus: { label: 'Estatus', type: 'text', format: sapStatusLabel },
+  monto: { label: 'Monto', type: 'number' },
+  saldo: { label: 'Saldo disponible', type: 'number' },
+  fecha: { label: 'Fecha del documento', type: 'date' },
+  entrega: { label: 'Fecha de entrega', type: 'date' },
+};
 
 /** D1: badge de origen de la OC. */
 function OriginBadge({ po }: { po: SapPurchaseOrder }) {
@@ -124,17 +158,39 @@ function RequesterCell({ po }: { po: SapPurchaseOrder }) {
       </div>
     );
   }
-  if (po.created_by_name) {
+  return (
+    <span className="text-gray-400" title="La OC no nació de una solicitud de pedido de SAP">
+      —
+    </span>
+  );
+}
+
+/** E4: comprador de Maximo (migradas) o quién capturó la OC en SAP. */
+function BuyerCell({ po }: { po: SapPurchaseOrder }) {
+  const label = buyerLabel(po);
+  if (!label) {
     return (
-      <span
-        className="block max-w-40 truncate text-gray-500"
-        title={`Sin solicitud de pedido en SAP. Capturó la OC: ${po.created_by_name}`}
-      >
-        Capturó: {po.created_by_name}
+      <span className="text-gray-400" title={po.maximo_ponum ? 'La OC de Maximo no trae comprador' : 'Sin dato'}>
+        —
       </span>
     );
   }
-  return <span className="text-gray-400">—</span>;
+  if (po.buyer_kind === 'comprador') {
+    return (
+      <div className="leading-tight max-w-40" title="Comprador de la OC en Maximo">
+        <span className="block truncate text-gray-900">{po.buyer_name}</span>
+        <span className="block text-xs text-gray-500">según Maximo</span>
+      </div>
+    );
+  }
+  return (
+    <span
+      className="block max-w-40 truncate text-gray-500"
+      title={`SAP no registra comprador en la OC. Capturó la OC: ${po.buyer_name}`}
+    >
+      {label}
+    </span>
+  );
 }
 
 const formatDate = (date: string | null) =>
@@ -161,29 +217,39 @@ export default function SapOrdersTab({
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
   const [detailDocEntry, setDetailDocEntry] = useState<number | null>(null);
+  const cf = useColumnFilters('sapPo', () => setPage(1));
 
-  const filters = { search, status: statuses, from, to, origin, year: year ?? undefined };
-  const filterQs = toQuery(filters);
-  const listQs = toQuery({ page, limit: PAGE_SIZE, ...filters });
+  const baseQuery = { search, status: statuses, from, to, origin, year: year ?? undefined };
+  const filterQs = toQuery({ ...baseQuery, ...cf.params });
+  const listQs = toQuery({ page, limit: PAGE_SIZE, ...baseQuery, ...cf.params });
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['sap-purchase-orders', listQs],
     queryFn: () => api.get<PaginatedResponse<SapPurchaseOrder>>(`/sap/purchase-orders?${listQs}`),
+    // E1: la tabla anterior se queda en pantalla mientras llega la nueva
+    placeholderData: keepPreviousData,
   });
   const summaryQ = useQuery({
     queryKey: ['sap', 'summary', year],
     queryFn: () => api.get<SapSummary>(`/sap/summary${year ? `?year=${year}` : ''}`),
   });
+  // E1: chips por estatus con los demás filtros (sin el propio estatus)
+  const statusFacet = useColumnFacet(
+    '/sap/purchase-orders/facets',
+    { ...baseQuery, status: undefined, ...cf.params },
+    'estatus',
+  );
+  const statusCounts = facetCounts(statusFacet.data);
 
   const orders = data?.data ?? [];
   const meta = data?.meta;
-  const hasFilters = !!search || statuses.length > 0 || !!from || !!to || !!origin || !!year;
+  const hasFilters = !!search || statuses.length > 0 || !!from || !!to || !!origin || !!year || cf.activeCount > 0;
   const canSeeIntegrations = hasRole(...PURCHASE_ADMIN_ROLES, 'executive');
   const summary = summaryQ.data?.purchaseOrders;
   const chips = SAP_STATUS_OPTIONS.map((opt) => ({
     key: opt.value,
     label: opt.label,
-    count: summary?.byStatus.find((s) => s.status === opt.value)?.count ?? 0,
+    count: statusCounts.get(opt.value) ?? 0,
     className: sapStatusBadgeClass(opt.value),
   }));
 
@@ -247,6 +313,7 @@ export default function SapOrdersTab({
           onToggleStatus={toggleStatus}
           loading={isLoading}
         />
+        <ActiveColumnFilters cf={cf} columns={COLUMNS} />
         {summaryQ.data && summaryQ.data.migradas.total > 0 && (
           <p className="text-xs text-gray-600">
             {summaryQ.data.migradas.total.toLocaleString('es-MX')} OC creadas desde Maximo
@@ -280,93 +347,89 @@ export default function SapOrdersTab({
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-[#424846]">
-                  <tr>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Número</th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase" title="SAP: capturada en SAP. Migrada de Maximo: creada por la integración con el PO de Maximo">Origen</th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Proveedor</th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Solicitante</th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-white uppercase">Monto</th>
-                    <th
-                      className="px-3 py-3 text-right text-xs font-medium text-white uppercase whitespace-nowrap"
-                      title="Lo que falta por recibir o facturar de la OC, con IVA"
-                    >
-                      Saldo disponible
-                    </th>
-                    <th
-                      className="px-3 py-3 text-center text-xs font-medium text-white uppercase"
-                      title="Fecha del documento y, abajo, fecha de entrega"
-                    >
-                      Fechas
-                    </th>
-                    {/* En pantallas angostas van al detalle y al Excel (casi todas
-                        dicen "Sin clasificar"/"No disponible" mientras avanza la captura) */}
-                    <th className="hidden 2xl:table-cell px-3 py-3 text-center text-xs font-medium text-white uppercase">Clasif. líneas</th>
-                    <th className="hidden 2xl:table-cell px-3 py-3 text-right text-xs font-medium text-white uppercase">Ahorro</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {orders.map((po, idx) => {
-                    const status = sapDocStatus(po);
-                    return (
-                      <tr
-                        key={po.id}
-                        onClick={() => setDetailDocEntry(po.doc_entry)}
-                        className={`cursor-pointer hover:bg-[#52AF32]/5 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                      >
-                        <td className="px-3 py-3">
-                          <span className="font-mono font-medium text-[#222D59]">{dash(po.doc_num)}</span>
-                        </td>
-                        <td className="px-3 py-3"><OriginBadge po={po} /></td>
-                        <td className="px-3 py-3 text-sm text-gray-900 max-w-44 truncate" title={po.card_name ?? undefined}>{dash(po.card_name)}</td>
-                        <td className="px-3 py-3 text-sm">
-                          <RequesterCell po={po} />
-                        </td>
-                        <td className="px-3 py-3 text-center">
-                          <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${sapStatusBadgeClass(status)}`}>
-                            {sapStatusLabel(status)}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 text-sm text-gray-900 text-right font-medium whitespace-nowrap">
-                          {formatMoney(po.doc_total, po.currency)}
-                        </td>
-                        <td className="px-3 py-3 text-sm text-right whitespace-nowrap">
-                          <SaldoCell po={po} />
-                        </td>
-                        <td className="px-3 py-3 text-center text-sm whitespace-nowrap leading-tight">
-                          <div className="text-gray-700">{formatDate(po.doc_date)}</div>
-                          <div className="text-xs text-gray-500">entrega {formatDate(po.doc_due_date)}</div>
-                        </td>
-                        <td className="hidden 2xl:table-cell px-3 py-3 text-center text-sm whitespace-nowrap">
-                          {po.lines_total === 0 ? (
-                            <span className="text-gray-400">—</span>
-                          ) : po.lines_classified === 0 ? (
-                            <span className="text-gray-400 italic">Sin clasificar</span>
-                          ) : (
-                            <span className="text-gray-700">{po.lines_classified}/{po.lines_total}</span>
-                          )}
-                        </td>
-                        <td className="hidden 2xl:table-cell px-3 py-3 text-sm text-right whitespace-nowrap">
-                          {po.ahorro_total === null ? (
-                            <span className="text-gray-400 italic">No disponible</span>
-                          ) : (
-                            <span className="text-gray-700">{formatMoney(po.ahorro_total, po.currency)}</span>
-                          )}
+              <ColumnFilterProvider value={{ cf, columns: COLUMNS, facetsPath: '/sap/purchase-orders/facets', baseQuery }}>
+                <table className="w-full">
+                  <thead className="bg-[#424846]">
+                    <tr>
+                      <FilterTh column="numero" className="px-3 py-3">Número</FilterTh>
+                      <FilterTh column="origen" className="px-3 py-3" title="SAP: capturada en SAP. Migrada de Maximo: creada por la integración con el PO de Maximo">Origen</FilterTh>
+                      <FilterTh column="proveedor" className="px-3 py-3">Proveedor</FilterTh>
+                      <FilterTh column="solicitante" className="px-3 py-3">Solicitante</FilterTh>
+                      <FilterTh column="comprador" className="px-3 py-3" title="SAP no registra comprador en sus OC: la migrada muestra el de Maximo y las demás quién la capturó">Comprador</FilterTh>
+                      <FilterTh column="estatus" align="center" className="px-3 py-3">Estatus</FilterTh>
+                      <FilterTh column="monto" align="right" className="px-3 py-3">Monto</FilterTh>
+                      <FilterTh column="saldo" align="right" className="px-3 py-3" title="Lo que falta por recibir o facturar de la OC, con IVA">Saldo disponible</FilterTh>
+                      <FilterTh column="fecha" align="center" className="px-3 py-3" title="Fecha del documento y, abajo, fecha de entrega">Fechas</FilterTh>
+                      {/* En pantallas angostas van al detalle y al Excel (casi todas
+                          dicen "Sin clasificar"/"No disponible" mientras avanza la captura) */}
+                      <th className="hidden 2xl:table-cell px-3 py-3 text-center text-xs font-medium text-white uppercase">Clasif. líneas</th>
+                      <th className="hidden 2xl:table-cell px-3 py-3 text-right text-xs font-medium text-white uppercase">Ahorro</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {orders.map((po, idx) => {
+                      const status = sapDocStatus(po);
+                      return (
+                        <tr
+                          key={po.id}
+                          onClick={() => setDetailDocEntry(po.doc_entry)}
+                          className={`cursor-pointer hover:bg-[#52AF32]/5 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                        >
+                          <td className="px-3 py-3">
+                            <span className="font-mono font-medium text-[#222D59]">{dash(po.doc_num)}</span>
+                          </td>
+                          <td className="px-3 py-3"><OriginBadge po={po} /></td>
+                          <td className="px-3 py-3 text-sm text-gray-900 max-w-44 truncate" title={po.card_name ?? undefined}>{dash(po.card_name)}</td>
+                          <td className="px-3 py-3 text-sm">
+                            <RequesterCell po={po} />
+                          </td>
+                          <td className="px-3 py-3 text-sm">
+                            <BuyerCell po={po} />
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${sapStatusBadgeClass(status)}`}>
+                              {sapStatusLabel(status)}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-sm text-gray-900 text-right font-medium whitespace-nowrap">
+                            {formatMoney(po.doc_total, po.currency)}
+                          </td>
+                          <td className="px-3 py-3 text-sm text-right whitespace-nowrap">
+                            <SaldoCell po={po} />
+                          </td>
+                          <td className="px-3 py-3 text-center text-sm whitespace-nowrap leading-tight">
+                            <div className="text-gray-700">{formatDate(po.doc_date)}</div>
+                            <div className="text-xs text-gray-500">entrega {formatDate(po.doc_due_date)}</div>
+                          </td>
+                          <td className="hidden 2xl:table-cell px-3 py-3 text-center text-sm whitespace-nowrap">
+                            {po.lines_total === 0 ? (
+                              <span className="text-gray-400">—</span>
+                            ) : po.lines_classified === 0 ? (
+                              <span className="text-gray-400 italic">Sin clasificar</span>
+                            ) : (
+                              <span className="text-gray-700">{po.lines_classified}/{po.lines_total}</span>
+                            )}
+                          </td>
+                          <td className="hidden 2xl:table-cell px-3 py-3 text-sm text-right whitespace-nowrap">
+                            {po.ahorro_total === null ? (
+                              <span className="text-gray-400 italic">No disponible</span>
+                            ) : (
+                              <span className="text-gray-700">{formatMoney(po.ahorro_total, po.currency)}</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {orders.length === 0 && (
+                      <tr>
+                        <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
+                          No hay órdenes de SAP que coincidan con los filtros
                         </td>
                       </tr>
-                    );
-                  })}
-                  {orders.length === 0 && (
-                    <tr>
-                      <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
-                        No hay órdenes de SAP que coincidan con los filtros
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              </ColumnFilterProvider>
             </div>
 
             {meta && meta.totalPages > 1 && (

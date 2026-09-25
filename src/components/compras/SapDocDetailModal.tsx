@@ -232,6 +232,22 @@ export default function SapDocDetailModal({
                         )
                       }
                     />
+                    {/* E4: SAP no trae comprador en sus OC; la migrada toma el de Maximo */}
+                    <Field
+                      label="Comprador"
+                      value={
+                        poDoc?.buyer_kind === 'comprador' ? (
+                          <>
+                            {poDoc.buyer_name}
+                            <span className="block text-xs text-gray-500">según Maximo</span>
+                          </>
+                        ) : (
+                          <span className="text-gray-500">
+                            {poDoc?.maximo_ponum ? 'Sin comprador en Maximo' : 'SAP no registra comprador en la OC'}
+                          </span>
+                        )
+                      }
+                    />
                     <Field label="Capturó (SAP)" value={dash(poDoc?.created_by_name)} />
                   </>
                 ) : (

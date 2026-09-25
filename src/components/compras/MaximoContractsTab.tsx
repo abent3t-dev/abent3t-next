@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { toQuery } from '@/lib/compras-format';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,9 +17,19 @@ import {
   maximoStatusLabel,
 } from '@/types/purchases';
 import MaximoContractDetailModal from './MaximoContractDetailModal';
+import MaximoContractGroupsView from './MaximoContractGroupsView';
 import ResultChips from './ResultChips';
 import StatusMultiSelect from './StatusMultiSelect';
 import ExportExcelButton from './ExportExcelButton';
+import {
+  ActiveColumnFilters,
+  ColumnFilterProvider,
+  FilterTh,
+  facetCounts,
+  useColumnFacet,
+} from '@/components/ui/ColumnFilter';
+import { useColumnFilters } from '@/hooks/useColumnFilters';
+import type { ColumnConfigs } from '@/lib/column-filters';
 
 /**
  * Fase INT-5 (T6) — Pestana "Contratos Maximo" (vive en /compras/contratos
@@ -32,6 +43,9 @@ import ExportExcelButton from './ExportExcelButton';
  * Bloque 2026-09-23 (D8, Ingrid): valor, consumido y saldo (valor − consumido,
  * negativo en rojo). El consumido llega null mientras AB_CONTRATOS no lo
  * exponga (pedido a CIISA junto con MAXVOL) → "No disponible", nunca 0.
+ * E1 (2026-09-25, pedido también por César): filtro "tipo Excel" por columna.
+ * E2 (2026-09-25, parte independiente del consumido): "Agrupar por contrato"
+ * (activo por defecto; `mxCt_g=0` en la URL = una fila por PR).
  */
 
 const NotAvailable = ({ hint }: { hint: string }) => (
@@ -39,6 +53,25 @@ const NotAvailable = ({ hint }: { hint: string }) => (
 );
 
 const PAGE_SIZE = 15;
+
+const COLUMNS: ColumnConfigs = {
+  pr: { label: 'PRNUM', type: 'text' },
+  contrato: { label: 'Contrato', type: 'text', emptyLabel: 'Sin contrato' },
+  estatus: {
+    label: 'Estatus',
+    type: 'text',
+    format: (v) => `${maximoStatusLabel(v)} (${v})`,
+    emptyLabel: 'Sin estatus en Maximo',
+  },
+  proveedor: { label: 'Proveedor', type: 'text' },
+  valor: { label: 'Valor contrato', type: 'number' },
+  consumido: { label: 'Consumido', type: 'number' },
+  saldo: { label: 'Saldo', type: 'number' },
+  moneda: { label: 'Moneda', type: 'text' },
+  fin: { label: 'Fin de vigencia', type: 'date' },
+  depto: { label: 'Departamento', type: 'text' },
+  revision: { label: 'Revisión', type: 'number' },
+};
 const EXPIRY_WARNING_DAYS = 30;
 
 const STATUS_OPTIONS = Object.keys(MAXIMO_STATUS_BADGE_CLASSES).map((value) => ({
@@ -73,39 +106,82 @@ const expiresSoon = (endDate: string | null): boolean => {
   return days >= 0 && days < EXPIRY_WARNING_DAYS;
 };
 
+/** E2: una fila por contrato (default) o una por PR, recordado en la URL. */
 export default function MaximoContractsTab({ initialStatus = [] }: { initialStatus?: string[] }) {
+  const searchParams = useSearchParams();
+  const [grouped, setGrouped] = useState(searchParams.get('mxCt_g') !== '0');
+  const toggle = () => {
+    const next = !grouped;
+    setGrouped(next);
+    const url = new URL(window.location.href);
+    if (next) url.searchParams.delete('mxCt_g');
+    else url.searchParams.set('mxCt_g', '0');
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  };
+  const groupToggle = (
+    <label
+      className="inline-flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 cursor-pointer select-none"
+      title="Una fila por contrato con sus solicitudes (PR), en lugar de una fila por PR"
+    >
+      <input type="checkbox" checked={grouped} onChange={toggle} className="accent-[#52AF32]" />
+      Agrupar por contrato
+    </label>
+  );
+  return grouped ? (
+    <MaximoContractGroupsView initialStatus={initialStatus} groupToggle={groupToggle} />
+  ) : (
+    <MaximoContractRowsView initialStatus={initialStatus} groupToggle={groupToggle} />
+  );
+}
+
+function MaximoContractRowsView({
+  initialStatus = [],
+  groupToggle,
+}: {
+  initialStatus?: string[];
+  groupToggle: ReactNode;
+}) {
   const { hasRole } = useAuth();
   const [search, setSearch] = useState('');
   const [statuses, setStatuses] = useState<string[]>(initialStatus);
   const [hasContractFilter, setHasContractFilter] = useState('');
   const [page, setPage] = useState(1);
   const [detailKey, setDetailKey] = useState<string | null>(null);
+  const cf = useColumnFilters('mxCt', () => setPage(1));
 
   const filters = { search, status: statuses, has_contract: hasContractFilter };
-  const filterQs = toQuery(filters);
-  const listQs = toQuery({ page, limit: PAGE_SIZE, ...filters });
+  const filterQs = toQuery({ ...filters, ...cf.params });
+  const listQs = toQuery({ page, limit: PAGE_SIZE, ...filters, ...cf.params });
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['maximo-contracts', listQs],
     queryFn: () => api.get<PaginatedResponse<MaximoContract>>(`/maximo/contracts?${listQs}`),
+    // E1: la tabla anterior se queda en pantalla mientras llega la nueva
+    placeholderData: keepPreviousData,
   });
   const summaryQ = useQuery({
     queryKey: ['maximo', 'summary'],
     queryFn: () => api.get<MaximoSummary>('/maximo/summary'),
   });
+  // E1: chips por estatus con los demás filtros (sin el propio estatus)
+  const statusFacet = useColumnFacet(
+    '/maximo/contracts/facets',
+    { ...filters, status: undefined, ...cf.params },
+    'estatus',
+  );
 
   const contracts = data?.data ?? [];
   const meta = data?.meta;
-  const hasFilters = !!search || statuses.length > 0 || !!hasContractFilter;
+  const hasFilters = !!search || statuses.length > 0 || !!hasContractFilter || cf.activeCount > 0;
   const canSeeIntegrations = hasRole(...PURCHASE_ADMIN_ROLES, 'executive');
   const summary = summaryQ.data?.contracts;
-  const chips = (summary?.byStatus ?? [])
-    .filter((s) => s.status !== null)
-    .map((s) => ({
-      key: s.status as string,
-      label: maximoStatusLabel(s.status),
-      count: s.count,
-      className: maximoStatusBadgeClass(s.status),
+  const chips = [...facetCounts(statusFacet.data).entries()]
+    .filter((entry): entry is [string, number] => entry[0] !== null)
+    .map(([status, count]) => ({
+      key: status,
+      label: maximoStatusLabel(status),
+      count,
+      className: maximoStatusBadgeClass(status),
     }));
   const toggleStatus = (key: string) => {
     setStatuses(statuses.includes(key) ? statuses.filter((s) => s !== key) : [...statuses, key]);
@@ -137,6 +213,7 @@ export default function MaximoContractsTab({ initialStatus = [] }: { initialStat
             <option value="true">Con contrato</option>
             <option value="false">Sin contrato</option>
           </select>
+          {groupToggle}
           <ExportExcelButton
             path={`/maximo/contracts/export${filterQs ? `?${filterQs}` : ''}`}
             filename={`contratos_maximo_${new Date().toISOString().slice(0, 10)}.xlsx`}
@@ -151,6 +228,7 @@ export default function MaximoContractsTab({ initialStatus = [] }: { initialStat
           onToggleStatus={toggleStatus}
           loading={isLoading}
         />
+        <ActiveColumnFilters cf={cf} columns={COLUMNS} />
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -174,20 +252,21 @@ export default function MaximoContractsTab({ initialStatus = [] }: { initialStat
         ) : (
           <>
             <div className="overflow-x-auto">
+              <ColumnFilterProvider value={{ cf, columns: COLUMNS, facetsPath: '/maximo/contracts/facets', baseQuery: filters }}>
               <table className="w-full">
                 <thead className="bg-[#424846]">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">PRNUM</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Contrato</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Proveedor</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase">Valor contrato</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase" title="Consumido del contrato según Maximo">Consumido</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase" title="Valor − consumido">Saldo</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Moneda</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Vigencia</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Depto.</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Rev.</th>
+                    <FilterTh column="pr">PRNUM</FilterTh>
+                    <FilterTh column="contrato">Contrato</FilterTh>
+                    <FilterTh column="estatus" align="center">Estatus</FilterTh>
+                    <FilterTh column="proveedor">Proveedor</FilterTh>
+                    <FilterTh column="valor" align="right">Valor contrato</FilterTh>
+                    <FilterTh column="consumido" align="right" title="Consumido del contrato según Maximo">Consumido</FilterTh>
+                    <FilterTh column="saldo" align="right" title="Valor − consumido">Saldo</FilterTh>
+                    <FilterTh column="moneda" align="center">Moneda</FilterTh>
+                    <FilterTh column="fin" align="center" title="Filtra y ordena por el fin de la vigencia">Vigencia</FilterTh>
+                    <FilterTh column="depto">Depto.</FilterTh>
+                    <FilterTh column="revision" align="center">Rev.</FilterTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -271,6 +350,7 @@ export default function MaximoContractsTab({ initialStatus = [] }: { initialStat
                   )}
                 </tbody>
               </table>
+              </ColumnFilterProvider>
             </div>
 
             {meta && meta.totalPages > 1 && (

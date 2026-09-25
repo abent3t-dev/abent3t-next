@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Suspense, useState } from 'react';
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
 import { Supplier } from '@/types/purchases';
@@ -9,6 +9,31 @@ import SupplierModal from '@/components/compras/SupplierModal';
 import ResultChips from '@/components/compras/ResultChips';
 import ExportExcelButton from '@/components/compras/ExportExcelButton';
 import { useAuth } from '@/contexts/AuthContext';
+import {
+  ActiveColumnFilters,
+  ColumnFilterProvider,
+  FilterTh,
+} from '@/components/ui/ColumnFilter';
+import { useColumnFilters } from '@/hooks/useColumnFilters';
+import type { ColumnConfigs } from '@/lib/column-filters';
+import { toQuery } from '@/lib/compras-format';
+
+/**
+ * Catálogo de proveedores (SAP + ABENT). E1 (2026-09-25): filtro "tipo
+ * Excel" por columna (URL, total y Excel con el mismo filtro).
+ */
+const COLUMNS: ColumnConfigs = {
+  proveedor: { label: 'Proveedor', type: 'text' },
+  rfc: { label: 'RFC', type: 'text' },
+  contacto: { label: 'Contacto', type: 'text', emptyLabel: '(Sin contacto)' },
+  moneda: { label: 'Moneda', type: 'text' },
+  puntuacion: { label: 'Puntuación', type: 'number' },
+  estado: {
+    label: 'Estado',
+    type: 'text',
+    format: (v) => (v === 'bloqueado' ? 'Bloqueado' : v === 'activo' ? 'Activo' : v),
+  },
+};
 
 interface PaginatedResponse {
   data: Supplier[];
@@ -71,7 +96,7 @@ const getScoreColor = (score: number) => {
   return 'text-red-600';
 };
 
-export default function ProveedoresPage() {
+function ProveedoresContent() {
   const qc = useQueryClient();
   // Modelo "ver todos, actuar por rol": el catálogo es consulta para
   // cualquiera; alta/edición/bloqueo solo administración de compras (espejo
@@ -83,18 +108,19 @@ export default function ProveedoresPage() {
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const cf = useColumnFilters('sup', () => setPage(1));
 
   // Siempre paginado: con el espejo de SAP el catalogo supera los 800
   // proveedores y la lista completa ya no es renderizable de golpe.
-  const queryParams = new URLSearchParams();
-  queryParams.set('page', String(page));
-  queryParams.set('limit', String(PAGE_SIZE));
-  if (search) queryParams.set('search', search);
-  if (blockedFilter) queryParams.set('is_blocked', blockedFilter);
+  const baseQuery = { search, is_blocked: blockedFilter };
+  const listQs = toQuery({ page, limit: PAGE_SIZE, ...baseQuery, ...cf.params });
+  const exportQs = toQuery({ ...baseQuery, ...cf.params });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['suppliers', search, blockedFilter, page],
-    queryFn: () => api.get<PaginatedResponse>(`/suppliers?${queryParams.toString()}`),
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['suppliers', listQs],
+    queryFn: () => api.get<PaginatedResponse>(`/suppliers?${listQs}`),
+    // E1: la tabla anterior se queda en pantalla mientras llega la nueva
+    placeholderData: keepPreviousData,
   });
 
   const suppliers = data?.data ?? [];
@@ -191,19 +217,14 @@ export default function ProveedoresPage() {
             <option value="true">Bloqueados</option>
           </select>
           <ExportExcelButton
-            path={`/suppliers/export${(() => {
-              const qs = new URLSearchParams();
-              if (search) qs.set('search', search);
-              if (blockedFilter) qs.set('is_blocked', blockedFilter);
-              const s = qs.toString();
-              return s ? `?${s}` : '';
-            })()}`}
+            path={`/suppliers/export${exportQs ? `?${exportQs}` : ''}`}
             filename={`proveedores_${new Date().toISOString().slice(0, 10)}.xlsx`}
             disabled={isLoading || suppliers.length === 0}
           />
         </div>
-        <div className="mt-3">
+        <div className="mt-3 space-y-3">
           <ResultChips filteredTotal={meta?.total} loading={isLoading} />
+          <ActiveColumnFilters cf={cf} columns={COLUMNS} />
         </div>
         <p className="mt-3 text-xs text-gray-500">
           <span className="inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded bg-[#222D59]/10 text-[#222D59] mr-1">SAP</span>
@@ -219,17 +240,22 @@ export default function ProveedoresPage() {
           <div className="p-8 text-center">
             <div className="w-8 h-8 border-4 border-[#52AF32] border-t-transparent rounded-full animate-spin mx-auto" />
           </div>
+        ) : isError ? (
+          <p className="p-8 text-center text-red-600">
+            No se pudieron cargar los proveedores. Si aplicaste un filtro, límpialo e intenta de nuevo.
+          </p>
         ) : (
           <div className="overflow-x-auto">
+          <ColumnFilterProvider value={{ cf, columns: COLUMNS, facetsPath: '/suppliers/facets', baseQuery }}>
           <table className="w-full">
             <thead className="bg-[#424846]">
               <tr>
-                <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Proveedor</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">RFC</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Contacto</th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Moneda</th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Puntuación</th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Estado</th>
+                <FilterTh column="proveedor" className="px-3 py-3">Proveedor</FilterTh>
+                <FilterTh column="rfc" className="px-3 py-3">RFC</FilterTh>
+                <FilterTh column="contacto" className="px-3 py-3">Contacto</FilterTh>
+                <FilterTh column="moneda" align="center" className="px-3 py-3">Moneda</FilterTh>
+                <FilterTh column="puntuacion" align="center" className="px-3 py-3" title="0 = sin evaluar (no entra en el rango)">Puntuación</FilterTh>
+                <FilterTh column="estado" align="center" className="px-3 py-3">Estado</FilterTh>
                 <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Acciones</th>
               </tr>
             </thead>
@@ -347,6 +373,7 @@ export default function ProveedoresPage() {
               )}
             </tbody>
           </table>
+          </ColumnFilterProvider>
           </div>
         )}
         {meta && meta.totalPages > 1 && (
@@ -385,5 +412,14 @@ export default function ProveedoresPage() {
         supplier={editingSupplier}
       />
     </div>
+  );
+}
+
+/** Los filtros por columna viven en la URL: useSearchParams pide Suspense. */
+export default function ProveedoresPage() {
+  return (
+    <Suspense fallback={null}>
+      <ProveedoresContent />
+    </Suspense>
   );
 }

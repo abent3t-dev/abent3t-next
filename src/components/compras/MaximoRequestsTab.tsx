@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { toQuery } from '@/lib/compras-format';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,6 +20,15 @@ import MaximoContractDetailModal from './MaximoContractDetailModal';
 import ResultChips from './ResultChips';
 import StatusMultiSelect from './StatusMultiSelect';
 import ExportExcelButton from './ExportExcelButton';
+import {
+  ActiveColumnFilters,
+  ColumnFilterProvider,
+  FilterTh,
+  facetCounts,
+  useColumnFacet,
+} from '@/components/ui/ColumnFilter';
+import { useColumnFilters } from '@/hooks/useColumnFilters';
+import type { ColumnConfigs } from '@/lib/column-filters';
 
 /**
  * Sprint 2026-09-22 (A7) — Pestana "Solicitudes Maximo" en /compras/solicitudes.
@@ -32,6 +41,7 @@ import ExportExcelButton from './ExportExcelButton';
  * el estatus de la PR sin contrato); D7 monto de la PR (`pr_total`, "No
  * disponible" mientras la OS no lo traiga); D6 solicitante con nombre si hay
  * alias; D4 año.
+ * E1 (2026-09-25): filtro "tipo Excel" por columna (URL, chips y Excel).
  */
 
 const formatMoney = (amount: number | null, currency: string | null) => {
@@ -47,6 +57,23 @@ const formatMoney = (amount: number | null, currency: string | null) => {
 };
 
 const PAGE_SIZE = 15;
+
+const COLUMNS: ColumnConfigs = {
+  pr: { label: 'PR', type: 'text' },
+  estatus: {
+    label: 'Estatus',
+    type: 'text',
+    format: (v) => `${maximoStatusLabel(v)} (${v})`,
+    emptyLabel: 'Sin estatus en Maximo',
+  },
+  solicitud: { label: 'Fecha de solicitud', type: 'date' },
+  aprobacion: { label: 'Fecha de aprobación', type: 'date' },
+  dias: { label: 'Días', type: 'number' },
+  monto_pr: { label: 'Monto', type: 'number' },
+  solicitante: { label: 'Solicitado por', type: 'text', emptyLabel: '(Sin solicitante)' },
+  depto: { label: 'Departamento', type: 'text' },
+  contrato: { label: 'Contrato', type: 'text', emptyLabel: 'Sin contrato' },
+};
 
 const STATUS_OPTIONS = Object.keys(MAXIMO_STATUS_BADGE_CLASSES).map((value) => ({
   value,
@@ -80,33 +107,43 @@ export default function MaximoRequestsTab({
   const [statuses, setStatuses] = useState<string[]>(initialStatus);
   const [page, setPage] = useState(1);
   const [detailKey, setDetailKey] = useState<string | null>(null);
+  const cf = useColumnFilters('mxPr', () => setPage(1));
 
   const filters = { search, status: statuses, year: year ?? undefined };
-  const filterQs = toQuery(filters);
-  const listQs = toQuery({ page, limit: PAGE_SIZE, ...filters });
+  const filterQs = toQuery({ ...filters, ...cf.params });
+  const listQs = toQuery({ page, limit: PAGE_SIZE, ...filters, ...cf.params });
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['maximo-requests', listQs],
     queryFn: () => api.get<PaginatedResponse<MaximoContract>>(`/maximo/contracts?${listQs}`),
+    // E1: la tabla anterior se queda en pantalla mientras llega la nueva
+    placeholderData: keepPreviousData,
   });
   const summaryQ = useQuery({
     queryKey: ['maximo', 'summary', year],
     queryFn: () => api.get<MaximoSummary>(`/maximo/summary${year ? `?year=${year}` : ''}`),
   });
+  // E1: chips por estatus con los demás filtros (sin el propio estatus)
+  const statusFacet = useColumnFacet(
+    '/maximo/contracts/facets',
+    { ...filters, status: undefined, ...cf.params },
+    'estatus',
+  );
+  const statusCounts = facetCounts(statusFacet.data);
 
   const rows = data?.data ?? [];
   const meta = data?.meta;
-  const hasFilters = !!search || statuses.length > 0 || !!year;
-  const sinEstatus = summaryQ.data?.contracts.byStatus.find((s) => s.status === null)?.count ?? 0;
+  const hasFilters = !!search || statuses.length > 0 || !!year || cf.activeCount > 0;
+  const sinEstatus = statusFacet.data ? (statusCounts.get(null) ?? 0) : 0;
   const canSeeIntegrations = hasRole(...PURCHASE_ADMIN_ROLES, 'executive');
   const summary = summaryQ.data?.contracts;
-  const chips = (summary?.byStatus ?? [])
-    .filter((s) => s.status !== null)
-    .map((s) => ({
-      key: s.status as string,
-      label: maximoStatusLabel(s.status),
-      count: s.count,
-      className: maximoStatusBadgeClass(s.status),
+  const chips = [...statusCounts.entries()]
+    .filter((entry): entry is [string, number] => entry[0] !== null)
+    .map(([status, count]) => ({
+      key: status,
+      label: maximoStatusLabel(status),
+      count,
+      className: maximoStatusBadgeClass(status),
     }));
   const toggleStatus = (key: string) => {
     setStatuses(statuses.includes(key) ? statuses.filter((s) => s !== key) : [...statuses, key]);
@@ -143,6 +180,7 @@ export default function MaximoRequestsTab({
           onToggleStatus={toggleStatus}
           loading={isLoading}
         />
+        <ActiveColumnFilters cf={cf} columns={COLUMNS} />
         {sinEstatus > 0 && (
           <p className="text-xs text-gray-600" title={MAXIMO_NO_STATUS_HINT}>
             <strong>{sinEstatus.toLocaleString('es-MX')} sin estatus en Maximo:</strong> {MAXIMO_NO_STATUS_HINT}
@@ -171,18 +209,19 @@ export default function MaximoRequestsTab({
         ) : (
           <>
             <div className="overflow-x-auto">
+              <ColumnFilterProvider value={{ cf, columns: COLUMNS, facetsPath: '/maximo/contracts/facets', baseQuery: filters }}>
               <table className="w-full">
                 <thead className="bg-[#424846]">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">PR</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">F. Solicitud</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">F. Aprobación</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Días</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-white uppercase" title="Monto de la solicitud en Maximo (PR.TOTALCOST). 'No disponible' mientras la Object Structure no lo exponga">Monto</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Solicitado por</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Depto.</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Contrato</th>
+                    <FilterTh column="pr">PR</FilterTh>
+                    <FilterTh column="estatus" align="center">Estatus</FilterTh>
+                    <FilterTh column="solicitud" align="center">F. Solicitud</FilterTh>
+                    <FilterTh column="aprobacion" align="center">F. Aprobación</FilterTh>
+                    <FilterTh column="dias" align="center">Días</FilterTh>
+                    <FilterTh column="monto_pr" align="right" title="Monto de la solicitud en Maximo (PR.TOTALCOST). 'No disponible' mientras la Object Structure no lo exponga">Monto</FilterTh>
+                    <FilterTh column="solicitante">Solicitado por</FilterTh>
+                    <FilterTh column="depto">Depto.</FilterTh>
+                    <FilterTh column="contrato">Contrato</FilterTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -245,6 +284,7 @@ export default function MaximoRequestsTab({
                   )}
                 </tbody>
               </table>
+              </ColumnFilterProvider>
             </div>
 
             {meta && meta.totalPages > 1 && (
