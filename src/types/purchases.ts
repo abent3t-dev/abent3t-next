@@ -1362,6 +1362,8 @@ export interface SapApprovalRequest {
   originator_name: string | null;
   creation_date: string | null;
   days_waiting: number | null;
+  /** G5 (2026-09-28), con `approver`: días con ese aprobador desde que le llegó. */
+  days_with_approver?: number | null;
   doc_num: number | null;
   doc_date: string | null;
   doc_total: number | null;
@@ -1504,8 +1506,11 @@ export const ERP_ALIAS_SYSTEM_LABELS: Record<ErpAliasSystem, string> = {
 export interface ApprovalTimesReport {
   maximo: {
     ordenes: { promedio_dias: number | null; total: number };
-    /** `aprobador` = nombre (alias D6) o el usuario de Maximo; `usuario` = código. */
-    ordenes_por_aprobador: Array<{ aprobador: string; usuario: string | null; promedio_dias: number; total: number }>;
+    /**
+     * `aprobador` = nombre (alias D6) o el usuario de Maximo; `usuario` = código.
+     * G6: cada aprobación del historial (todos los niveles), días desde que le llegó.
+     */
+    ordenes_por_aprobador: Array<{ aprobador: string; usuario: string | null; promedio_dias: number; total: number; niveles?: string[] }>;
     contratos: { promedio_dias: number | null; total: number };
   };
   sap: {
@@ -1592,3 +1597,78 @@ export const SAP_RUN_MODE_LABELS: Record<SapSyncRun['mode'], string> = {
   full: 'Completa',
   incremental: 'Incremental',
 };
+
+// ── G5/G6 (reunión con Ingrid 2026-09-28): aprobaciones por persona ─────────
+
+/** GET /compras/reportes/aprobadores — días desde que el documento LE LLEGÓ. */
+export interface ApproverRow {
+  aprobador: string;
+  usuario: string;
+  aprobadas: {
+    total: number;
+    dias_promedio: number | null;
+    dias_mediana: number | null;
+    dias_max: number | null;
+  };
+  /** null = el sistema no registra rechazos por aprobador (Maximo). */
+  rechazadas: number | null;
+  /** null = no se sabe a quién le toca (Maximo: se ve por nivel). */
+  pendientes: { total: number; dias_promedio: number | null; dias_max: number | null } | null;
+  /** Maximo: niveles en los que aprobó. */
+  niveles?: string[];
+}
+export interface MaximoLevelTimes {
+  nivel: string;
+  aprobaciones: number;
+  dias_promedio: number | null;
+  dias_mediana: number | null;
+}
+export interface AprobadoresReport {
+  periodo: { from: string; to: string };
+  sap: ApproverRow[];
+  maximo: ApproverRow[];
+  maximo_niveles: MaximoLevelTimes[];
+  definiciones: { sap: string; maximo: string };
+}
+
+/** GET /compras/reportes/cadena-maximo — OC de Maximo en aprobación hoy. */
+export interface MaximoHabitualApprover {
+  usuario: string;
+  nombre: string;
+  veces: number;
+}
+export interface MaximoPendingOrder {
+  ponum: string;
+  descripcion: string | null;
+  estatus: string | null;
+  estatus_etiqueta: string;
+  nivel: number | null;
+  nivel_etiqueta: string;
+  proveedor: string | null;
+  proveedor_codigo: string | null;
+  proveedor_nota: string | null;
+  monto: number | null;
+  moneda: string | null;
+  desde: string | null;
+  dias: number | null;
+  aprobadores_habituales: MaximoHabitualApprover[];
+}
+export interface CadenaMaximo {
+  total: number;
+  truncado: boolean;
+  por_nivel: Array<{
+    nivel: number | null;
+    etiqueta: string;
+    pendientes: number;
+    dias_max: number | null;
+    dias_promedio: number | null;
+    aprobadores_habituales: MaximoHabitualApprover[];
+  }>;
+  ordenes: MaximoPendingOrder[];
+  nota: string;
+}
+
+/** G5: link a Aprobaciones con los pendientes de un aprobador. */
+export function approverHref(system: 'sap' | 'maximo', usuario: string): string {
+  return `/compras/aprobaciones?tab=${system === 'sap' ? 'sap' : 'maximo'}&aprobador=${encodeURIComponent(usuario)}`;
+}

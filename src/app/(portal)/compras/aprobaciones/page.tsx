@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
@@ -8,10 +9,16 @@ import { Approval, REQUISITION_STATUS_LABELS, APPROVAL_LEVEL_NAMES } from '@/typ
 import { useAuth } from '@/contexts/AuthContext';
 import { APPROVER_ROLES } from '@/types/auth';
 import SapApprovalsTab from '@/components/compras/SapApprovalsTab';
+import MaximoChainTab from '@/components/compras/MaximoChain';
+import ApproverHistoryTab from '@/components/compras/ApproverHistory';
 
 // Sprint 2026-09-22 (B5): pestana con la cola de autorizacion de SAP (solo
 // lectura, para cualquiera) junto a la bandeja propia (solo aprobadores).
-type ApprovalsTab = 'sap' | 'abent';
+// Reunión con Ingrid 2026-09-28: G6 cadena de aprobación de Maximo (OC por
+// nivel que esperan) y G5 histórico por aprobador; `?tab=` y `?aprobador=`
+// llegan del clic en el nombre de un aprobador (dashboard, reportes).
+type ApprovalsTab = 'sap' | 'maximo' | 'historico' | 'abent';
+const TAB_IDS: ApprovalsTab[] = ['sap', 'maximo', 'historico', 'abent'];
 
 function ApprovalTabs({
   tab,
@@ -22,13 +29,14 @@ function ApprovalTabs({
   setTab: (t: ApprovalsTab) => void;
   showAbent: boolean;
 }) {
-  if (!showAbent) return null;
   const tabs: Array<{ id: ApprovalsTab; label: string }> = [
     { id: 'sap', label: 'Pendientes de autorización (SAP)' },
+    { id: 'maximo', label: 'Cadena de aprobación Maximo' },
+    { id: 'historico', label: 'Histórico por aprobador' },
     ...(showAbent ? [{ id: 'abent' as const, label: 'Mi bandeja (flujo ABENT)' }] : []),
   ];
   return (
-    <div className="flex gap-2 bg-white rounded-xl p-2 shadow">
+    <div className="flex flex-wrap gap-2 bg-white rounded-xl p-2 shadow">
       {tabs.map((t) => (
         <button
           key={t.id}
@@ -80,7 +88,13 @@ const formatCurrency = (amount: number) =>
 const formatDate = (date: string) =>
   new Date(date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-export default function AprobacionesPage() {
+function AprobacionesPageInner({
+  initialTab,
+  initialApprover,
+}: {
+  initialTab: ApprovalsTab;
+  initialApprover: string | null;
+}) {
   const qc = useQueryClient();
   // Esta página es la BANDEJA PERSONAL del aprobador: /approvals/pending
   // sigue restringido a la cadena de aprobación aunque el resto del módulo
@@ -88,7 +102,7 @@ export default function AprobacionesPage() {
   // aprobador se le explica en lugar de dispararle un 403.
   const { hasRole } = useAuth();
   const isApprover = hasRole('super_admin', ...APPROVER_ROLES);
-  const [tab, setTab] = useState<ApprovalsTab>('sap');
+  const [tab, setTab] = useState<ApprovalsTab>(initialTab);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
@@ -143,19 +157,27 @@ export default function AprobacionesPage() {
 
   const approvals = pendingApprovals ?? [];
 
-  // Cola de SAP: consulta para cualquiera. La bandeja propia (flujo ABENT)
-  // sigue siendo exclusiva de la cadena de aprobacion.
-  if (!isApprover || tab === 'sap') {
+  // Cola de SAP, cadena de Maximo e histórico: consulta para cualquiera. La
+  // bandeja propia (flujo ABENT) sigue siendo exclusiva de la cadena de
+  // aprobacion.
+  if (!isApprover || tab !== 'abent') {
+    const visible: ApprovalsTab = tab === 'abent' ? 'sap' : tab;
     return (
       <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
         <div>
           <h1 className="text-2xl font-bold text-[#424846]">Panel de Aprobaciones</h1>
           <p className="text-gray-500">
-            Lo que falta autorizar en SAP y, para la cadena de aprobación, la bandeja del flujo propio
+            Lo que falta autorizar en SAP y en Maximo, quién lo tiene y cuánto tarda cada aprobador
           </p>
         </div>
-        <ApprovalTabs tab="sap" setTab={setTab} showAbent={isApprover} />
-        <SapApprovalsTab />
+        <ApprovalTabs tab={visible} setTab={setTab} showAbent={isApprover} />
+        {visible === 'maximo' ? (
+          <MaximoChainTab initialApprover={initialTab === 'maximo' ? initialApprover : null} />
+        ) : visible === 'historico' ? (
+          <ApproverHistoryTab />
+        ) : (
+          <SapApprovalsTab initialApprover={initialTab === 'sap' ? initialApprover : null} />
+        )}
       </div>
     );
   }
@@ -352,5 +374,28 @@ export default function AprobacionesPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/** `?tab=sap|maximo|historico&aprobador=<usuario>` (clic en un aprobador). */
+function AprobacionesFromUrl() {
+  const params = useSearchParams();
+  const tabParam = params.get('tab');
+  const initialTab = TAB_IDS.includes(tabParam as ApprovalsTab) ? (tabParam as ApprovalsTab) : 'sap';
+  const initialApprover = params.get('aprobador');
+  return (
+    <AprobacionesPageInner
+      key={`${initialTab}|${initialApprover ?? ''}`}
+      initialTab={initialTab}
+      initialApprover={initialApprover}
+    />
+  );
+}
+
+export default function AprobacionesPage() {
+  return (
+    <Suspense fallback={null}>
+      <AprobacionesFromUrl />
+    </Suspense>
   );
 }

@@ -9,6 +9,7 @@ import { formatAmountLines, formatDays, NO_DISPONIBLE } from '@/lib/compras-form
 import { SHOW_INTERNAL_REQUISITIONS } from '@/lib/features';
 import { PieChart } from '@/components/charts/PieChart';
 import { AbentLevels, SapPendingApprovers } from '@/components/compras/ApprovalDelays';
+import { MaximoChainSummary, useCadenaMaximo } from '@/components/compras/MaximoChain';
 import YearChips from '@/components/compras/YearChips';
 import {
   ApprovalStats,
@@ -296,6 +297,8 @@ export default function ComprasDashboardPage() {
     queryFn: () => api.get<ApprovalTimesReport>('/compras/reportes/tiempos-aprobacion'),
   });
   const tiempos = tiemposQ.data;
+  // G6: cadena de aprobación de Maximo (OC por nivel que esperan)
+  const cadenaQ = useCadenaMaximo();
 
   const goSapOrders = (status: string | null) =>
     router.push(`/compras/ordenes?tab=sap_po${status ? `&status=${status}` : ''}${yearParam}`);
@@ -331,10 +334,9 @@ export default function ComprasDashboardPage() {
     ? `Sin límite de fecha: SAP ${summary.solicitudes.por_fuente.sap.pendientes_sin_limite.toLocaleString('es-MX')} · Maximo ${summary.solicitudes.por_fuente.maximo.pendientes_sin_limite.toLocaleString('es-MX')}.`
     : '';
   const migradas = summary?.ordenes.migradas;
-  // D7: el flujo propio se muestra si hay alguien asignado en algún nivel
-  const showAbentLevels =
-    SHOW_INTERNAL_REQUISITIONS ||
-    (tiempos?.abent_niveles ?? []).some((n) => n.aprobadores.length > 0);
+  // G6: los niveles 1/2/3 y Director General son del Comité (CCC), no de
+  // las aprobaciones de SAP/Maximo: solo se muestran con la captura propia
+  const showAbentLevels = SHOW_INTERNAL_REQUISITIONS;
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -632,16 +634,26 @@ export default function ComprasDashboardPage() {
               </h4>
               <SapPendingApprovers tiempos={tiempos} />
             </div>
-            {showAbentLevels ? (
+            <div>
+              <div className="flex items-baseline justify-between flex-wrap gap-2 mb-2">
+                <h4 className="text-sm font-semibold text-[#424846]">Cadena de aprobación Maximo</h4>
+                <Link href="/compras/aprobaciones?tab=historico" className="text-sm text-[#52AF32] hover:underline">
+                  Tiempos por aprobador
+                </Link>
+              </div>
+              {cadenaQ.isError ? (
+                <p className="text-sm text-red-600">No se pudo cargar la cadena de aprobación de Maximo.</p>
+              ) : !cadenaQ.data ? (
+                <div className="w-6 h-6 border-4 border-[#52AF32] border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <MaximoChainSummary cadena={cadenaQ.data} />
+              )}
+            </div>
+            {showAbentLevels && (
               <div>
-                <h4 className="text-sm font-semibold text-[#424846] mb-2">Aprobadores por nivel</h4>
+                <h4 className="text-sm font-semibold text-[#424846] mb-2">Flujo propio ABENT — por nivel</h4>
                 <AbentLevels niveles={tiempos.abent_niveles} stats={approvalStats} />
               </div>
-            ) : (
-              <p className="text-xs text-gray-500">
-                Niveles de aprobación sin personas asignadas todavía. Se asignan en Compras → Roles; al ligar ahí el usuario de
-                SAP/Maximo de cada aprobador, aquí se verán sus pendientes por nivel.
-              </p>
             )}
           </>
         )}

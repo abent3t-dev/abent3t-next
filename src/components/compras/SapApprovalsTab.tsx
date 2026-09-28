@@ -16,12 +16,16 @@ import {
   SapSummary,
 } from '@/types/purchases';
 import ResultChips from './ResultChips';
+import LinkedFilterChips from './LinkedFilterChips';
 
 /**
  * Sprint 2026-09-22 (B5) — "Pendientes de autorización (SAP)": la cola de
  * autorización del ERP (ApprovalRequests + borrador), SOLO LECTURA — aprobar
  * se sigue haciendo en SAP. Esto es lo que Ingrid ve en su "Informe status
  * de autorización" y que antes no aparecía en la plataforma.
+ *
+ * G5 (2026-09-28): con `approver` (clic en el nombre de un aprobador) solo
+ * sus documentos y los días que llevan con él desde que le llegaron.
  */
 
 const PAGE_SIZE = 15;
@@ -54,15 +58,16 @@ const KIND_LABELS: Record<SapApprovalRequest['document_kind'], string> = {
 
 type StatusFilter = 'pending' | 'approved' | 'rejected' | 'all';
 
-export default function SapApprovalsTab() {
+export default function SapApprovalsTab({ initialApprover = null }: { initialApprover?: string | null }) {
   const { hasRole } = useAuth();
   const [status, setStatus] = useState<StatusFilter>('pending');
   const [kind, setKind] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [approver, setApprover] = useState(initialApprover);
 
-  const listQs = toQuery({ page, limit: PAGE_SIZE, status, kind, search });
+  const listQs = toQuery({ page, limit: PAGE_SIZE, status, kind, search, approver: approver ?? undefined });
   const { data, isLoading, isError } = useQuery({
     queryKey: ['sap-approval-requests', listQs],
     queryFn: () => api.get<PaginatedResponse<SapApprovalRequest>>(`/sap/approval-requests?${listQs}`),
@@ -118,6 +123,21 @@ export default function SapApprovalsTab() {
           </select>
         </div>
         <ResultChips filteredTotal={meta?.total} grandTotal={status === 'all' ? total : undefined} loading={isLoading} />
+        <LinkedFilterChips
+          filters={
+            approver
+              ? [
+                  {
+                    key: 'aprobador',
+                    label: 'Aprobador',
+                    value: approver,
+                    title: 'Solo los documentos de este aprobador; con "Pendientes", los de su etapa actual',
+                    onClear: () => { setApprover(null); setPage(1); },
+                  },
+                ]
+              : []
+          }
+        />
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -127,7 +147,7 @@ export default function SapApprovalsTab() {
           <div className="p-8 text-center">
             <div className="w-8 h-8 border-4 border-[#52AF32] border-t-transparent rounded-full animate-spin mx-auto" />
           </div>
-        ) : rows.length === 0 && !search && !kind && status === 'pending' && (total ?? 0) === 0 ? (
+        ) : rows.length === 0 && !search && !kind && !approver && status === 'pending' && (total ?? 0) === 0 ? (
           <div className="p-10 text-center space-y-2">
             <p className="text-gray-500">Aún no se ha sincronizado la cola de autorización desde SAP</p>
             {canSeeIntegrations && (
@@ -150,6 +170,14 @@ export default function SapApprovalsTab() {
                     <th className="px-2.5 py-3 text-left text-xs font-medium text-white uppercase">Aprobadores</th>
                     <th className="px-2.5 py-3 text-center text-xs font-medium text-white uppercase">Estatus</th>
                     <th className="px-2.5 py-3 text-center text-xs font-medium text-white uppercase">Fecha</th>
+                    {approver && (
+                      <th
+                        className="px-2.5 py-3 text-right text-xs font-medium text-white uppercase whitespace-nowrap"
+                        title="Días con este aprobador desde que le llegó (la aprobación de la etapa anterior o la creación)"
+                      >
+                        Con él
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -200,11 +228,20 @@ export default function SapApprovalsTab() {
                         {formatDate(r.creation_date)}
                         {r.days_waiting !== null && <p className={`text-xs whitespace-nowrap ${r.days_waiting >= 7 ? 'font-medium text-red-600' : 'text-gray-500'}`}>{r.days_waiting} {r.days_waiting === 1 ? 'día' : 'días'}</p>}
                       </td>
+                      {approver && (
+                        <td
+                          className={`px-2.5 py-3 text-right text-sm tabular-nums whitespace-nowrap ${(r.days_with_approver ?? 0) >= 7 ? 'font-semibold text-red-700' : 'text-gray-900'}`}
+                        >
+                          {r.days_with_approver === null || r.days_with_approver === undefined
+                            ? '—'
+                            : `${r.days_with_approver} ${r.days_with_approver === 1 ? 'día' : 'días'}`}
+                        </td>
+                      )}
                     </tr>
                   ))}
                   {rows.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={approver ? 9 : 8} className="px-4 py-8 text-center text-gray-500">
                         No hay solicitudes de autorización que coincidan con los filtros
                       </td>
                     </tr>

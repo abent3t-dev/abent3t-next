@@ -6,6 +6,9 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { formatAmountLines, formatCurrencyAmount, formatDays, NO_DISPONIBLE } from '@/lib/compras-format';
 import { AbentLevels, SapPendingApprovers } from '@/components/compras/ApprovalDelays';
+import { MaximoChainSummary, useCadenaMaximo } from '@/components/compras/MaximoChain';
+import { SHOW_INTERNAL_REQUISITIONS } from '@/lib/features';
+import Link from 'next/link';
 import ExportExcelButton from '@/components/compras/ExportExcelButton';
 import { PieChart } from '@/components/charts/PieChart';
 import {
@@ -610,6 +613,8 @@ export default function ReportesComprasPage() {
   });
   const erp = erpQ.data;
   const tiempos = tiemposQ.data;
+  // G6: cadena de aprobación de Maximo (hoy)
+  const cadenaQ = useCadenaMaximo();
 
   const resumen = resumenQ.data;
   const rq = rqQ.data;
@@ -893,14 +898,19 @@ export default function ReportesComprasPage() {
                 <span>OC (en espera → aprobada): <strong>{formatDays(tiempos.maximo.ordenes.promedio_dias)}</strong> ({tiempos.maximo.ordenes.total})</span>
                 <span>Contratos: <strong>{formatDays(tiempos.maximo.contratos.promedio_dias)}</strong> ({tiempos.maximo.contratos.total})</span>
               </div>
-              <p className="text-xs text-gray-500">Por aprobador (usuario Maximo que aprobó la OC)</p>
+              <p className="text-xs text-gray-500">
+                Por aprobador: cada aprobación de la cadena (nivel 1, 2, 3, 4 o final), días desde que le llegó la OC ·{' '}
+                <Link href="/compras/aprobaciones?tab=historico" className="text-[#52AF32] hover:underline">
+                  histórico con periodo
+                </Link>
+              </p>
               {tiempos.maximo.ordenes_por_aprobador.length === 0 ? (
                 <Empty text="Sin aprobaciones con aprobador identificado" />
               ) : (
                 tiempos.maximo.ordenes_por_aprobador.map((row) => (
                   <HBar
-                    key={row.aprobador}
-                    label={row.aprobador}
+                    key={row.usuario ?? row.aprobador}
+                    label={`${row.aprobador}${row.niveles && row.niveles.length > 0 ? ` · ${row.niveles.join(', ')}` : ''}`}
                     value={row.promedio_dias}
                     max={Math.max(...tiempos.maximo.ordenes_por_aprobador.map((r) => r.promedio_dias), 1)}
                     display={`${formatDays(row.promedio_dias)} · ${row.total}`}
@@ -920,7 +930,7 @@ export default function ReportesComprasPage() {
                 <span>Autorizadas: <strong>{formatDays(tiempos.sap.solicitudes_autorizadas.promedio_dias)}</strong> ({tiempos.sap.solicitudes_autorizadas.total})</span>
                 <span>Pendientes: <strong>{tiempos.sap.pendientes.total}</strong>{tiempos.sap.pendientes.dias_esperando_promedio !== null && ` · esperando ${tiempos.sap.pendientes.dias_esperando_promedio} días en promedio`}</span>
               </div>
-              <p className="text-xs text-gray-500">Por aprobador (usuario SAP que autorizó)</p>
+              <p className="text-xs text-gray-500">Por aprobador (usuario SAP que autorizó; días desde que le llegó la solicitud)</p>
               {tiempos.sap.por_aprobador.length === 0 ? (
                 <Empty text="Sin autorizaciones sincronizadas todavía" />
               ) : (
@@ -938,9 +948,21 @@ export default function ReportesComprasPage() {
             </div>
           </div>
           <div>
-            <p className="text-sm font-medium text-[#424846] mb-2">Flujo propio ABENT — por nivel</p>
-            <AbentLevels niveles={tiempos.abent_niveles} stats={aprobaciones?.stats as ApprovalStats | undefined} />
+            <p className="text-sm font-medium text-[#424846] mb-2">Cadena de aprobación Maximo — pendientes por nivel (hoy)</p>
+            {cadenaQ.isError ? (
+              <p className="text-sm text-red-600">No se pudo cargar la cadena de aprobación de Maximo.</p>
+            ) : !cadenaQ.data ? (
+              <Empty />
+            ) : (
+              <MaximoChainSummary cadena={cadenaQ.data} />
+            )}
           </div>
+          {SHOW_INTERNAL_REQUISITIONS && (
+            <div>
+              <p className="text-sm font-medium text-[#424846] mb-2">Flujo propio ABENT — por nivel</p>
+              <AbentLevels niveles={tiempos.abent_niveles} stats={aprobaciones?.stats as ApprovalStats | undefined} />
+            </div>
+          )}
           </div>
         )}
       </Section>

@@ -1,18 +1,23 @@
 'use client';
 
+import Link from 'next/link';
 import { formatDays } from '@/lib/compras-format';
 import { SHOW_INTERNAL_REQUISITIONS } from '@/lib/features';
+import { approverHref } from '@/types/purchases';
 import type { ApprovalStats, ApprovalTimesReport } from '@/types/purchases';
 
 /**
- * Quién tiene detenidas las aprobaciones y desde cuándo (dashboard y
- * reportes). SAP sí dice quién tiene cada solicitud; Maximo solo registra al
- * aprobador cuando aprueba, así que de sus OC en espera solo hay conteo y días.
+ * Quién tiene detenidas las aprobaciones de SAP y desde cuándo (dashboard y
+ * reportes). Lo de Maximo va en la cadena de aprobación (MaximoChain.tsx):
+ * Maximo no dice a quién le toca cada OC, solo el nivel que espera.
  *
  * D6 (2026-09-23): los nombres ya llegan resueltos con los alias de SAP/Maximo
  * (Compras → Roles → Usuarios de SAP y Maximo); `usuario` conserva el código.
  * En los niveles del flujo propio se muestran los usuarios del ERP ligados a
  * cada aprobador y sus autorizaciones pendientes en SAP.
+ *
+ * G5 (2026-09-28): los días cuentan desde que el documento LE LLEGÓ al
+ * aprobador y su nombre lleva a sus pendientes en Aprobaciones.
  */
 
 const LEVEL_LABELS: Record<number, string> = {
@@ -27,7 +32,6 @@ const dayCount = (days: number) => `${days} ${days === 1 ? 'día' : 'días'}`;
 export function SapPendingApprovers({ tiempos }: { tiempos: ApprovalTimesReport }) {
   const historico = new Map(tiempos.sap.por_aprobador.map((r) => [r.aprobador, r.promedio_dias]));
   const rows = tiempos.sap.pendientes_por_aprobador;
-  const maximo = tiempos.maximo_pendientes;
 
   return (
     <div className="space-y-3">
@@ -52,8 +56,10 @@ export function SapPendingApprovers({ tiempos }: { tiempos: ApprovalTimesReport 
                 const retrasado = esperando !== null && promedio !== null && esperando > promedio;
                 return (
                   <tr key={row.usuario ?? row.aprobador}>
-                    <td className="px-3 py-2 text-gray-900 font-medium" title={row.usuario && row.usuario !== row.aprobador ? `Usuario SAP: ${row.usuario}` : undefined}>
-                      {row.aprobador}
+                    <td className="px-3 py-2 font-medium" title={row.usuario && row.usuario !== row.aprobador ? `Usuario SAP: ${row.usuario}` : undefined}>
+                      <Link href={approverHref('sap', row.usuario ?? row.aprobador)} className="text-[#222D59] hover:underline">
+                        {row.aprobador}
+                      </Link>
                     </td>
                     <td className="px-3 py-2 text-right text-gray-900 tabular-nums">{row.pendientes}</td>
                     <td className={`px-3 py-2 text-right tabular-nums font-semibold ${retrasado ? 'text-red-700' : 'text-gray-900'}`}>
@@ -85,16 +91,9 @@ export function SapPendingApprovers({ tiempos }: { tiempos: ApprovalTimesReport 
         </div>
       )}
       <p className="text-xs text-gray-600">
-        Días naturales desde que se creó la solicitud de autorización. &quot;Retrasado&quot; = la más antigua
-        lleva más días que lo que ese aprobador suele tardar en autorizar.
-      </p>
-      <p className="text-sm text-gray-700">
-        <strong>Maximo:</strong>{' '}
-        {maximo.total === 0
-          ? 'sin órdenes en espera de aprobación.'
-          : `${maximo.total} ${maximo.total === 1 ? 'orden' : 'órdenes'} en espera de aprobación` +
-            (maximo.dias_esperando_max === null ? '.' : `, la más antigua desde hace ${dayCount(maximo.dias_esperando_max)}.`) +
-            ' Maximo registra al aprobador hasta que aprueba, por eso aquí no hay nombre.'}
+        Días naturales desde que la solicitud le llegó al aprobador (la aprobación de la etapa anterior o la creación).
+        &quot;Retrasado&quot; = la más antigua lleva más días que lo que ese aprobador suele tardar en autorizar.
+        Clic en un nombre para ver sus documentos.
       </p>
     </div>
   );
