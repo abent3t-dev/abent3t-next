@@ -19,6 +19,7 @@ import {
 } from '@/types/purchases';
 import SapDocDetailModal from './SapDocDetailModal';
 import ResultChips from './ResultChips';
+import LinkedFilterChips from './LinkedFilterChips';
 import StatusMultiSelect from './StatusMultiSelect';
 import ExportExcelButton from './ExportExcelButton';
 import {
@@ -53,6 +54,10 @@ import type { ColumnConfigs } from '@/lib/column-filters';
  * chips y Excel con el mismo filtro); E4 columna Comprador — SAP no tiene
  * comprador en ninguna OC: la migrada muestra el de Maximo y las demás
  * "Capturó: …" (antes ese respaldo vivía en Solicitante).
+ *
+ * G1 (2026-09-28): clic en una barra del top de proveedores de Reportes →
+ * proveedor exacto (`card_code`), "contadas una vez" (sin las migradas que
+ * ya cuenta Maximo, D1) y el periodo, como chips que se pueden quitar.
  */
 
 const ORIGIN_OPTIONS: Array<{ value: 'sap' | 'maximo' | ''; label: string }> = [
@@ -68,6 +73,8 @@ const ORIGIN_LABELS: Record<string, string> = {
 };
 
 const COLUMNS: ColumnConfigs = {
+  // G1: la barra del top de Reportes filtra por moneda (sin encabezado propio)
+  moneda: { label: 'Moneda', type: 'text' },
   numero: { label: 'Número', type: 'text' },
   origen: { label: 'Origen', type: 'text', format: (v) => ORIGIN_LABELS[v] ?? v },
   proveedor: { label: 'Proveedor', type: 'text' },
@@ -211,24 +218,42 @@ export default function SapOrdersTab({
   initialStatus = [],
   initialOrigin = '',
   year = null,
+  linkedVendor = null,
+  initialFrom = '',
+  initialTo = '',
 }: {
   initialStatus?: string[];
   /** D1: filtro inicial de origen (desde el dashboard). */
   initialOrigin?: 'sap' | 'maximo' | '';
   /** D4: año (lo controla la página de Órdenes). */
   year?: number | null;
+  /** G1: proveedor de la barra del top de Reportes (código de SAP). */
+  linkedVendor?: { code: string; name: string | null; countedOnce: boolean } | null;
+  /** G1: periodo del reporte (fecha del documento). */
+  initialFrom?: string;
+  initialTo?: string;
 }) {
   const { hasRole } = useAuth();
   const [search, setSearch] = useState('');
   const [statuses, setStatuses] = useState<string[]>(initialStatus);
   const [origin, setOrigin] = useState<'sap' | 'maximo' | ''>(initialOrigin);
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [from, setFrom] = useState(initialFrom);
+  const [to, setTo] = useState(initialTo);
+  const [vendor, setVendor] = useState(linkedVendor);
   const [page, setPage] = useState(1);
   const [detailDocEntry, setDetailDocEntry] = useState<number | null>(null);
   const cf = useColumnFilters('sapPo', () => setPage(1));
 
-  const baseQuery = { search, status: statuses, from, to, origin, year: year ?? undefined };
+  const baseQuery = {
+    search,
+    status: statuses,
+    from,
+    to,
+    origin,
+    year: year ?? undefined,
+    card_code: vendor?.code,
+    counted_once: vendor?.countedOnce ? 'true' : undefined,
+  };
   const filterQs = toQuery({ ...baseQuery, ...cf.params });
   const listQs = toQuery({ page, limit: PAGE_SIZE, ...baseQuery, ...cf.params });
 
@@ -252,7 +277,7 @@ export default function SapOrdersTab({
 
   const orders = data?.data ?? [];
   const meta = data?.meta;
-  const hasFilters = !!search || statuses.length > 0 || !!from || !!to || !!origin || !!year || cf.activeCount > 0;
+  const hasFilters = !!search || statuses.length > 0 || !!from || !!to || !!origin || !!year || !!vendor || cf.activeCount > 0;
   const canSeeIntegrations = hasRole(...PURCHASE_ADMIN_ROLES, 'executive');
   const summary = summaryQ.data?.purchaseOrders;
   const chips = SAP_STATUS_OPTIONS.map((opt) => ({
@@ -321,6 +346,23 @@ export default function SapOrdersTab({
           activeStatuses={statuses}
           onToggleStatus={toggleStatus}
           loading={isLoading}
+        />
+        <LinkedFilterChips
+          filters={
+            vendor
+              ? [
+                  {
+                    key: 'proveedor',
+                    label: 'Proveedor',
+                    value: `${vendor.name ?? vendor.code} (${vendor.code})${vendor.countedOnce ? ' · sin las migradas que ya cuenta Maximo' : ''}`,
+                    title: vendor.countedOnce
+                      ? 'Mismas OC que cuenta el top de proveedores de SAP: las migradas desde Maximo que existen allá se cuentan en Maximo'
+                      : undefined,
+                    onClear: () => { setVendor(null); setPage(1); },
+                  },
+                ]
+              : []
+          }
         />
         <ActiveColumnFilters cf={cf} columns={COLUMNS} />
         {summaryQ.data && summaryQ.data.migradas.total > 0 && (

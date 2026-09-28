@@ -346,6 +346,12 @@ function ExpeditacionContent() {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900 min-w-48">
                           {item.supplier?.legal_name ?? '—'}
+                          {/* G1: proveedor efectivo de Maximo; "en Maximo: …" si su maestro lo nombra distinto */}
+                          {item.supplier_note && (
+                            <span className="block text-xs italic text-amber-700" title="Maximo tiene otro nombre para este proveedor; se muestra el de SAP">
+                              {item.supplier_note}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm min-w-40">
                           {item.buyer_name ? (

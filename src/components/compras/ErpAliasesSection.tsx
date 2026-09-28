@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, uploadFile } from '@/lib/api';
 import { notify } from '@/lib/notifications';
+import ProfileCombobox, { type ProfileOption } from '@/components/compras/ProfileCombobox';
 import type { PaginatedResponse } from '@/types/pagination';
 import { ERP_ALIAS_SYSTEM_LABELS, ErpAlias, ErpAliasSystem } from '@/types/purchases';
 
@@ -18,25 +19,24 @@ import { ERP_ALIAS_SYSTEM_LABELS, ErpAlias, ErpAliasSystem } from '@/types/purch
 
 const PAGE_SIZE = 20;
 
-interface ProfileOption {
-  id: string;
-  full_name: string | null;
-  email: string;
-}
-
-interface ProfilesResponse {
-  data: ProfileOption[];
-}
-
 interface FormState {
   id: string | null;
   system: ErpAliasSystem;
   code: string;
   display_name: string;
   profile_id: string;
+  /** Perfil ligado, para mostrarlo en el selector (no viaja al guardar). */
+  profile: ProfileOption | null;
 }
 
-const EMPTY_FORM: FormState = { id: null, system: 'maximo', code: '', display_name: '', profile_id: '' };
+const EMPTY_FORM: FormState = {
+  id: null,
+  system: 'maximo',
+  code: '',
+  display_name: '',
+  profile_id: '',
+  profile: null,
+};
 
 const QUERY_KEY = ['compras', 'erp-aliases'];
 
@@ -47,7 +47,6 @@ export default function ErpAliasesSection() {
   const [system, setSystem] = useState<ErpAliasSystem | ''>('');
   const [page, setPage] = useState(1);
   const [form, setForm] = useState<FormState | null>(null);
-  const [profileSearch, setProfileSearch] = useState('');
   const [importSystem, setImportSystem] = useState<ErpAliasSystem>('maximo');
   const [importing, setImporting] = useState(false);
 
@@ -58,14 +57,6 @@ export default function ErpAliasesSection() {
   const listQ = useQuery({
     queryKey: [...QUERY_KEY, search, system, page],
     queryFn: () => api.get<PaginatedResponse<ErpAlias>>(`/compras/erp-aliases?${qs.toString()}`),
-  });
-  const profilesQ = useQuery({
-    queryKey: ['compras-roles-users', 'picker', profileSearch],
-    queryFn: () =>
-      api.get<ProfilesResponse>(
-        `/compras/usuarios/gestion?limit=20${profileSearch ? `&search=${encodeURIComponent(profileSearch)}` : ''}`,
-      ),
-    enabled: form !== null,
   });
 
   const invalidate = () => {
@@ -247,26 +238,16 @@ export default function ErpAliasesSection() {
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-600 mb-1">Perfil de la plataforma (opcional)</label>
-              <input
-                type="text"
-                value={profileSearch}
-                onChange={(e) => setProfileSearch(e.target.value)}
-                placeholder="Buscar por nombre o correo"
-                className="w-full px-3 py-1.5 mb-1 text-xs border border-gray-300 rounded-lg text-gray-900"
+              <label htmlFor="erp-alias-profile" className="block text-xs text-gray-600 mb-1">
+                Perfil de la plataforma (opcional)
+              </label>
+              {/* G4: búsqueda en el servidor sobre todos los perfiles activos */}
+              <ProfileCombobox
+                key={form.id ?? 'nuevo'}
+                id="erp-alias-profile"
+                value={form.profile}
+                onChange={(profile) => setForm({ ...form, profile_id: profile?.id ?? '', profile })}
               />
-              <select
-                value={form.profile_id}
-                onChange={(e) => setForm({ ...form, profile_id: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900"
-              >
-                <option value="">Sin ligar</option>
-                {(profilesQ.data?.data ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.full_name ?? p.email} · {p.email}
-                  </option>
-                ))}
-              </select>
             </div>
             <div className="flex gap-2">
               <button
@@ -348,6 +329,10 @@ export default function ErpAliasesSection() {
                             code: row.code,
                             display_name: row.display_name,
                             profile_id: row.profile_id ?? '',
+                            profile:
+                              row.profile_id && row.profile
+                                ? { id: row.profile_id, full_name: row.profile.full_name, email: row.profile.email }
+                                : null,
                           })
                         }
                         className="text-sm text-[#52AF32] hover:underline"

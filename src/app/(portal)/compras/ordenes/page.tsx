@@ -100,18 +100,29 @@ const getStatusBadgeClass = (status: POStatus) => {
   return colorMap[PO_STATUS_COLORS[status]] || 'bg-gray-100 text-gray-800';
 };
 
+/** G1: proveedor y periodo que llegan desde el top de Reportes. */
+interface LinkedVendorParams {
+  key: string;
+  name: string | null;
+  countedOnce: boolean;
+  from: string;
+  to: string;
+}
+
 function OrdenesPageInner({
   initialTab,
   initialStatus,
   initialYear,
   initialSearch,
   initialOrigin,
+  linked,
 }: {
   initialTab: OrdersTab | null;
   initialStatus: string[];
   initialYear: number | null;
   initialSearch: string;
   initialOrigin: 'sap' | 'maximo' | '';
+  linked: LinkedVendorParams | null;
 }) {
   // Modelo "ver todos, actuar por rol": crear/editar solo equipo de compras
   // (espejo de los @Roles del backend). La expeditación desde la fila queda
@@ -223,6 +234,9 @@ function OrdenesPageInner({
           initialStatus={initialTab === 'maximo_po' ? initialStatus : []}
           initialSearch={initialTab === 'maximo_po' ? initialSearch : ''}
           year={year}
+          linkedVendor={initialTab === 'maximo_po' && linked ? { key: linked.key, name: linked.name } : null}
+          initialFrom={initialTab === 'maximo_po' ? (linked?.from ?? '') : ''}
+          initialTo={initialTab === 'maximo_po' ? (linked?.to ?? '') : ''}
         />
       )}
       {activeTab === 'sap_po' && (
@@ -230,6 +244,13 @@ function OrdenesPageInner({
           initialStatus={initialTab === 'sap_po' ? initialStatus : []}
           initialOrigin={initialTab === 'sap_po' ? initialOrigin : ''}
           year={year}
+          linkedVendor={
+            initialTab === 'sap_po' && linked?.key.startsWith('sap:')
+              ? { code: linked.key.slice(4), name: linked.name, countedOnce: linked.countedOnce }
+              : null
+          }
+          initialFrom={initialTab === 'sap_po' ? (linked?.from ?? '') : ''}
+          initialTo={initialTab === 'sap_po' ? (linked?.to ?? '') : ''}
         />
       )}
 
@@ -430,7 +451,9 @@ function OrdenesPageInner({
 
 /**
  * Pestana/estatus iniciales desde la URL (?tab=sap_po&status=open&year=2025
- * &origin=maximo&search=PO1234); Suspense por useSearchParams.
+ * &origin=maximo&search=PO1234); Suspense por useSearchParams. G1: desde el
+ * top de Reportes llegan `proveedor` (sap:P0000219 / maximo:P0000440),
+ * `proveedor_nombre`, `contadas_una_vez`, `from` y `to`.
  */
 function OrdenesFromUrl() {
   const params = useSearchParams();
@@ -442,14 +465,27 @@ function OrdenesFromUrl() {
   const originParam = params.get('origin');
   const initialOrigin = originParam === 'sap' || originParam === 'maximo' ? originParam : '';
   const initialSearch = params.get('search') ?? '';
+  const vendorKey = params.get('proveedor') ?? '';
+  const isoDay = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '');
+  const linked: LinkedVendorParams | null =
+    /^(sap|maximo):.+/.test(vendorKey)
+      ? {
+          key: vendorKey,
+          name: params.get('proveedor_nombre'),
+          countedOnce: params.get('contadas_una_vez') === '1',
+          from: isoDay(params.get('from')),
+          to: isoDay(params.get('to')),
+        }
+      : null;
   return (
     <OrdenesPageInner
-      key={`${initialTab ?? ''}|${initialStatus.join(',')}|${initialYear ?? ''}|${initialOrigin}|${initialSearch}`}
+      key={`${initialTab ?? ''}|${initialStatus.join(',')}|${initialYear ?? ''}|${initialOrigin}|${initialSearch}|${vendorKey}|${linked?.from ?? ''}|${linked?.to ?? ''}`}
       initialTab={initialTab}
       initialStatus={initialStatus}
       initialYear={initialYear}
       initialSearch={initialSearch}
       initialOrigin={initialOrigin}
+      linked={linked}
     />
   );
 }

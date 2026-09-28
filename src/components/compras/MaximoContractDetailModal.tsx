@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import MaximoSupplierCell from './MaximoSupplierCell';
 import {
   MaximoContractDetail,
   maximoStatusBadgeClass,
   maximoStatusLabel,
+  maximoStatusTitle,
 } from '@/types/purchases';
 
 /**
@@ -138,7 +140,7 @@ export default function MaximoContractDetailModal({
               <div className="flex items-center gap-3 flex-wrap">
                 <span
                   className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${maximoStatusBadgeClass(current.status)}`}
-                  title={current.status ?? undefined}
+                  title={maximoStatusTitle(current.status)}
                 >
                   {maximoStatusLabel(current.status)}
                 </span>
@@ -154,7 +156,11 @@ export default function MaximoContractDetailModal({
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <Field label="Proveedor" value={dash(current.vendor_name)} />
+                <Field label="Proveedor" value={<MaximoSupplierCell po={current} />} />
+                <Field
+                  label="Proveedor en Maximo"
+                  value={`${dash(current.vendor_name)} (${dash(current.vendor_id)})`}
+                />
                 <Field
                   label="MAXVOL"
                   value={
@@ -254,7 +260,7 @@ export default function MaximoContractDetailModal({
                       <li key={idx} className="flex items-center gap-3 text-sm">
                         <span
                           className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${maximoStatusBadgeClass(entry.status)}`}
-                          title={entry.status ?? undefined}
+                          title={maximoStatusTitle(entry.status)}
                         >
                           {maximoStatusLabel(entry.status)}
                         </span>
@@ -288,7 +294,7 @@ export default function MaximoContractDetailModal({
                           <td className="px-3 py-2">
                             <span
                               className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap ${maximoStatusBadgeClass(rev.status)}`}
-                              title={rev.status ?? undefined}
+                              title={maximoStatusTitle(rev.status)}
                             >
                               {maximoStatusLabel(rev.status)}
                             </span>

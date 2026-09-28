@@ -18,6 +18,7 @@ import {
 } from '@/types/purchases';
 import MaximoContractDetailModal from './MaximoContractDetailModal';
 import ResultChips from './ResultChips';
+import LinkedFilterChips, { periodText } from './LinkedFilterChips';
 import StatusMultiSelect from './StatusMultiSelect';
 import ExportExcelButton from './ExportExcelButton';
 import {
@@ -97,19 +98,29 @@ const daysBetween = (from: string | null, to: string | null): number | null => {
 export default function MaximoRequestsTab({
   initialStatus = [],
   year = null,
+  pendingFrom = null,
 }: {
   initialStatus?: string[];
   /** D4: año (created_at_source). */
   year?: number | null;
+  /** G3 (2026-09-28): solo PR sin OC ni contrato, creadas desde esta fecha ('' = sin fecha). */
+  pendingFrom?: string | null;
 }) {
   const { hasRole } = useAuth();
   const [search, setSearch] = useState('');
   const [statuses, setStatuses] = useState<string[]>(initialStatus);
   const [page, setPage] = useState(1);
   const [detailKey, setDetailKey] = useState<string | null>(null);
+  const [pending, setPending] = useState(pendingFrom);
   const cf = useColumnFilters('mxPr', () => setPage(1));
 
-  const filters = { search, status: statuses, year: year ?? undefined };
+  const filters = {
+    search,
+    status: statuses,
+    year: year ?? undefined,
+    sin_oc: pending !== null ? 'true' : undefined,
+    pr_desde: pending || undefined,
+  };
   const filterQs = toQuery({ ...filters, ...cf.params });
   const listQs = toQuery({ page, limit: PAGE_SIZE, ...filters, ...cf.params });
 
@@ -133,7 +144,7 @@ export default function MaximoRequestsTab({
 
   const rows = data?.data ?? [];
   const meta = data?.meta;
-  const hasFilters = !!search || statuses.length > 0 || !!year || cf.activeCount > 0;
+  const hasFilters = !!search || statuses.length > 0 || !!year || pending !== null || cf.activeCount > 0;
   const sinEstatus = statusFacet.data ? (statusCounts.get(null) ?? 0) : 0;
   const canSeeIntegrations = hasRole(...PURCHASE_ADMIN_ROLES, 'executive');
   const summary = summaryQ.data?.contracts;
@@ -179,6 +190,21 @@ export default function MaximoRequestsTab({
           activeStatuses={statuses}
           onToggleStatus={toggleStatus}
           loading={isLoading}
+        />
+        <LinkedFilterChips
+          filters={
+            pending !== null
+              ? [
+                  {
+                    key: 'sin_oc',
+                    label: 'Pendientes de gestionar',
+                    value: `sin OC ni contrato${pending ? `, creadas ${periodText(pending)}` : year ? `, creadas en ${year}` : ''}`,
+                    title: 'PR sin contrato cuyo número no aparece en ninguna OC vigente de Maximo. Maximo no da la fecha de esas PR: el periodo se ubica por su folio (se numeran en orden)',
+                    onClear: () => { setPending(null); setPage(1); },
+                  },
+                ]
+              : []
+          }
         />
         <ActiveColumnFilters cf={cf} columns={COLUMNS} />
         {sinEstatus > 0 && (

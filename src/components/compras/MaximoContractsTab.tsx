@@ -15,12 +15,14 @@ import {
   MaximoSummary,
   maximoStatusBadgeClass,
   maximoStatusLabel,
+  maximoStatusTitle,
 } from '@/types/purchases';
 import MaximoContractDetailModal from './MaximoContractDetailModal';
 import MaximoContractGroupsView from './MaximoContractGroupsView';
 import ResultChips from './ResultChips';
 import StatusMultiSelect from './StatusMultiSelect';
 import ExportExcelButton from './ExportExcelButton';
+import MaximoSupplierCell from './MaximoSupplierCell';
 import {
   ActiveColumnFilters,
   ColumnFilterProvider,
@@ -259,7 +261,7 @@ function MaximoContractRowsView({
                     <FilterTh column="pr">PRNUM</FilterTh>
                     <FilterTh column="contrato">Contrato</FilterTh>
                     <FilterTh column="estatus" align="center">Estatus</FilterTh>
-                    <FilterTh column="proveedor">Proveedor</FilterTh>
+                    <FilterTh column="proveedor" title="Proveedor según SAP cuando las OC migradas de su código de Maximo quedaron a nombre de un proveedor de SAP; si no, el de Maximo">Proveedor</FilterTh>
                     <FilterTh column="valor" align="right">Valor contrato</FilterTh>
                     <FilterTh column="consumido" align="right" title="Consumido del contrato según Maximo">Consumido</FilterTh>
                     <FilterTh column="saldo" align="right" title="Valor − consumido">Saldo</FilterTh>
@@ -293,12 +295,14 @@ function MaximoContractRowsView({
                         <td className="px-4 py-3 text-center">
                           <span
                             className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full whitespace-nowrap ${maximoStatusBadgeClass(contract.status)}`}
-                            title={contract.status ?? undefined}
+                            title={maximoStatusTitle(contract.status)}
                           >
                             {maximoStatusLabel(contract.status)}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{dash(contract.vendor_name)}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <MaximoSupplierCell po={contract} />
+                        </td>
                         <td className="px-4 py-3 text-sm text-gray-900 text-right">
                           {formatMoney(contract.contract_value, contract.currency)}
                         </td>

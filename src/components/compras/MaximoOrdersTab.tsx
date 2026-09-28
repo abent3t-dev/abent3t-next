@@ -15,9 +15,12 @@ import {
   buyerLabel,
   maximoStatusBadgeClass,
   maximoStatusLabel,
+  maximoStatusTitle,
 } from '@/types/purchases';
 import MaximoPoDetailModal from './MaximoPoDetailModal';
 import ResultChips from './ResultChips';
+import LinkedFilterChips, { periodText } from './LinkedFilterChips';
+import MaximoSupplierCell from './MaximoSupplierCell';
 import StatusMultiSelect from './StatusMultiSelect';
 import ExportExcelButton from './ExportExcelButton';
 import {
@@ -45,6 +48,12 @@ import type { ColumnConfigs } from '@/lib/column-filters';
  * Pedidos de Ingrid 2026-09-25: E1 filtro "tipo Excel" por columna; E4
  * columna Comprador (PURCHASEAGENT con su nombre: alias > Maximo > usuario);
  * F1: sin PURCHASEAGENT (casi todas), "Capturó: …" = quien creó la OC.
+ *
+ * Reunión con Ingrid 2026-09-28: G1 proveedor EFECTIVO (según SAP si la OC
+ * migró o por cruce de código; "en Maximo: …" cuando Maximo lo nombra
+ * distinto) y clic desde el top de Reportes (proveedor + periodo); G7
+ * estatus en aprobación por nivel (APPRn / APPRnREV) con el código en el
+ * tooltip.
  */
 
 const PAGE_SIZE = 15;
@@ -58,6 +67,8 @@ const STATUS_OPTIONS = Object.keys(MAXIMO_STATUS_BADGE_CLASSES).map((value) => (
 }));
 
 const COLUMNS: ColumnConfigs = {
+  // G1: la barra del top de Reportes filtra por moneda (sin encabezado propio)
+  moneda: { label: 'Moneda', type: 'text' },
   ponum: { label: 'PONUM', type: 'text' },
   descripcion: { label: 'Descripción', type: 'text' },
   estatus: {
@@ -107,12 +118,20 @@ export default function MaximoOrdersTab({
   initialStatus = [],
   initialSearch = '',
   year = null,
+  linkedVendor = null,
+  initialFrom = '',
+  initialTo = '',
 }: {
   initialStatus?: string[];
   /** D1: PONUM prefiltrado desde el detalle de una OC de SAP migrada. */
   initialSearch?: string;
   /** D4: año (created_at_source), lo controla la página de Órdenes. */
   year?: number | null;
+  /** G1: proveedor efectivo de la barra del top de Reportes. */
+  linkedVendor?: { key: string; name: string | null } | null;
+  /** G1: periodo del reporte (fecha de la OC en Maximo). */
+  initialFrom?: string;
+  initialTo?: string;
 }) {
   const { hasRole } = useAuth();
   const [search, setSearch] = useState(initialSearch);
@@ -122,6 +141,10 @@ export default function MaximoOrdersTab({
   const [approvedTo, setApprovedTo] = useState('');
   const [page, setPage] = useState(1);
   const [detailPonum, setDetailPonum] = useState<string | null>(null);
+  const [vendor, setVendor] = useState(linkedVendor);
+  const [period, setPeriod] = useState(
+    initialFrom || initialTo ? { from: initialFrom, to: initialTo } : null,
+  );
   const cf = useColumnFilters('mxPo', () => setPage(1));
 
   const filters = {
@@ -131,6 +154,9 @@ export default function MaximoOrdersTab({
     approved_from: approvedFrom,
     approved_to: approvedTo,
     year: year ?? undefined,
+    proveedor: vendor?.key,
+    from: period?.from || undefined,
+    to: period?.to || undefined,
   };
   const filterQs = toQuery({ ...filters, ...cf.params });
   const listQs = toQuery({ page, limit: PAGE_SIZE, ...filters, ...cf.params });
@@ -155,7 +181,7 @@ export default function MaximoOrdersTab({
   const orders = data?.data ?? [];
   const meta = data?.meta;
   const hasFilters =
-    !!search || statuses.length > 0 || !!clasfFilter || !!approvedFrom || !!approvedTo || !!year || cf.activeCount > 0;
+    !!search || statuses.length > 0 || !!clasfFilter || !!approvedFrom || !!approvedTo || !!year || !!vendor || !!period || cf.activeCount > 0;
   const canSeeIntegrations = hasRole(...PURCHASE_ADMIN_ROLES, 'executive');
   const summary = summaryQ.data?.purchaseOrders;
   const chips = [...facetCounts(statusFacet.data).entries()]
@@ -225,6 +251,33 @@ export default function MaximoOrdersTab({
           onToggleStatus={toggleStatus}
           loading={isLoading}
         />
+        <LinkedFilterChips
+          filters={[
+            ...(vendor
+              ? [
+                  {
+                    key: 'proveedor',
+                    label: 'Proveedor',
+                    value: `${vendor.name ?? vendor.key} (${vendor.key.replace(/^(sap|maximo):/, '')})`,
+                    title: vendor.key.startsWith('sap:')
+                      ? 'Proveedor efectivo según SAP (la OC migró a SAP o su código de Maximo cae en este proveedor)'
+                      : 'Proveedor según el maestro de Maximo',
+                    onClear: () => { setVendor(null); setPage(1); },
+                  },
+                ]
+              : []),
+            ...(period
+              ? [
+                  {
+                    key: 'periodo',
+                    label: 'Fecha de la OC',
+                    value: periodText(period.from, period.to),
+                    onClear: () => { setPeriod(null); setPage(1); },
+                  },
+                ]
+              : []),
+          ]}
+        />
         <ActiveColumnFilters cf={cf} columns={COLUMNS} />
       </div>
 
@@ -257,7 +310,7 @@ export default function MaximoOrdersTab({
                     <FilterTh column="ponum" className="px-3 py-3">PONUM</FilterTh>
                     <FilterTh column="descripcion" className="px-3 py-3">Descripción</FilterTh>
                     <FilterTh column="estatus" align="center" className="px-3 py-3">Estatus</FilterTh>
-                    <FilterTh column="proveedor" className="px-3 py-3">Proveedor</FilterTh>
+                    <FilterTh column="proveedor" className="px-3 py-3" title="Proveedor según SAP cuando la OC migró o por el cruce de su código; si no, el de Maximo">Proveedor</FilterTh>
                     <FilterTh column="monto" align="right" className="px-3 py-3">Monto</FilterTh>
                     <FilterTh column="solicitante" className="px-3 py-3">Solicitante</FilterTh>
                     <FilterTh column="comprador" className="px-3 py-3" title="Comprador de la OC en Maximo (PURCHASEAGENT)">Comprador</FilterTh>
@@ -281,12 +334,14 @@ export default function MaximoOrdersTab({
                       <td className="px-3 py-3 text-center">
                         <span
                           className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full whitespace-nowrap ${maximoStatusBadgeClass(po.status)}`}
-                          title={po.status ?? undefined}
+                          title={maximoStatusTitle(po.status)}
                         >
                           {maximoStatusLabel(po.status)}
                         </span>
                       </td>
-                      <td className="px-3 py-3 text-sm text-gray-900">{dash(po.vendor_name)}</td>
+                      <td className="px-3 py-3 text-sm">
+                        <MaximoSupplierCell po={po} />
+                      </td>
                       <td className="px-3 py-3 text-sm text-gray-900 text-right font-medium">
                         {formatMoney(po.total_cost, po.currency)}
                       </td>

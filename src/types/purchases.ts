@@ -372,7 +372,28 @@ export const APPROVAL_LEVEL_NAMES: Record<number, string> = {
 
 export type MaximoSyncTarget = 'purchase_orders' | 'contracts';
 
-export interface MaximoPurchaseOrder {
+/**
+ * G1 (2026-09-28): proveedor EFECTIVO de Maximo — el de SAP si la OC migró
+ * (`sap_oc`) o por el cruce de su código (`sap_cruce`); si no, el de Maximo.
+ * `vendor_id` / `vendor_name` conservan lo que dice el maestro de Maximo.
+ */
+export type SupplierSource = 'sap_oc' | 'sap_cruce' | 'maximo';
+export interface SupplierFields {
+  /** Llave de filtro: `sap:P0000219` / `maximo:P0000440`. */
+  supplier_key: string | null;
+  supplier_code: string | null;
+  supplier_name: string | null;
+  supplier_source: SupplierSource | null;
+  /** "en Maximo: NOMBRE (CÓDIGO)" cuando Maximo lo nombra distinto. */
+  supplier_note: string | null;
+}
+export const SUPPLIER_SOURCE_LABELS: Record<SupplierSource, string> = {
+  sap_oc: 'Según SAP: la OC ya migró a SAP a nombre de este proveedor',
+  sap_cruce: 'Según SAP: las OC migradas de este código de Maximo quedaron a nombre de este proveedor',
+  maximo: 'Según el maestro de proveedores de Maximo',
+};
+
+export interface MaximoPurchaseOrder extends SupplierFields {
   id: string;
   ponum: string;
   siteid: string | null;
@@ -428,7 +449,7 @@ export interface MaximoPurchaseOrderDetail {
  * E2 (2026-09-25): contrato de Maximo agrupado — una fila por contrato
  * (última revisión) con las PR que lo usan (`group=contract`).
  */
-export interface MaximoContractGroup {
+export interface MaximoContractGroup extends SupplierFields {
   contractnum: string;
   /** Clave para abrir el detalle (PR de la fila representativa). */
   detail_key: string;
@@ -455,7 +476,7 @@ export interface MaximoContractGroup {
   }>;
 }
 
-export interface MaximoContract {
+export interface MaximoContract extends SupplierFields {
   id: string;
   prnum: string | null;
   contractnum: string | null;
@@ -587,6 +608,15 @@ export const MAXIMO_STATUS_BADGE_CLASSES: Record<string, string> = {
   CLOSE: 'bg-gray-200 text-gray-700',
   COMP: 'bg-green-100 text-green-800',
   WAPPR: 'bg-yellow-100 text-yellow-800',
+  // G7: en aprobación por nivel (estatus propios de A3T)
+  APPR1: 'bg-yellow-100 text-yellow-800',
+  APPR2: 'bg-yellow-100 text-yellow-800',
+  APPR3: 'bg-yellow-100 text-yellow-800',
+  APPR4: 'bg-yellow-100 text-yellow-800',
+  APPR1REV: 'bg-yellow-100 text-yellow-800',
+  APPR2REV: 'bg-yellow-100 text-yellow-800',
+  APPR3REV: 'bg-yellow-100 text-yellow-800',
+  APPR4REV: 'bg-yellow-100 text-yellow-800',
   PNDREV: 'bg-yellow-100 text-yellow-800',
   REVISD: 'bg-blue-100 text-blue-800',
   INPRG: 'bg-blue-100 text-blue-800',
@@ -594,13 +624,17 @@ export const MAXIMO_STATUS_BADGE_CLASSES: Record<string, string> = {
   CANCEL: 'bg-red-100 text-red-800',
 };
 
-/** Etiquetas en español de los estatus conocidos de Maximo (A2). */
+/**
+ * Etiquetas en español de los estatus conocidos de Maximo (A2). G7
+ * (2026-09-28): provisionales hasta que Alfredo confirme los significados;
+ * APPRn / APPRnREV se resuelven en `maximoStatusLabel`.
+ */
 export const MAXIMO_STATUS_LABELS: Record<string, string> = {
   APPR: 'Aprobada',
   WAPPR: 'En espera de aprobación',
   PNDREV: 'Pendiente de revisión',
   REVISD: 'Revisada',
-  INPRG: 'En progreso',
+  INPRG: 'En proceso',
   COMP: 'Completada',
   CLOSE: 'Cerrada',
   CAN: 'Cancelada',
@@ -615,10 +649,74 @@ export const MAXIMO_STATUS_LABELS: Record<string, string> = {
  */
 export const MAXIMO_NO_STATUS_LABEL = 'Sin estatus en Maximo';
 export const MAXIMO_NO_STATUS_HINT =
-  'La Object Structure de Maximo (AB_CONTRATOS) no expone el estatus de la solicitud sin contrato; pedido a CIISA. Las pendientes (WAPPR/PNDREV) sí cuentan.';
+  'La Object Structure de Maximo (AB_CONTRATOS) no expone el estatus de la solicitud sin contrato; pedido a CIISA. Las pendientes de gestionar no dependen de este estatus: son las solicitudes que todavía no tienen OC.';
+
+const MAXIMO_LEVEL_STATUS = /^APPR(\d+)$/;
+const MAXIMO_LEVEL_REVISION_STATUS = /^APPR(\d+)REV$/;
+
+/** G7: nivel ya aprobado de APPRn / APPRnREV; null para cualquier otro. */
+export function maximoApprovedLevel(status: string | null): number | null {
+  if (!status) return null;
+  const match = MAXIMO_LEVEL_STATUS.exec(status) ?? MAXIMO_LEVEL_REVISION_STATUS.exec(status);
+  return match ? Number(match[1]) : null;
+}
+
+/** G7: WAPPR, APPRn y APPRnREV (cualquier n) = la OC sigue en aprobación. */
+export function isMaximoInApproval(status: string | null): boolean {
+  return status === 'WAPPR' || maximoApprovedLevel(status) !== null;
+}
 
 export function maximoStatusLabel(status: string | null): string {
-  return (status && MAXIMO_STATUS_LABELS[status]) || (status ?? MAXIMO_NO_STATUS_LABEL);
+  if (!status) return MAXIMO_NO_STATUS_LABEL;
+  const known = MAXIMO_STATUS_LABELS[status];
+  if (known) return known;
+  const revision = MAXIMO_LEVEL_REVISION_STATUS.exec(status);
+  if (revision) return `En aprobación · revisión aprobada en nivel ${revision[1]}`;
+  const level = MAXIMO_LEVEL_STATUS.exec(status);
+  if (level) return `En aprobación · nivel ${level[1]} aprobado`;
+  return status;
+}
+
+/** G7: tooltip de un estatus — siempre con el código. */
+export function maximoStatusTitle(status: string | null): string | undefined {
+  if (!status) return undefined;
+  if (status === 'INPRG') {
+    return 'INPRG · la ponen los compradores después de la aprobación; significado exacto por confirmar con Alfredo';
+  }
+  const label = maximoStatusLabel(status);
+  return label === status ? status : `${status} · ${label}`;
+}
+
+/** Clave sintética del grupo "En aprobación" en los pies (G7). */
+export const MAXIMO_IN_APPROVAL_KEY = 'EN_APROBACION';
+
+/**
+ * G7: junta WAPPR, APPRn y APPRnREV en un solo segmento "En aprobación"
+ * (con sus códigos, para navegar a la tabla con todos ellos).
+ */
+export function groupMaximoStatusCounts<T extends { status: string | null; count: number }>(
+  rows: T[],
+): Array<{ status: string | null; count: number; codes: string[] }> {
+  const out: Array<{ status: string | null; count: number; codes: string[] }> = [];
+  let inApproval: { status: string; count: number; codes: string[] } | null = null;
+  for (const row of rows) {
+    if (row.status && isMaximoInApproval(row.status)) {
+      if (!inApproval) {
+        inApproval = { status: MAXIMO_IN_APPROVAL_KEY, count: 0, codes: [] };
+        out.push(inApproval);
+      }
+      inApproval.count += row.count;
+      inApproval.codes.push(row.status);
+      continue;
+    }
+    out.push({ status: row.status, count: row.count, codes: row.status ? [row.status] : [] });
+  }
+  return out;
+}
+
+/** Etiqueta de los pies: el grupo sintético se llama "En aprobación". */
+export function maximoGroupLabel(status: string | null): string {
+  return status === MAXIMO_IN_APPROVAL_KEY ? 'En aprobación' : maximoStatusLabel(status);
 }
 
 /** Colores de gráfica por estatus (mismo criterio que los badges). */
@@ -626,6 +724,7 @@ export const MAXIMO_STATUS_CHART_COLORS: Record<string, string> = {
   APPR: '#52AF32',
   COMP: '#2f7d1c',
   WAPPR: '#f59e0b',
+  EN_APROBACION: '#f59e0b',
   PNDREV: '#DFA922',
   REVISD: '#3b82f6',
   INPRG: '#222D59',
@@ -928,6 +1027,10 @@ export interface ExpeditingItem {
   /** D1: OC de SAP que nació en Maximo (se muestra una sola vez, con este badge). */
   maximo_ponum: string | null;
   supplier: { id: string | null; legal_name: string; email: string | null } | null;
+  /** G1 (2026-09-28): código del proveedor (SAP o efectivo de Maximo). */
+  supplier_code?: string | null;
+  /** G1: "en Maximo: …" cuando Maximo nombra distinto al proveedor. */
+  supplier_note?: string | null;
   buyer: { id: string; full_name: string | null; email: string } | null;
   /**
    * E4 (2026-09-25): comprador a mostrar. ABENT: el de la OC; Maximo:
@@ -1297,23 +1400,41 @@ export interface DashboardSourceOrders {
   count: number;
   monto_por_moneda: CurrencyAmount[];
 }
+/**
+ * G2 (2026-09-28): días de gestión de un sistema = de que se crea la RQ a
+ * que se crea la OC. null = sin base ("No disponible", nunca 0).
+ */
+export interface GestionStats {
+  promedio_dias: number | null;
+  mediana_dias: number | null;
+  /** OC con solicitud que entran al cálculo (N). */
+  total: number;
+  descartadas?: number;
+  /** Maximo: OC sin solicitud (fuera del promedio). */
+  sin_solicitud?: number;
+  definicion?: string;
+}
+/** G3: RQ sin OC; Maximo null = sin fechas de PR para ubicar el periodo. */
+export interface DashboardPendingSource {
+  total: number;
+  pendientes: number | null;
+  pendientes_sin_limite: number;
+}
 export interface DashboardSummary {
   /** D4: año aplicado (null = todo). */
   anio: number | null;
   solicitudes: {
     total: number;
     pendientes: number;
-    por_fuente: { sap: DashboardSourceCount; maximo: DashboardSourceCount; abent: DashboardSourceCount };
+    por_fuente: { sap: DashboardPendingSource; maximo: DashboardPendingSource; abent: DashboardSourceCount };
+    /** G3: periodo de los pendientes (año elegido o últimos 12 meses). */
+    pendientes_periodo: { desde: string; hasta: string | null };
   };
+  /** G2: una definición por sistema. */
   dias_gestion: {
-    sap_solicitudes: number | null;
-    sap_ordenes: number | null;
-    maximo_ordenes: number | null;
-    abent_requisiciones: number | null;
-  };
-  /** D3: base del promedio de SAP OC (N visible). */
-  dias_gestion_base: {
-    sap_ordenes: { total: number; descartadas: number; definicion: string };
+    sap: GestionStats;
+    maximo: GestionStats;
+    abent: number | null;
   };
   ordenes: {
     total: number;

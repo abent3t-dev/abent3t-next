@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import UserRolesModal from '@/components/auth/UserRolesModal';
 import ErpAliasesSection from '@/components/compras/ErpAliasesSection';
 import type { UserProfile, UserRole } from '@/types/auth';
@@ -74,15 +75,29 @@ export default function ComprasRolesPage() {
   const [page, setPage] = useState(1);
   const [rolesUser, setRolesUser] = useState<ManagedUser | null>(null);
 
+  // G4: el input responde al instante; la consulta sale cuando se deja de
+  // teclear (el servidor busca sin acentos y por palabras en todos los
+  // perfiles activos, no solo en la página visible).
+  const debouncedSearch = useDebouncedValue(search.trim(), 300);
+  // Término nuevo (ya con debounce) → página 1. Ajuste durante el render
+  // (patrón de React para reiniciar estado cuando cambia un valor), sin efecto.
+  const [pageTerm, setPageTerm] = useState(debouncedSearch);
+  if (pageTerm !== debouncedSearch) {
+    setPageTerm(debouncedSearch);
+    setPage(1);
+  }
+
   const queryParams = new URLSearchParams();
   queryParams.set('page', String(page));
   queryParams.set('limit', String(PAGE_SIZE));
-  if (search) queryParams.set('search', search);
+  if (debouncedSearch) queryParams.set('search', debouncedSearch);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['compras-roles-users', search, page],
+  const { data, isLoading, isPlaceholderData } = useQuery({
+    queryKey: ['compras-roles-users', debouncedSearch, page],
     queryFn: () =>
       api.get<PaginatedResponse>(`/compras/usuarios/gestion?${queryParams.toString()}`),
+    // La tabla anterior se queda en pantalla mientras llega la nueva
+    placeholderData: keepPreviousData,
   });
 
   const users = data?.data ?? [];
@@ -114,18 +129,19 @@ export default function ComprasRolesPage() {
           <input
             type="text"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Buscar por nombre o email..."
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nombre o correo (sin importar acentos)..."
+            aria-label="Buscar usuarios por nombre o correo"
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
           />
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      {/* Table (atenuada mientras llega el resultado de la búsqueda nueva) */}
+      <div
+        aria-busy={isPlaceholderData}
+        className={`bg-white rounded-lg shadow overflow-hidden transition-opacity ${isPlaceholderData ? 'opacity-60' : ''}`}
+      >
         {isLoading ? (
           <div className="p-8 text-center">
             <div className="w-8 h-8 border-4 border-[#52AF32] border-t-transparent rounded-full animate-spin mx-auto" />

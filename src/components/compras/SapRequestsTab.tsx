@@ -18,6 +18,7 @@ import {
 } from '@/types/purchases';
 import SapDocDetailModal from './SapDocDetailModal';
 import ResultChips from './ResultChips';
+import LinkedFilterChips, { periodText } from './LinkedFilterChips';
 import StatusMultiSelect from './StatusMultiSelect';
 import ExportExcelButton from './ExportExcelButton';
 import {
@@ -75,19 +76,29 @@ const formatDate = (date: string | null) =>
 export default function SapRequestsTab({
   initialStatus = [],
   year = null,
+  pendingFrom = null,
 }: {
   initialStatus?: string[];
   /** D4 (2026-09-23): año de doc_date (viene del dashboard). */
   year?: number | null;
+  /** G3 (2026-09-28): solo las que no tienen OC, creadas desde esta fecha ('' = sin fecha). */
+  pendingFrom?: string | null;
 }) {
   const { hasRole } = useAuth();
   const [search, setSearch] = useState('');
   const [statuses, setStatuses] = useState<string[]>(initialStatus);
   const [page, setPage] = useState(1);
   const [detailDocEntry, setDetailDocEntry] = useState<number | null>(null);
+  const [pending, setPending] = useState(pendingFrom);
   const cf = useColumnFilters('sapPr', () => setPage(1));
 
-  const baseQuery = { search, status: statuses, year: year ?? undefined };
+  const baseQuery = {
+    search,
+    status: statuses,
+    year: year ?? undefined,
+    sin_oc: pending !== null ? 'true' : undefined,
+    from: pending || undefined,
+  };
   const filterQs = toQuery({ ...baseQuery, ...cf.params });
   const listQs = toQuery({ page, limit: PAGE_SIZE, ...baseQuery, ...cf.params });
 
@@ -111,7 +122,7 @@ export default function SapRequestsTab({
 
   const requests = data?.data ?? [];
   const meta = data?.meta;
-  const hasFilters = !!search || statuses.length > 0 || !!year || cf.activeCount > 0;
+  const hasFilters = !!search || statuses.length > 0 || !!year || pending !== null || cf.activeCount > 0;
   const canSeeIntegrations = hasRole(...PURCHASE_ADMIN_ROLES, 'executive');
   const summary = summaryQ.data?.purchaseRequests;
   const chips = SAP_STATUS_OPTIONS.map((opt) => ({
@@ -154,6 +165,21 @@ export default function SapRequestsTab({
           activeStatuses={statuses}
           onToggleStatus={toggleStatus}
           loading={isLoading}
+        />
+        <LinkedFilterChips
+          filters={
+            pending !== null
+              ? [
+                  {
+                    key: 'sin_oc',
+                    label: 'Pendientes de gestionar',
+                    value: `sin OC${pending ? `, creadas ${periodText(pending)}` : year ? `, creadas en ${year}` : ''}`,
+                    title: 'Solicitudes de pedido abiertas que ninguna OC no cancelada usa como base: todavía no tienen OC',
+                    onClear: () => { setPending(null); setPage(1); },
+                  },
+                ]
+              : []
+          }
         />
         <ActiveColumnFilters cf={cf} columns={COLUMNS} />
       </div>

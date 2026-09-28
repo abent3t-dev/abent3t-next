@@ -106,11 +106,14 @@ function SolicitudesPageInner({
   initialStatus,
   initialMaximoStatus,
   initialYear,
+  pendingFrom,
 }: {
   initialTab: RequestsTab | null;
   initialStatus: string[];
   initialMaximoStatus: string[];
   initialYear: number | null;
+  /** G3: "pendientes de gestionar" (sin OC) desde la tarjeta del dashboard; '' = sin fecha (con año). */
+  pendingFrom: string | null;
 }) {
   const { hasRole } = useAuth();
   const canCreate = hasRole(...CREATOR_ROLES) && SHOW_INTERNAL_REQUISITIONS;
@@ -205,12 +208,17 @@ function SolicitudesPageInner({
       </div>
 
       {activeTab === 'sap_pr' && (
-        <SapRequestsTab initialStatus={initialTab === 'sap_pr' ? initialStatus : []} year={initialYear} />
+        <SapRequestsTab
+          initialStatus={initialTab === 'sap_pr' ? initialStatus : []}
+          year={initialYear}
+          pendingFrom={pendingFrom}
+        />
       )}
       {activeTab === 'maximo_pr' && (
         <MaximoRequestsTab
           initialStatus={initialTab === 'maximo_pr' ? initialStatus : initialMaximoStatus}
           year={initialYear}
+          pendingFrom={pendingFrom}
         />
       )}
 
@@ -421,13 +429,18 @@ function SolicitudesFromUrl() {
   const initialMaximoStatus = (params.get('maximo_status') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   const yearParam = Number(params.get('year'));
   const initialYear = Number.isInteger(yearParam) && yearParam > 2000 ? yearParam : null;
+  // G3: tarjeta "Pendientes de gestionar" → solicitudes sin OC del periodo
+  const desde = params.get('desde') ?? '';
+  const pendingFrom =
+    params.get('sin_oc') === 'true' ? (/^\d{4}-\d{2}-\d{2}$/.test(desde) ? desde : '') : null;
   return (
     <SolicitudesPageInner
-      key={`${initialTab ?? ''}|${initialStatus.join(',')}|${initialMaximoStatus.join(',')}|${initialYear ?? ''}`}
+      key={`${initialTab ?? ''}|${initialStatus.join(',')}|${initialMaximoStatus.join(',')}|${initialYear ?? ''}|${pendingFrom ?? ''}`}
       initialTab={initialTab}
       initialStatus={initialStatus}
       initialMaximoStatus={initialMaximoStatus}
       initialYear={initialYear}
+      pendingFrom={pendingFrom}
     />
   );
 }

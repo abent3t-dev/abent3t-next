@@ -14,16 +14,19 @@ import {
   ApprovalStats,
   ApprovalTimesReport,
   DashboardSummary,
+  GestionStats,
+  groupMaximoStatusCounts,
   MAXIMO_NO_STATUS_HINT,
   MAXIMO_RUN_STATUS_LABELS,
   MAXIMO_STATUS_CHART_COLORS,
   MaximoSummary,
-  maximoStatusLabel,
+  maximoGroupLabel,
   SAP_STATUS_CHART_COLORS,
   SapSummary,
   sapStatusLabel,
   statusChartColors,
 } from '@/types/purchases';
+import { periodText } from '@/components/compras/LinkedFilterChips';
 
 /**
  * Sprint 2026-09-22 (A1/A2/A3) — Dashboard de Compras con las TRES fuentes
@@ -42,6 +45,14 @@ import {
  *  - D2: "Sin estatus en Maximo" explicado en el pie de solicitudes Maximo.
  *  - D7: el bloque del flujo propio solo se muestra si hay niveles con
  *    persona asignada (o si la captura propia está activa).
+ *
+ * Reunión con Ingrid 2026-09-28:
+ *  - G2: "Días de gestión" = UN número por sistema (de la solicitud a la OC)
+ *    con mediana y N; salen "SAP solicitudes" y el tiempo de aprobación de
+ *    Maximo (vive en Aprobaciones/Reportes).
+ *  - G3: "Pendientes de gestionar" = solicitudes sin OC (año o 12 meses) y
+ *    navega a esas mismas solicitudes.
+ *  - G7: WAPPR / APPRn / APPRnREV de Maximo se juntan como "En aprobación".
  */
 
 const Icons = {
@@ -67,7 +78,7 @@ const Icons = {
   ),
 };
 
-type SourceKpi = { total?: number; count?: number; pendientes?: number };
+type SourceKpi = { total?: number; count?: number; pendientes?: number | null };
 
 function KpiCard({
   label,
@@ -138,10 +149,11 @@ function StatusPie({
   nullHint,
 }: {
   title: string;
-  data: Array<{ status: string | null; count: number }>;
+  data: Array<{ status: string | null; count: number; codes?: string[] }>;
   labelOf: (s: string | null) => string;
   colorOf: Record<string, string>;
-  onSlice: (status: string | null) => void;
+  /** G7: `codes` = estatus reales detrás de un segmento agrupado. */
+  onSlice: (status: string | null, codes?: string[]) => void;
   emptyText: string;
   /** "órdenes" / "solicitudes": texto del centro y de la ayuda. */
   noun: string;
@@ -151,7 +163,7 @@ function StatusPie({
   const rows = data
     .filter((d) => d.count > 0)
     .sort((a, b) => b.count - a.count)
-    .map((d) => ({ key: d.status ?? 'sin_estatus', name: labelOf(d.status), value: d.count, status: d.status }));
+    .map((d) => ({ key: d.status ?? 'sin_estatus', name: labelOf(d.status), value: d.count, status: d.status, codes: d.codes }));
   const total = rows.reduce((s, r) => s + r.value, 0);
   const colors = statusChartColors(
     rows.map((r) => r.status),
@@ -175,7 +187,10 @@ function StatusPie({
             colors={colors}
             height={240}
             centerCaption={noun}
-            onSliceClick={(entry) => onSlice((entry as { status: string | null }).status)}
+            onSliceClick={(entry) => {
+              const slice = entry as { status: string | null; codes?: string[] };
+              onSlice(slice.status, slice.codes);
+            }}
           />
           <p className="mt-2 text-xs text-gray-600 text-center">
             Clic en un estatus para ver esas {noun} en su tabla
@@ -191,12 +206,58 @@ function StatusPie({
   );
 }
 
+const kpiNumber = (v: number | null | undefined) =>
+  v === null ? NO_DISPONIBLE : (v ?? 0).toLocaleString('es-MX');
+
 const fuente = (
   s: { sap: SourceKpi; maximo: SourceKpi; abent: SourceKpi },
   key: 'total' | 'count' | 'pendientes',
 ) =>
-  `SAP ${(s.sap[key] ?? 0).toLocaleString('es-MX')} · Maximo ${(s.maximo[key] ?? 0).toLocaleString('es-MX')}` +
-  (SHOW_INTERNAL_REQUISITIONS || (s.abent[key] ?? 0) > 0 ? ` · ABENT ${(s.abent[key] ?? 0).toLocaleString('es-MX')}` : '');
+  `SAP ${kpiNumber(s.sap[key])} · Maximo ${kpiNumber(s.maximo[key])}` +
+  (SHOW_INTERNAL_REQUISITIONS || (s.abent[key] ?? 0) > 0 ? ` · ABENT ${kpiNumber(s.abent[key])}` : '');
+
+const GESTION_HINT =
+  'Días naturales desde que se crea la solicitud hasta que se crea la orden de compra (la fecha de la OC cierra la gestión). ' +
+  'SAP: fecha de la solicitud de pedido (la más antigua, si hay varias) → fecha de la OC; solo OC que nacieron de una solicitud. ' +
+  'Maximo: fecha de creación de la solicitud (PR) → fecha de la OC en Maximo; solo OC con PR. ' +
+  'La mediana es el caso típico: las OC capturadas meses después suben el promedio. Con año, cuentan las OC creadas ese año.';
+
+/** G2: un número por sistema (promedio y mediana) con su N. */
+function GestionCard({ rows }: { rows: Array<{ label: string; stats: GestionStats | null; abent?: number | null }> }) {
+  return (
+    <div className="bg-white p-4 rounded-lg shadow border-l-4 border-[#DFA922]" title={GESTION_HINT}>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm text-gray-600">
+          Días de gestión (solicitud → OC)
+          <span className="ml-1 text-gray-400 cursor-help" aria-label="Definición">ⓘ</span>
+        </p>
+        <div className="text-[#DFA922] shrink-0">{Icons.clock}</div>
+      </div>
+      <ul className="mt-1 space-y-2">
+        {rows.map(({ label, stats, abent }) => {
+          const promedio = stats ? stats.promedio_dias : (abent ?? null);
+          return (
+            <li key={label}>
+              <p className="flex items-baseline gap-2">
+                <span className="w-16 shrink-0 text-sm font-medium text-gray-700">{label}</span>
+                <span className="text-xl font-bold text-[#424846] tabular-nums">
+                  {promedio === null ? NO_DISPONIBLE : formatDays(promedio)}
+                </span>
+              </p>
+              {stats && (
+                <p className="pl-[4.5rem] -mt-0.5 text-xs text-gray-600 tabular-nums">
+                  {stats.total === 0
+                    ? 'sin OC con solicitud'
+                    : `mediana ${formatDays(stats.mediana_dias)} · ${stats.total.toLocaleString('es-MX')} OC con solicitud`}
+                </p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
 
 const monthYear = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' }) : null;
@@ -238,32 +299,37 @@ export default function ComprasDashboardPage() {
 
   const goSapOrders = (status: string | null) =>
     router.push(`/compras/ordenes?tab=sap_po${status ? `&status=${status}` : ''}${yearParam}`);
+  // G7: el segmento "En aprobación" lleva todos sus estatus reales
+  const goMaximoOrders = (status: string | null, codes?: string[]) => {
+    const list = codes && codes.length > 0 ? codes.join(',') : status;
+    router.push(`/compras/ordenes?tab=maximo_po${list ? `&status=${list}` : ''}${yearParam}`);
+  };
   const goSapRequests = (status: string | null) =>
     router.push(`/compras/solicitudes?tab=sap_pr${status ? `&status=${status}` : ''}${yearParam}`);
-  const goMaximoOrders = (status: string | null) =>
-    router.push(`/compras/ordenes?tab=maximo_po${status ? `&status=${status}` : ''}${yearParam}`);
-  const goMaximoRequests = (status: string | null) =>
-    router.push(`/compras/solicitudes?tab=maximo_pr${status ? `&status=${status}` : ''}${yearParam}`);
-  // D4: pendientes = SAP abiertas + Maximo WAPPR/PNDREV (cada pestaña con su filtro)
+  const goMaximoRequests = (status: string | null, codes?: string[]) => {
+    const list = codes && codes.length > 0 ? codes.join(',') : status;
+    router.push(`/compras/solicitudes?tab=maximo_pr${list ? `&status=${list}` : ''}${yearParam}`);
+  };
+  // G3: pendientes = solicitudes sin OC del periodo (cada pestaña con su filtro)
+  const pendingPeriod = summary?.solicitudes.pendientes_periodo;
   const goPending = () =>
-    router.push(`/compras/solicitudes?tab=sap_pr&status=open&maximo_status=WAPPR,PNDREV${yearParam}`);
+    router.push(
+      `/compras/solicitudes?tab=sap_pr&status=open&sin_oc=true` +
+        (year ? yearParam : pendingPeriod ? `&desde=${pendingPeriod.desde}` : ''),
+    );
 
-  const diasGestion: Array<[string, number | null]> = summary
+  const gestionRows: Array<{ label: string; stats: GestionStats | null; abent?: number | null }> = summary
     ? [
-        ['SAP solicitudes', summary.dias_gestion.sap_solicitudes],
-        ['SAP OC', summary.dias_gestion.sap_ordenes],
-        ['Maximo OC', summary.dias_gestion.maximo_ordenes],
-        ...(SHOW_INTERNAL_REQUISITIONS || summary.dias_gestion.abent_requisiciones !== null
-          ? ([['ABENT', summary.dias_gestion.abent_requisiciones]] as Array<[string, number | null]>)
+        { label: 'SAP', stats: summary.dias_gestion.sap },
+        { label: 'Maximo', stats: summary.dias_gestion.maximo },
+        ...(SHOW_INTERNAL_REQUISITIONS || summary.dias_gestion.abent !== null
+          ? [{ label: 'ABENT', stats: null, abent: summary.dias_gestion.abent }]
           : []),
       ]
     : [];
-  const diasConBase = diasGestion.filter(([, v]) => v !== null);
-  const diasPromedio =
-    diasConBase.length === 0
-      ? null
-      : Math.round((diasConBase.reduce((s, [, v]) => s + (v as number), 0) / diasConBase.length) * 10) / 10;
-  const sapOcBase = summary?.dias_gestion_base.sap_ordenes;
+  const sinLimite = summary
+    ? `Sin límite de fecha: SAP ${summary.solicitudes.por_fuente.sap.pendientes_sin_limite.toLocaleString('es-MX')} · Maximo ${summary.solicitudes.por_fuente.maximo.pendientes_sin_limite.toLocaleString('es-MX')}.`
+    : '';
   const migradas = summary?.ordenes.migradas;
   // D7: el flujo propio se muestra si hay alguien asignado en algún nivel
   const showAbentLevels =
@@ -327,25 +393,23 @@ export default function ComprasDashboardPage() {
           <KpiCard
             label="Pendientes de gestionar"
             value={summary.solicitudes.pendientes.toLocaleString('es-MX')}
-            sub={fuente(summary.solicitudes.por_fuente, 'pendientes')}
-            hint="SAP: solicitudes abiertas no canceladas. Maximo: PR en espera de aprobación (WAPPR) o pendientes de revisión (PNDREV)."
+            sub={
+              `${fuente(summary.solicitudes.por_fuente, 'pendientes')} · ` +
+              (year ? `creadas en ${year}` : `creadas ${periodText(pendingPeriod?.desde)}`)
+            }
+            hint={
+              'Solicitudes creadas que todavía no tienen orden de compra (la gestión termina cuando nace la OC). ' +
+              'SAP: solicitudes de pedido abiertas que ninguna OC usa como base. ' +
+              'Maximo: PR sin contrato cuyo número no aparece en ninguna OC vigente; Maximo no da la fecha de esas PR, así que el periodo se ubica por su folio (se numeran en orden). ' +
+              (year ? `Creadas en ${year}. ` : 'Solo las de los últimos 12 meses, para no contar solicitudes históricas que nunca se cerraron. ') +
+              sinLimite
+            }
             icon={Icons.clock}
             border="border-yellow-500"
             color="text-yellow-500"
             onClick={goPending}
           />
-          <KpiCard
-            label="Días promedio de gestión"
-            value={diasPromedio === null ? NO_DISPONIBLE : formatDays(diasPromedio)}
-            lines={diasGestion.map(([k, v]) =>
-              `${k}: ${v === null ? 'sin datos' : formatDays(v)}` +
-              (k === 'SAP OC' && sapOcBase && v !== null ? ` (promedio de ${sapOcBase.total.toLocaleString('es-MX')} OC con solicitud de pedido)` : ''),
-            )}
-            hint="SAP OC: de la fecha de la solicitud de pedido (liberada) a la fecha de la orden de compra; solo OC que nacieron de una solicitud. SAP solicitudes: fecha de cierre − fecha del documento, de las cerradas. Maximo: aprobación − primer WAPPR de las OC aprobadas. Promedio simple de las fuentes con datos; 'sin datos' = no hay base para calcularlo."
-            icon={Icons.clock}
-            border="border-[#DFA922]"
-            color="text-[#DFA922]"
-          />
+          <GestionCard rows={gestionRows} />
           <KpiCard
             label="Órdenes de compra"
             value={summary.ordenes.total.toLocaleString('es-MX')}
@@ -407,8 +471,8 @@ export default function ComprasDashboardPage() {
         />
         <StatusPie
           title={`Órdenes de compra Maximo — por estatus${year ? ` (${year})` : ''}`}
-          data={maximo?.purchaseOrders.byStatus ?? []}
-          labelOf={maximoStatusLabel}
+          data={groupMaximoStatusCounts(maximo?.purchaseOrders.byStatus ?? [])}
+          labelOf={maximoGroupLabel}
           colorOf={MAXIMO_STATUS_CHART_COLORS}
           onSlice={goMaximoOrders}
           noun="órdenes"
@@ -416,8 +480,8 @@ export default function ComprasDashboardPage() {
         />
         <StatusPie
           title={`Solicitudes / contratos Maximo — por estatus${year ? ` (${year})` : ''}`}
-          data={maximo?.contracts.byStatus ?? []}
-          labelOf={maximoStatusLabel}
+          data={groupMaximoStatusCounts(maximo?.contracts.byStatus ?? [])}
+          labelOf={maximoGroupLabel}
           colorOf={MAXIMO_STATUS_CHART_COLORS}
           onSlice={goMaximoRequests}
           noun="solicitudes"
@@ -467,9 +531,13 @@ export default function ComprasDashboardPage() {
                   <li key={l}>{l}</li>
                 ))}
               </ul>
-              <p className="mt-2 text-xs text-gray-500">
-                Días promedio de gestión: {formatDays(sap.purchaseRequests.diasPromedioGestion)}
-              </p>
+              {/* G2: la misma gestión de la tarjeta (solicitud → OC), no el cierre del documento */}
+              {summary && (
+                <p className="mt-2 text-xs text-gray-500" title={summary.dias_gestion.sap.definicion}>
+                  Días de gestión (solicitud → OC): {formatDays(summary.dias_gestion.sap.promedio_dias)}
+                  {summary.dias_gestion.sap.mediana_dias !== null && ` · mediana ${formatDays(summary.dias_gestion.sap.mediana_dias)}`}
+                </p>
+              )}
             </div>
             <div>
               <p className="text-sm text-gray-500">Cola de autorización</p>

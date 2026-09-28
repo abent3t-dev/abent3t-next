@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { formatAmountLines, formatCurrencyAmount, formatDays, NO_DISPONIBLE } from '@/lib/compras-format';
@@ -11,8 +12,10 @@ import {
   ApprovalStats,
   ApprovalTimesReport,
   CurrencyAmount,
+  groupMaximoStatusCounts,
   MAXIMO_STATUS_CHART_COLORS,
   MaximoSummary,
+  maximoGroupLabel,
   maximoStatusLabel,
   SAP_STATUS_CHART_COLORS,
   sapStatusLabel,
@@ -28,6 +31,13 @@ import {
  *
  * 2026-09-23 (Ingrid): periodo "Semana" (lunes a domingo, con navegación y
  * comparación contra la semana anterior) y descarga del reporte en Excel.
+ *
+ * Reunión con Ingrid 2026-09-28: G1 tops de proveedores con código; el de
+ * Maximo por proveedor EFECTIVO ("en Maximo: …" cuando su maestro lo nombra
+ * distinto), top SAP + Maximo contado una vez, barras clicables a Órdenes
+ * (pestaña, proveedor, periodo y moneda) y la lista "nombres distintos" para
+ * Alfredo; G2 días de gestión por sistema con mediana; G3 pendientes de
+ * gestionar = solicitudes sin OC; G7 "En aprobación" agrupado en los pies.
  */
 
 // ── Tipos de las respuestas del backend ────────────────────────────────────
@@ -51,10 +61,13 @@ interface Resumen {
   todas_las_fuentes: {
     solicitudes: {
       creadas: number;
-      abiertas: number;
-      por_fuente: Record<'sap' | 'maximo' | 'abent', { creadas: number; abiertas: number }>;
+      /** G3: solicitudes sin OC (al día de hoy, últimos 12 meses). */
+      pendientes: number;
+      por_fuente: Record<'sap' | 'maximo' | 'abent', { creadas: number; pendientes: number | null }>;
+      pendientes_periodo: { desde: string; hasta: string | null };
     };
-    dias_gestion: { sap: number | null; maximo: number | null; abent: number | null };
+    /** G2: de la solicitud a la OC, OC del periodo. */
+    dias_gestion: { sap: GestionLite; maximo: GestionLite; abent: number | null };
     ordenes: {
       total: number;
       monto_por_moneda: CurrencyAmount[];
@@ -149,6 +162,28 @@ interface MaximoReport {
   contracts: { por_estatus: Array<{ status: string; count: number }> };
 }
 
+interface GestionLite {
+  promedio_dias: number | null;
+  mediana_dias: number | null;
+  total: number;
+}
+
+/** G1: fila de un top de proveedores (por proveedor y moneda). */
+interface VendorTopRow {
+  key: string;
+  sistema: 'sap' | 'maximo';
+  codigo: string | null;
+  proveedor: string;
+  currency: string | null;
+  count: number;
+  monto: number;
+  nota: string | null;
+  por_fuente: {
+    sap: { count: number; monto: number };
+    maximo: { count: number; monto: number };
+  };
+}
+
 // Sprint 2026-09-22 (B2/B3): SAP + Maximo por periodo y tiempos de aprobación
 interface ErpSerie {
   monedas: string[];
@@ -162,13 +197,15 @@ interface ErpReport {
   sap: {
     ordenes: { serie_mensual: ErpSerie; por_estatus: Array<{ status: string | null; count: number }> };
     solicitudes: { serie_mensual: ErpSerie; por_estatus: Array<{ status: string | null; count: number }> };
-    top_proveedores: Array<{ proveedor: string; currency: string | null; count: number; monto: number }>;
+    top_proveedores: VendorTopRow[];
   };
   maximo: {
     ordenes: { serie_mensual: ErpSerie; por_estatus: Array<{ status: string | null; count: number }> };
     contratos: { por_estatus: Array<{ status: string | null; count: number }> };
-    top_proveedores: Array<{ proveedor: string; currency: string | null; count: number; monto: number }>;
+    top_proveedores: VendorTopRow[];
   };
+  /** G1: SAP + Maximo contado una vez, por proveedor efectivo. */
+  combinado: { top_proveedores: VendorTopRow[] };
 }
 type TiemposReport = ApprovalTimesReport;
 
@@ -348,6 +385,94 @@ function porFuente<T>(
   return `SAP ${valor(fuentes.sap).toLocaleString('es-MX')} · Maximo ${valor(fuentes.maximo).toLocaleString('es-MX')} · ABENT ${valor(fuentes.abent).toLocaleString('es-MX')}`;
 }
 
+/**
+ * G1: link a Órdenes con el proveedor, el periodo y la moneda de la barra.
+ * SAP va "contada una vez" (sin las migradas que ya cuenta Maximo, D1).
+ */
+function ordersHref(
+  row: Pick<VendorTopRow, 'key' | 'proveedor' | 'currency'>,
+  source: 'sap' | 'maximo',
+  range: { from: string; to: string },
+): string {
+  const qs = new URLSearchParams({
+    tab: source === 'sap' ? 'sap_po' : 'maximo_po',
+    proveedor: row.key,
+    proveedor_nombre: row.proveedor,
+    from: range.from,
+    to: range.to,
+  });
+  if (source === 'sap') qs.set('contadas_una_vez', '1');
+  if (row.currency) {
+    qs.set(source === 'sap' ? 'sapPo_f' : 'mxPo_f', JSON.stringify({ moneda: { in: [row.currency] } }));
+  }
+  return `/compras/ordenes?${qs.toString()}`;
+}
+
+/** G1: top de proveedores con código, nota "en Maximo" y barras clicables. */
+function VendorTop({
+  rows,
+  color = 'bg-[#52AF32]',
+  range,
+  combined = false,
+}: {
+  rows: VendorTopRow[];
+  color?: string;
+  range: { from: string; to: string };
+  /** Top SAP + Maximo: cada fila liga a las dos pestañas. */
+  combined?: boolean;
+}) {
+  const router = useRouter();
+  if (rows.length === 0) return <Empty />;
+  return (
+    <div className="space-y-2">
+      {rows.map((row) => {
+        const max = Math.max(...rows.filter((r) => r.currency === row.currency).map((r) => r.monto), 1);
+        const pct = Math.round((row.monto / max) * 100);
+        const single: 'sap' | 'maximo' = row.por_fuente.sap.count > 0 ? 'sap' : 'maximo';
+        const go = (source: 'sap' | 'maximo') => router.push(ordersHref(row, source, range));
+        return (
+          <div key={`${row.key}-${row.currency}`} className="flex items-start gap-3">
+            <div className="w-40 lg:w-72 shrink-0 min-w-0 text-sm leading-tight" title={row.nota ?? undefined}>
+              <span className="block truncate text-gray-700">{row.proveedor}</span>
+              <span className="block text-xs text-gray-500">
+                {row.codigo ?? 'sin código'}
+                {row.sistema === 'maximo' && ' · según Maximo'}
+              </span>
+              {row.nota && <span className="block text-xs italic text-amber-700 break-words">{row.nota}</span>}
+              {combined && (
+                <span className="block text-xs">
+                  {row.por_fuente.sap.count > 0 && (
+                    <button type="button" onClick={() => go('sap')} className="text-[#52AF32] hover:underline mr-2">
+                      SAP {row.por_fuente.sap.count}
+                    </button>
+                  )}
+                  {row.por_fuente.maximo.count > 0 && (
+                    <button type="button" onClick={() => go('maximo')} className="text-[#222D59] hover:underline">
+                      Maximo {row.por_fuente.maximo.count}
+                    </button>
+                  )}
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => go(combined ? single : row.por_fuente.maximo.count > 0 ? 'maximo' : 'sap')}
+              className="flex-1 h-4 mt-0.5 bg-gray-100 rounded-full overflow-hidden hover:ring-2 hover:ring-[#52AF32]/40"
+              title="Ver estas órdenes (con el periodo y la moneda aplicados)"
+            >
+              <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
+            </button>
+            <div className="w-28 lg:w-48 lg:whitespace-nowrap text-sm text-right text-gray-700">
+              {formatCurrencyAmount(row.monto, row.currency)} · {row.count}
+            </div>
+          </div>
+        );
+      })}
+      <p className="text-xs text-gray-500">Clic en una barra para ver esas órdenes con el periodo y la moneda aplicados.</p>
+    </div>
+  );
+}
+
 function ErpPie({
   data,
   labelOf,
@@ -500,18 +625,13 @@ export default function ReportesComprasPage() {
     maximoSummaryQ.data?.syncEnabled === false &&
     (maximo?.purchase_orders.por_estatus.length ?? 0) === 0;
 
-  const diasGestion: Array<[string, number | null]> = resumen
-    ? [
-        ['SAP', resumen.todas_las_fuentes.dias_gestion.sap],
-        ['Maximo', resumen.todas_las_fuentes.dias_gestion.maximo],
-        ['ABENT', resumen.todas_las_fuentes.dias_gestion.abent],
-      ]
-    : [];
-  const diasConBase = diasGestion.filter(([, v]) => v !== null) as Array<[string, number]>;
-  const diasPromedio =
-    diasConBase.length === 0
-      ? null
-      : Math.round((diasConBase.reduce((sum, [, v]) => sum + v, 0) / diasConBase.length) * 10) / 10;
+  // G2: una definición por sistema (de la solicitud a la OC), con mediana y N
+  const gestion = resumen?.todas_las_fuentes.dias_gestion;
+  const gestionLine = (label: string, g: GestionLite | undefined) =>
+    !g || g.promedio_dias === null
+      ? `${label}: sin OC con solicitud`
+      : `${label}: ${formatDays(g.promedio_dias)} (mediana ${formatDays(g.mediana_dias)}, ${g.total.toLocaleString('es-MX')} OC)`;
+  const pendientes = resumen?.todas_las_fuentes.solicitudes;
 
   // Captura propia de ABENT: si todo está vacío se muestra un aviso compacto
   // al final en lugar de cuatro tarjetas "Sin datos" arriba.
@@ -611,17 +731,28 @@ export default function ReportesComprasPage() {
           <KpiCard
             label="Solicitudes del periodo"
             value={resumen.todas_las_fuentes.solicitudes.creadas.toLocaleString('es-MX')}
-            lines={[`${resumen.todas_las_fuentes.solicitudes.abiertas.toLocaleString('es-MX')} abiertas hoy`]}
+            lines={[
+              `${resumen.todas_las_fuentes.solicitudes.pendientes.toLocaleString('es-MX')} pendientes de gestionar hoy (sin OC)` +
+                (pendientes?.por_fuente.maximo.pendientes === null ? ' · Maximo no disponible' : ''),
+            ]}
             sub={porFuente(resumen.todas_las_fuentes.solicitudes.por_fuente, (f) => f.creadas)}
             compare={versus(resumen.todas_las_fuentes.solicitudes.creadas, anterior?.solicitudes.creadas)}
-            hint="Solicitudes de pedido de SAP y solicitudes (PR) de Maximo creadas en el periodo, más requisiciones capturadas en ABENT."
+            hint={
+              'Solicitudes de pedido de SAP y solicitudes (PR) de Maximo creadas en el periodo, más requisiciones capturadas en ABENT. ' +
+              'Maximo no da la fecha de las PR sin OC: se ubican por su folio (se numeran en orden). ' +
+              `Pendientes de gestionar = creadas desde ${fechaCorta(pendientes?.pendientes_periodo.desde ?? '')} que todavía no tienen OC.`
+            }
             border="border-blue-500"
           />
           <KpiCard
-            label="Días de gestión (prom.)"
-            value={diasPromedio === null ? NO_DISPONIBLE : formatDays(diasPromedio)}
-            lines={diasGestion.map(([k, v]) => `${k}: ${v === null ? 'sin datos' : formatDays(v)}`)}
-            hint="SAP: de la fecha del documento al cierre, en solicitudes cerradas en el periodo (la gestión de OC — solicitud de pedido → OC — está en Tiempos de aprobación). Maximo: de la solicitud a su aprobación. ABENT: días hábiles de requisiciones cerradas. Promedio simple de las fuentes con datos."
+            label="Días de gestión (solicitud → OC)"
+            value={
+              gestion?.sap.promedio_dias === null || gestion === undefined
+                ? NO_DISPONIBLE
+                : `SAP ${formatDays(gestion.sap.promedio_dias)}`
+            }
+            lines={[gestionLine('SAP', gestion?.sap), gestionLine('Maximo', gestion?.maximo)]}
+            hint="De que se crea la solicitud a que se crea la OC, para las OC creadas en el periodo. SAP: fecha de la solicitud de pedido (la más antigua) → fecha de la OC. Maximo: fecha de creación de la PR → fecha de la OC en Maximo. La mediana es el caso típico: las OC capturadas meses después suben el promedio."
             border="border-yellow-500"
           />
           <KpiCard
@@ -680,22 +811,10 @@ export default function ReportesComprasPage() {
               <ErpMonths serie={erp.sap.ordenes.serie_mensual} />
             </div>
             <div className="lg:col-span-3 space-y-2">
-              <p className="text-sm font-medium text-[#424846]">Top proveedores por monto (OC)</p>
-              {erp.sap.top_proveedores.length === 0 ? (
-                <Empty />
-              ) : (
-                erp.sap.top_proveedores.map((row) => (
-                  <HBar
-                    key={`${row.proveedor}-${row.currency}`}
-                    label={row.proveedor}
-                    value={row.monto}
-                    max={Math.max(...erp.sap.top_proveedores.filter((r) => r.currency === row.currency).map((r) => r.monto), 1)}
-                    display={`${formatCurrencyAmount(row.monto, row.currency)} · ${row.count}`}
-                    labelClassName="w-40 lg:w-72"
-                    displayClassName="w-28 lg:w-48 lg:whitespace-nowrap"
-                  />
-                ))
-              )}
+              <p className="text-sm font-medium text-[#424846]" title="Por proveedor y moneda. Sin las OC migradas desde Maximo que existen allá: esas cuentan en el top de Maximo.">
+                Top proveedores por monto (OC)
+              </p>
+              <VendorTop rows={erp.sap.top_proveedores} range={range} />
             </div>
           </div>
         )}
@@ -710,36 +829,48 @@ export default function ReportesComprasPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div>
               <p className="text-sm font-medium text-[#424846] mb-2">Órdenes por estatus</p>
-              <ErpPie data={erp.maximo.ordenes.por_estatus} labelOf={maximoStatusLabel} colorOf={MAXIMO_STATUS_CHART_COLORS} noun="órdenes" />
+              <ErpPie data={groupMaximoStatusCounts(erp.maximo.ordenes.por_estatus)} labelOf={maximoGroupLabel} colorOf={MAXIMO_STATUS_CHART_COLORS} noun="órdenes" />
             </div>
             <div>
               <p className="text-sm font-medium text-[#424846] mb-2">Solicitudes / contratos por estatus</p>
-              <ErpPie data={erp.maximo.contratos.por_estatus} labelOf={maximoStatusLabel} colorOf={MAXIMO_STATUS_CHART_COLORS} noun="solicitudes" />
+              <ErpPie data={groupMaximoStatusCounts(erp.maximo.contratos.por_estatus)} labelOf={maximoGroupLabel} colorOf={MAXIMO_STATUS_CHART_COLORS} noun="solicitudes" />
             </div>
             <div className="space-y-2">
               <p className="text-sm font-medium text-[#424846]">Órdenes por mes</p>
               <ErpMonths serie={erp.maximo.ordenes.serie_mensual} />
             </div>
             <div className="lg:col-span-3 space-y-2">
-              <p className="text-sm font-medium text-[#424846]">Top proveedores por monto (OC)</p>
-              {erp.maximo.top_proveedores.length === 0 ? (
-                <Empty />
-              ) : (
-                erp.maximo.top_proveedores.map((row) => (
-                  <HBar
-                    key={`${row.proveedor}-${row.currency}`}
-                    label={row.proveedor}
-                    value={row.monto}
-                    max={Math.max(...erp.maximo.top_proveedores.filter((r) => r.currency === row.currency).map((r) => r.monto), 1)}
-                    display={`${formatCurrencyAmount(row.monto, row.currency)} · ${row.count}`}
-                    color="bg-[#222D59]"
-                    labelClassName="w-40 lg:w-72"
-                    displayClassName="w-28 lg:w-48 lg:whitespace-nowrap"
-                  />
-                ))
-              )}
+              <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                <p
+                  className="text-sm font-medium text-[#424846]"
+                  title="Proveedor según SAP cuando la OC ya migró a SAP o cuando las OC migradas de su código de Maximo quedaron a nombre de un proveedor de SAP; si no, el nombre del maestro de Maximo."
+                >
+                  Top proveedores por monto (OC) — proveedor efectivo
+                </p>
+                <ExportExcelButton
+                  path="/maximo/vendor-xref/export"
+                  filename={`proveedores_maximo_vs_sap_${iso(new Date())}.xlsx`}
+                  label="Nombres distintos Maximo vs SAP"
+                  title="Proveedores cuyo nombre en el maestro de Maximo no es el de SAP (por sus OC migradas), para corregirlos en Maximo"
+                />
+              </div>
+              <VendorTop rows={erp.maximo.top_proveedores} range={range} color="bg-[#222D59]" />
             </div>
           </div>
+        )}
+      </Section>
+
+      {/* G1: el top que Ingrid realmente quiere — SAP + Maximo contado una vez */}
+      <Section
+        title="Top proveedores — SAP + Maximo"
+        note="contado una vez: una OC migrada de Maximo a SAP cuenta una sola vez · por moneda"
+      >
+        {erpQ.isError ? (
+          <p className="text-sm text-red-600">No se pudo cargar el reporte de los ERPs.</p>
+        ) : !erp ? (
+          <Empty />
+        ) : (
+          <VendorTop rows={erp.combinado.top_proveedores} range={range} combined color="bg-[#DFA922]" />
         )}
       </Section>
 
