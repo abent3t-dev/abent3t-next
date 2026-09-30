@@ -10,6 +10,7 @@ import { MaximoChainSummary, useCadenaMaximo } from '@/components/compras/Maximo
 import { SHOW_INTERNAL_REQUISITIONS } from '@/lib/features';
 import Link from 'next/link';
 import ExportExcelButton from '@/components/compras/ExportExcelButton';
+import AvanceSemanalCard from '@/components/compras/AvanceSemanalCard';
 import { PieChart } from '@/components/charts/PieChart';
 import {
   ApprovalStats,
@@ -41,6 +42,9 @@ import {
  * (pestaña, proveedor, periodo y moneda) y la lista "nombres distintos" para
  * Alfredo; G2 días de gestión por sistema con mediana; G3 pendientes de
  * gestionar = solicitudes sin OC; G7 "En aprobación" agrupado en los pies.
+ *
+ * 2026-09-29 (H1): "Reporte de avance semanal" en PDF (el de Jorge) de la
+ * semana elegida o la última completa, con su acumulado del año.
  */
 
 // ── Tipos de las respuestas del backend ────────────────────────────────────
@@ -552,6 +556,8 @@ export default function ReportesComprasPage() {
   const periodQs = `from=${range.from}&to=${range.to}`;
   const prevWeek = weekRange(weekOffset - 1);
   const semanaEnCurso = preset === 'semana' && weekOffset === 0;
+  // H1: el PDF es semanal; fuera de "Semana" usa la última completa
+  const avanceLunes = preset === 'semana' ? range.from : weekRange(-1).from;
 
   const resumenQ = useQuery({
     queryKey: ['reportes', 'resumen', periodQs],
@@ -729,6 +735,9 @@ export default function ReportesComprasPage() {
           />
         </div>
       </div>
+
+      {/* H1: reporte de avance semanal (PDF) */}
+      <AvanceSemanalCard lunes={avanceLunes} elegida={preset === 'semana'} />
 
       {/* KPIs cabecera: SAP + Maximo + registros propios */}
       {resumen && (
