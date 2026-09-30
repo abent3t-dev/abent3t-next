@@ -962,6 +962,8 @@ export interface CommitteeApprovalLevel {
   orden: number;
   role: string;
   profile_id: string | null;
+  /** H3: la persona que firma el nivel (null = cualquiera con el rol). */
+  profile: { id: string; full_name: string | null; email: string } | null;
   confirmed: boolean;
   is_active: boolean;
   notes: string | null;

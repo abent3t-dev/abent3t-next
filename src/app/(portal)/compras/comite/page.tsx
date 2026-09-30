@@ -19,11 +19,17 @@ import {
 } from '@/types/purchases';
 import CommitteeModal from '@/components/compras/CommitteeModal';
 import CommitteeReviewModal from '@/components/compras/CommitteeReviewModal';
+import CommitteeChainEditor from '@/components/compras/CommitteeChainEditor';
+import { useComitePendientes } from '@/hooks/useComitePendientes';
 
 /**
  * Fase §16 — Comite de Compras: sesiones con estatus y nivel vigente,
  * filtros, "mis pendientes" para aprobadores, aviso de mapeo sin confirmar
  * (solo PURCHASE_ADMINS) y modales de detalle/revision.
+ *
+ * H3 (2026-09-29): editor de la cadena (PURCHASE_ADMINS) y aviso en la app
+ * de lo que espera mi firma ("Mis pendientes (N)" y el menú) mientras el
+ * correo sigue en simulación.
  */
 
 const PAGE_SIZE = 15;
@@ -49,6 +55,7 @@ export default function ComitePage() {
   const [selected, setSelected] = useState<PurchaseCommittee | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [reviewing, setReviewing] = useState<PurchaseCommittee | null>(null);
+  const [showChain, setShowChain] = useState(false);
 
   const queryParams = new URLSearchParams();
   queryParams.set('page', page.toString());
@@ -65,11 +72,9 @@ export default function ComitePage() {
     enabled: !onlyMine,
   });
 
-  const mineQuery = useQuery({
-    queryKey: ['committees', 'pendientes-me'],
-    queryFn: () => api.get<PurchaseCommittee[]>('/compras/comite/pendientes/me'),
-    enabled: onlyMine && isApprover,
-  });
+  // H3: la misma consulta alimenta el contador del menú
+  const mineQuery = useComitePendientes();
+  const pendingCount = mineQuery.data?.length ?? 0;
 
   // Aviso §20.A.5: niveles sin confirmar (solo lo consultan los admins)
   const levelsQuery = useQuery({
@@ -115,12 +120,72 @@ export default function ComitePage() {
         )}
       </div>
 
+      {/* H3: aviso en la app de lo que espera mi firma (sin correo todavía) */}
+      {isApprover && pendingCount > 0 && !onlyMine && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-900 flex flex-wrap items-center justify-between gap-3">
+          <span>
+            {pendingCount === 1
+              ? 'Tienes 1 comité esperando tu firma.'
+              : `Tienes ${pendingCount} comités esperando tu firma.`}{' '}
+            Por ahora el aviso llega aquí y en el menú (Comité); el correo se activa cuando
+            TI habilite el envío.
+          </span>
+          <button
+            type="button"
+            onClick={() => setOnlyMine(true)}
+            className="px-3 py-1.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+          >
+            Ver mis pendientes
+          </button>
+        </div>
+      )}
+
       {/* Aviso discreto: mapeo pendiente de confirmar (regla 1 de la fase) */}
       {isAdmin && unconfirmed.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
-          La cadena de aprobación tiene {unconfirmed.length}{' '}
-          {unconfirmed.length === 1 ? 'nivel pendiente' : 'niveles pendientes'} de
-          confirmar; mientras tanto, el flujo opera con la asignación propuesta.
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800 flex flex-wrap items-center justify-between gap-3">
+          <span>
+            La cadena de aprobación tiene {unconfirmed.length}{' '}
+            {unconfirmed.length === 1 ? 'nivel pendiente' : 'niveles pendientes'} de
+            confirmar; mientras tanto, el flujo opera con la asignación propuesta.
+          </span>
+          {!showChain && (
+            <button
+              type="button"
+              onClick={() => setShowChain(true)}
+              className="px-3 py-1.5 text-sm font-medium rounded-lg border border-amber-300 bg-white text-amber-900 hover:bg-amber-100"
+            >
+              Revisar la cadena
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* H3: editor de la cadena de aprobación (super_admin y lider_procura) */}
+      {isAdmin && (
+        <div className="bg-white rounded-lg shadow">
+          <button
+            type="button"
+            onClick={() => setShowChain(!showChain)}
+            className="w-full flex items-center justify-between px-5 py-4 text-left"
+            aria-expanded={showChain}
+          >
+            <span>
+              <span className="block text-base font-semibold text-[#424846]">
+                Cadena de aprobación del comité
+              </span>
+              <span className="block text-sm text-gray-500">
+                Quién firma cada nivel, en qué orden, y si ya está confirmado
+              </span>
+            </span>
+            <span className="text-sm font-medium text-[#52AF32]">
+              {showChain ? 'Ocultar' : 'Editar cadena'}
+            </span>
+          </button>
+          {showChain && (
+            <div className="px-5 pb-5">
+              <CommitteeChainEditor />
+            </div>
+          )}
         </div>
       )}
 
@@ -162,7 +227,7 @@ export default function ComitePage() {
                   : 'bg-white text-[#424846] border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              Mis pendientes
+              Mis pendientes{pendingCount > 0 ? ` (${pendingCount})` : ''}
             </button>
           )}
         </div>

@@ -16,15 +16,18 @@ import {
 import { useEffect, useState } from 'react';
 import { Logo } from '@/components/ui/Logo';
 import { useSidebarBadges } from '@/hooks/useSidebarBadges';
+import { useComitePendientes } from '@/hooks/useComitePendientes';
 
 /**
  * Mapea cada ruta del sidebar al nombre de sección que usamos para badges.
  * Si una ruta no tiene entrada aquí, no muestra badge.
  */
-const BADGE_HREF_MAP: Record<string, 'solicitudes' | 'propuestas' | 'evidencias'> = {
+const BADGE_HREF_MAP: Record<string, keyof NavBadges> = {
   '/capacitacion/solicitudes': 'solicitudes',
   '/capacitacion/propuestas': 'propuestas',
   '/capacitacion/evidencias': 'evidencias',
+  // H3: comités esperando mi firma (aviso mientras no haya correo)
+  '/compras/comite': 'comite',
 };
 
 /**
@@ -226,6 +229,7 @@ interface NavBadges {
   solicitudes: number;
   propuestas: number;
   evidencias: number;
+  comite: number;
 }
 
 function getBadgeForItem(item: NavItem, badges: NavBadges): number {
@@ -346,7 +350,9 @@ function NavItemComponent({
 export function Sidebar() {
   const { user, signOut } = useAuth();
   const { isConnected } = useSocket();
-  const badges = useSidebarBadges();
+  const counts = useSidebarBadges();
+  const comite = useComitePendientes();
+  const badges: NavBadges = { ...counts, comite: comite.data?.length ?? 0 };
   const pathname = usePathname();
   const moduleSubtitle = getModuleSubtitle(pathname);
   const badgeRole = user ? getRoleForBadge(user, pathname) : null;

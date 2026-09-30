@@ -23,6 +23,8 @@ export interface ProfileOption {
   id: string;
   full_name: string | null;
   email: string;
+  /** Roles de compras vigentes (los trae la búsqueda de gestión de roles). */
+  purchase_roles?: string[];
 }
 
 interface ProfileComboboxProps {
