@@ -62,7 +62,8 @@ const COLUMNS: ColumnConfigs = {
   estatus: {
     label: 'Estatus',
     type: 'text',
-    format: (v) => CONTRACT_STATUS_LABELS[v as ContractStatus] ?? v,
+    // J2: el vencido histórico (sin avisos) se filtra aparte
+    format: (v) => (v === 'vencido_historico' ? 'Vencido (histórico)' : (CONTRACT_STATUS_LABELS[v as ContractStatus] ?? v)),
   },
   monto: { label: 'Monto', type: 'number' },
   consumido: { label: 'Consumido', type: 'number' },
@@ -319,7 +320,7 @@ function ContratosContent() {
                             <ContractVigencia contract={contract} />
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <ContractStatusBadge status={contract.status} />
+                            <ContractStatusBadge status={contract.status} historico={contract.vencido_historico} />
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900 text-right">
                             {contract.total_amount === null ? (

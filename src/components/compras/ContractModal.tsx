@@ -63,6 +63,8 @@ const EMPTY_FORM = {
   responsible_user_email: '',
   responsible_user_name: '',
   status: 'vigente' as ContractStatus,
+  // J2: solo cuenta si el contrato queda vencido (por defecto, sí)
+  vencido_historico: true,
   notes: '',
 };
 
@@ -152,6 +154,7 @@ function ContractModalBody({
           responsible_user_email: contract.responsible_user_email ?? '',
           responsible_user_name: contract.responsible_user_name ?? '',
           status: contract.status,
+          vencido_historico: contract.vencido_historico,
           notes: contract.notes ?? '',
         }
       : EMPTY_FORM,
@@ -188,6 +191,12 @@ function ContractModalBody({
     ? previewContractNumber(formData.carpeta, formData.doc_kind, formData.doc_kind === 'enmienda' ? docNumber : null)
     : null;
 
+  // J2: vencido = fin ya pasado (o estatus vencido sin fecha de fin)
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const willBeExpired = formData.end_date
+    ? formData.end_date < todayIso && formData.status !== 'renovado' && formData.status !== 'cancelado'
+    : formData.status === 'vencido';
+
   const buildPayload = () => ({
     ...(formData.carpeta.trim()
       ? {
@@ -213,6 +222,8 @@ function ContractModalBody({
     responsible_user_email: formData.responsible_user_email.trim() || undefined,
     responsible_user_name: formData.responsible_user_name.trim() || undefined,
     status: formData.status,
+    // J2: solo se manda si el contrato queda vencido (si no, se apaga solo)
+    ...(willBeExpired ? { vencido_historico: formData.vencido_historico } : {}),
     notes: formData.notes.trim() || undefined,
   });
 
@@ -436,7 +447,7 @@ function ContractModalBody({
             {view ? (
               <>
                 <div className="flex items-center gap-3">
-                  <ContractStatusBadge status={view.status} />
+                  <ContractStatusBadge status={view.status} historico={view.vencido_historico} />
                   <span className="text-sm text-gray-500">
                     {view.document_label ?? CONTRACT_DOC_KIND_LABELS[view.doc_kind]}
                     {view.carpeta ? ` · carpeta ${view.carpeta}` : ''}
@@ -691,6 +702,20 @@ function ContractModalBody({
                   className={inputClass}
                 />
                 <p className="text-xs text-gray-500 mt-1">Vacía = sin fecha de fin (permanente o por servicio): sin alertas</p>
+                {/* J2: el vencido histórico no entra al resumen diario de avisos */}
+                {willBeExpired && (
+                  <label className="mt-2 flex items-start gap-2 text-xs text-gray-700" title="Los contratos que ya estaban vencidos al cargar la base no generan avisos">
+                    <input
+                      type="checkbox"
+                      checked={formData.vencido_historico}
+                      onChange={(e) => setFormData({ ...formData, vencido_historico: e.target.checked })}
+                      className="mt-0.5 rounded border-gray-300 text-[#52AF32] focus:ring-[#52AF32]"
+                    />
+                    <span>
+                      <strong>Vencido histórico:</strong> sin avisos. Desmárcalo si está en renovación para que vuelva al resumen diario.
+                    </span>
+                  </label>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Monto total</label>

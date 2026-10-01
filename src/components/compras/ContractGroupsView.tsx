@@ -145,7 +145,7 @@ export default function ContractGroupsView({
                       <ContractVigencia contract={head} />
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <ContractStatusBadge status={head.status} />
+                      <ContractStatusBadge status={head.status} historico={head.vencido_historico} />
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900 text-right whitespace-nowrap">
                       {head.total_amount === null ? (
@@ -190,7 +190,7 @@ export default function ContractGroupsView({
                                   <ContractVigencia contract={doc} compact />
                                 </td>
                                 <td className="py-1.5 pr-4">
-                                  <ContractStatusBadge status={doc.status} />
+                                  <ContractStatusBadge status={doc.status} historico={doc.vencido_historico} />
                                 </td>
                                 <td className="py-1.5 text-right text-gray-900 whitespace-nowrap">
                                   {doc.total_amount === null ? (

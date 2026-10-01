@@ -926,6 +926,12 @@ export interface Contract {
   responsible_user_email: string | null;
   responsible_user_name: string | null;
   status: ContractStatus;
+  /**
+   * J2 (2026-10-01): vencido antes de la carga de la base real (o dado de
+   * alta ya vencido): sin avisos de vencimiento. Compras lo desmarca si está
+   * en renovación.
+   */
+  vencido_historico: boolean;
   notes: string | null;
   is_active: boolean;
   created_at: string;

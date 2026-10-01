@@ -42,6 +42,10 @@ export const daysToEnd = (endDate: string): number => {
 
 function ExpiryLine({ contract }: { contract: Contract }) {
   if (!contract.end_date) return null;
+  // J2: el vencido histórico no genera avisos
+  if (contract.status === 'vencido' && contract.vencido_historico) {
+    return <p className="mt-1 text-xs text-gray-500">Histórico: sin avisos</p>;
+  }
   const days = daysToEnd(contract.end_date);
   if (contract.status === 'vencido' || days < 0) {
     const ago = Math.abs(days);
