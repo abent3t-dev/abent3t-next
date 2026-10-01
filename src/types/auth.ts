@@ -244,6 +244,8 @@ export const SIDEBAR_NAV: NavItem[] = [
       { label: 'Reportes', href: '/compras/reportes', icon: 'bar-chart', roles: ROLE_PRIORITY },
       // Gestión de roles de Compras (autoservicio del líder de procura)
       { label: 'Roles', href: '/compras/roles', icon: 'shield', roles: PURCHASE_ADMINS },
+      // J1: cola y bitácora de correo (RH también tiene avisos en la cola)
+      { label: 'Correo', href: '/compras/correo', icon: 'mail', roles: [...PURCHASE_ADMINS, 'admin_rh'] },
       // Fase INT-5: estado y corridas del sync Maximo (pagina tecnica)
       { label: 'Integraciones', href: '/compras/integraciones', icon: 'database', roles: [...PURCHASE_ADMINS, 'executive'] },
     ],

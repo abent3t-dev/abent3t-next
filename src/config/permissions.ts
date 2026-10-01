@@ -43,6 +43,8 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
   { path: '/compras/integraciones', roles: ['super_admin', 'lider_procura', 'executive'] },
   // Gestión de roles de Compras (autoservicio): solo líder de procura.
   { path: '/compras/roles', roles: ['super_admin', 'lider_procura'] },
+  // J1: bitácora de correo (mismos roles que el backend)
+  { path: '/compras/correo', roles: ['super_admin', 'lider_procura', 'admin_rh'] },
   { path: '/compras/comite', roles: ROLE_PRIORITY },
   { path: '/compras/dashboard', roles: ROLE_PRIORITY },
   { path: '/compras/solicitudes', roles: ROLE_PRIORITY },

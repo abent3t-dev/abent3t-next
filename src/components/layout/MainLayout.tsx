@@ -1,6 +1,7 @@
 'use client';
 
 import { Sidebar } from './Sidebar';
+import { EmailQueueNotice } from './EmailQueueNotice';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface MainLayoutProps {
@@ -38,6 +39,8 @@ export function MainLayout({ children }: MainLayoutProps) {
       <main className="flex-1 overflow-auto">
         {/* Contenedor con padding y altura completa */}
         <div className="min-h-screen bg-gray-50 p-6 lg:p-8">
+          {/* J1: aviso de correo en pausa o en el tope del día */}
+          <EmailQueueNotice />
           {/* Contenido con fondo blanco y bordes sutiles */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 min-h-[calc(100vh-3rem)] lg:min-h-[calc(100vh-4rem)]">
             {children}
