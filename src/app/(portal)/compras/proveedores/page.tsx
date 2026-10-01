@@ -21,6 +21,10 @@ import { toQuery } from '@/lib/compras-format';
 /**
  * Catálogo de proveedores (SAP + ABENT). E1 (2026-09-25): filtro "tipo
  * Excel" por columna (URL, total y Excel con el mismo filtro).
+ *
+ * I5 (go-live 2026-09-30, "¿ninguno inactivo?"): estado EN SAP (congelado o
+ * no válido = inactivo) con contadores y filtro; "En ABENT" (activo /
+ * bloqueado) es aparte y la baja de la plataforma (`is_active`) no cambia.
  */
 const COLUMNS: ColumnConfigs = {
   proveedor: { label: 'Proveedor', type: 'text' },
@@ -29,11 +33,19 @@ const COLUMNS: ColumnConfigs = {
   moneda: { label: 'Moneda', type: 'text' },
   puntuacion: { label: 'Puntuación', type: 'number' },
   estado: {
-    label: 'Estado',
+    label: 'En ABENT',
     type: 'text',
     format: (v) => (v === 'bloqueado' ? 'Bloqueado' : v === 'activo' ? 'Activo' : v),
   },
+  sap: {
+    label: 'En SAP',
+    type: 'text',
+    format: (v) => (v === 'activo' ? 'Activo en SAP' : v === 'inactivo' ? 'Inactivo en SAP' : v),
+    emptyLabel: '(Capturado en ABENT)',
+  },
 };
+
+type SapState = '' | 'activo' | 'inactivo';
 
 interface PaginatedResponse {
   data: Supplier[];
@@ -105,6 +117,8 @@ function ProveedoresContent() {
   const canManage = hasRole('super_admin', 'lider_procura');
   const [search, setSearch] = useState('');
   const [blockedFilter, setBlockedFilter] = useState<'' | 'true' | 'false'>('');
+  // I5: activos / inactivos en SAP (congelado o no válido)
+  const [sapFilter, setSapFilter] = useState<SapState>('');
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
@@ -112,7 +126,7 @@ function ProveedoresContent() {
 
   // Siempre paginado: con el espejo de SAP el catalogo supera los 800
   // proveedores y la lista completa ya no es renderizable de golpe.
-  const baseQuery = { search, is_blocked: blockedFilter };
+  const baseQuery = { search, is_blocked: blockedFilter, sap_estado: sapFilter };
   const listQs = toQuery({ page, limit: PAGE_SIZE, ...baseQuery, ...cf.params });
   const exportQs = toQuery({ ...baseQuery, ...cf.params });
 
@@ -125,6 +139,16 @@ function ProveedoresContent() {
 
   const suppliers = data?.data ?? [];
   const meta = data?.meta;
+  // I5: "N activos · M inactivos" en SAP (todo el catálogo vigente)
+  const sapCountsQ = useQuery({
+    queryKey: ['suppliers', 'sap-counts'],
+    queryFn: () => api.get<{ activos: number; inactivos: number; sin_sap: number }>('/suppliers/sap-counts'),
+  });
+  const sapCounts = sapCountsQ.data;
+  const pickSap = (value: SapState) => {
+    setSapFilter(sapFilter === value ? '' : value);
+    setPage(1);
+  };
 
   const blockMutation = useMutation({
     mutationFn: (params: { id: string; reason: string }) =>
@@ -212,9 +236,22 @@ function ProveedoresContent() {
             }}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
           >
-            <option value="">Todos</option>
-            <option value="false">Activos</option>
-            <option value="true">Bloqueados</option>
+            <option value="">En ABENT: todos</option>
+            <option value="false">Activos en ABENT</option>
+            <option value="true">Bloqueados en ABENT</option>
+          </select>
+          <select
+            value={sapFilter}
+            onChange={(e) => {
+              setSapFilter(e.target.value as SapState);
+              setPage(1);
+            }}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 bg-white"
+            title="Inactivo en SAP = congelado o no válido en SAP B1"
+          >
+            <option value="">En SAP: todos</option>
+            <option value="activo">Activos en SAP</option>
+            <option value="inactivo">Inactivos en SAP</option>
           </select>
           <ExportExcelButton
             path={`/suppliers/export${exportQs ? `?${exportQs}` : ''}`}
@@ -223,6 +260,30 @@ function ProveedoresContent() {
           />
         </div>
         <div className="mt-3 space-y-3">
+          {sapCounts && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-gray-600">En SAP:</span>
+              <button
+                type="button"
+                onClick={() => pickSap('activo')}
+                className={`px-2.5 py-0.5 rounded-full border text-xs font-medium ${sapFilter === 'activo' ? 'bg-green-600 text-white border-green-600' : 'bg-green-50 text-green-800 border-green-200 hover:bg-green-100'}`}
+                title="Válidos y no congelados en SAP B1"
+              >
+                {sapCounts.activos.toLocaleString('es-MX')} activos
+              </button>
+              <button
+                type="button"
+                onClick={() => pickSap('inactivo')}
+                className={`px-2.5 py-0.5 rounded-full border text-xs font-medium ${sapFilter === 'inactivo' ? 'bg-gray-600 text-white border-gray-600' : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'}`}
+                title="Congelados o no válidos en SAP B1: no se les pueden hacer pedidos hasta que Compras los reactive en SAP"
+              >
+                {sapCounts.inactivos.toLocaleString('es-MX')} inactivos
+              </button>
+              {sapCounts.sin_sap > 0 && (
+                <span className="text-xs text-gray-500">· {sapCounts.sin_sap.toLocaleString('es-MX')} capturados en ABENT</span>
+              )}
+            </div>
+          )}
           <ResultChips filteredTotal={meta?.total} loading={isLoading} />
           <ActiveColumnFilters cf={cf} columns={COLUMNS} />
         </div>
@@ -230,7 +291,7 @@ function ProveedoresContent() {
           <span className="inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded bg-[#222D59]/10 text-[#222D59] mr-1">SAP</span>
           sincronizado desde SAP B1 (datos básicos de solo lectura).{' '}
           <span className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-gray-200 text-gray-600 mx-1">Inactivo en SAP</span>
-          = SAP lo tiene como no válido/congelado: no se le pueden hacer pedidos hasta que Compras lo reactive en SAP. La puntuación y el bloqueo de ABENT son independientes.
+          = SAP lo tiene como no válido o congelado: no se le pueden hacer pedidos hasta que Compras lo reactive en SAP. &quot;En ABENT&quot; (activo o bloqueado) y la puntuación son independientes.
         </p>
       </div>
 
@@ -255,7 +316,8 @@ function ProveedoresContent() {
                 <FilterTh column="contacto" className="px-3 py-3">Contacto</FilterTh>
                 <FilterTh column="moneda" align="center" className="px-3 py-3">Moneda</FilterTh>
                 <FilterTh column="puntuacion" align="center" className="px-3 py-3" title="0 = sin evaluar (no entra en el rango)">Puntuación</FilterTh>
-                <FilterTh column="estado" align="center" className="px-3 py-3">Estado</FilterTh>
+                <FilterTh column="sap" align="center" className="px-3 py-3" title="Inactivo en SAP = congelado o no válido en SAP B1">En SAP</FilterTh>
+                <FilterTh column="estado" align="center" className="px-3 py-3" title="Bloqueo de ABENT (independiente de SAP)">En ABENT</FilterTh>
                 <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Acciones</th>
               </tr>
             </thead>
@@ -272,22 +334,6 @@ function ProveedoresContent() {
                             title={`Sincronizado desde SAP (${supplier.external_id ?? ''})`}
                           >
                             SAP
-                          </span>
-                        )}
-                        {supplier.sap_valid === false && (
-                          <span
-                            className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-gray-200 text-gray-600"
-                            title={SAP_INACTIVE_HINT}
-                          >
-                            Inactivo en SAP
-                          </span>
-                        )}
-                        {supplier.sap_frozen === true && supplier.sap_valid !== false && (
-                          <span
-                            className="inline-flex px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-700"
-                            title={SAP_FROZEN_HINT}
-                          >
-                            Congelado en SAP
                           </span>
                         )}
                       </div>
@@ -320,6 +366,22 @@ function ProveedoresContent() {
                         <span className="text-xs text-gray-500 whitespace-nowrap">Sin evaluar</span>
                       );
                     })()}
+                  </td>
+                  <td className="px-3 py-3 text-center">
+                    {supplier.source !== 'sap' ? (
+                      <span className="text-gray-400" title="Proveedor capturado en ABENT (no viene de SAP)">—</span>
+                    ) : supplier.sap_valid === false || supplier.sap_frozen === true ? (
+                      <span
+                        className="inline-flex px-2.5 py-1 text-xs font-medium rounded-full bg-gray-200 text-gray-700 whitespace-nowrap"
+                        title={supplier.sap_valid === false ? SAP_INACTIVE_HINT : SAP_FROZEN_HINT}
+                      >
+                        Inactivo en SAP
+                      </span>
+                    ) : (
+                      <span className="inline-flex px-2.5 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 whitespace-nowrap">
+                        Activo en SAP
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-3 text-center">
                     <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${
@@ -366,7 +428,7 @@ function ProveedoresContent() {
               ))}
               {suppliers.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                     No hay proveedores que coincidan con los filtros
                   </td>
                 </tr>
