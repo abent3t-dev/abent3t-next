@@ -10,10 +10,12 @@ import {
   DELIVERY_STATUS_CLASSES,
   DELIVERY_STATUS_LABELS,
   DeliveryStatus,
+  ERP_CLOSED_BY_LABELS,
   EXPEDITING_SOURCE_LABELS,
   ExpeditingItem,
   ExpeditingSource,
   buyerLabel,
+  maximoStatusText,
 } from '@/types/purchases';
 import ExpeditingModal from '@/components/compras/ExpeditingModal';
 import ExportExcelButton from '@/components/compras/ExportExcelButton';
@@ -41,6 +43,11 @@ import { toQuery } from '@/lib/compras-format';
  * ("1,473 días de retraso" / "faltan N días") y retraso promedio por
  * fuente; E4 nombre del comprador ("Capturó: …" en las OC de SAP, que no
  * traen comprador).
+ *
+ * Go-live 2026-09-30: I1 una OC cerrada o cancelada en Maximo o en SAP ya no
+ * es entrega pendiente (badge "Cerrada en Maximo"…; el estatus de Maximo en
+ * el tooltip) y el export para depurarlas en SAP; I2 "PO Maximo" y "OC SAP"
+ * en columnas propias, y la búsqueda por cualquiera de los dos números.
  */
 
 const PAGE_SIZE = 15;
@@ -55,6 +62,8 @@ interface ExpeditingStats {
   /** E3: días de retraso promedio de las retrasadas (null = ninguna). */
   avg_delay_days: number | null;
   avg_delay_by_source?: Record<ExpeditingSource, number | null>;
+  /** I1a: abiertas en SAP que ya están cerradas o canceladas en Maximo. */
+  closed_in_maximo?: number;
 }
 
 const ORIGIN_LABELS: Record<string, string> = {
@@ -65,7 +74,9 @@ const ORIGIN_LABELS: Record<string, string> = {
 };
 
 const COLUMNS: ColumnConfigs = {
-  po: { label: 'PO', type: 'text' },
+  // I2: los dos números; la OC propia de ABENT va en la columna de la OC
+  po_maximo: { label: 'PO Maximo', type: 'text', emptyLabel: '(Sin PO de Maximo)' },
+  oc_sap: { label: 'OC SAP', type: 'text', emptyLabel: '(Sin OC de SAP)' },
   origen: { label: 'Origen', type: 'text', format: (v) => ORIGIN_LABELS[v] ?? v },
   proveedor: { label: 'Proveedor', type: 'text' },
   comprador: { label: 'Comprador', type: 'text', emptyLabel: '(Sin comprador)' },
@@ -97,7 +108,7 @@ const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
  */
 function DaysCell({ item }: { item: ExpeditingItem }) {
   const days = item.days_left;
-  if (days === null || item.delivery_status === 'entregada') {
+  if (days === null || item.delivery_status === 'entregada' || item.delivery_status === 'cancelada') {
     return <span className="text-gray-400">—</span>;
   }
   if (days === 0) return <span className="font-medium text-amber-700 whitespace-nowrap">vence hoy</span>;
@@ -109,6 +120,42 @@ function DaysCell({ item }: { item: ExpeditingItem }) {
       {!late && <span className="block text-xs">faltan</span>}
       <span className={`block ${late ? 'font-semibold' : 'font-medium'}`}>{n.toLocaleString('es-MX')}</span>
       <span className="block text-xs whitespace-nowrap">{plural(n, 'día', 'días')}{late ? ' de retraso' : ''}</span>
+    </div>
+  );
+}
+
+/**
+ * I1: estatus derivado y, si la OC ya se cerró o canceló en el otro sistema,
+ * el badge que lo explica. Tooltip: estatus en Maximo y recepción.
+ */
+function StatusCell({ item }: { item: ExpeditingItem }) {
+  const maximo = maximoStatusText({
+    maximo_status: item.maximo_status ?? null,
+    receipt_status: item.receipt_status ?? null,
+  });
+  const closedBy = item.closed_by ? ERP_CLOSED_BY_LABELS[item.closed_by] : null;
+  const partial = !item.closed_by && item.receipt_status?.toUpperCase() === 'PARTIAL';
+  const title = [
+    closedBy && item.source === 'sap' ? `Abierta en SAP; ${closedBy.toLowerCase()}` : closedBy,
+    maximo,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return (
+    <div className="flex flex-col items-center gap-1" title={title || undefined}>
+      <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${DELIVERY_STATUS_CLASSES[item.delivery_status]}`}>
+        {DELIVERY_STATUS_LABELS[item.delivery_status]}
+      </span>
+      {closedBy && (
+        <span className="inline-flex px-1.5 py-0.5 text-[10px] font-semibold leading-tight rounded bg-[#222D59]/10 text-[#222D59] whitespace-nowrap">
+          {closedBy}
+        </span>
+      )}
+      {partial && (
+        <span className="inline-flex px-1.5 py-0.5 text-[10px] font-semibold leading-tight rounded bg-orange-100 text-orange-800 whitespace-nowrap">
+          Recepción parcial
+        </span>
+      )}
     </div>
   );
 }
@@ -224,7 +271,7 @@ function ExpeditacionContent() {
               setSearch(e.target.value);
               setPage(1);
             }}
-            placeholder="Buscar por PO o proveedor..."
+            placeholder="Buscar por PO de Maximo, OC de SAP o proveedor..."
             className="flex-1 min-w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
           />
           <select
@@ -256,6 +303,14 @@ function ExpeditacionContent() {
           <ExportExcelButton
             path={`/compras/expeditacion/export${filteredQs ? `?${filteredQs}` : ''}`}
             filename={`expeditacion_${new Date().toISOString().slice(0, 10)}.xlsx`}
+          />
+          {/* I1a: la lista para cerrarlas en SAP (con los mismos filtros) */}
+          <ExportExcelButton
+            path={`/compras/expeditacion/export?${toQuery({ ...baseQuery, ...cf.params, closed_in_maximo: 'true' })}`}
+            filename={`expeditacion_depurar_sap_${new Date().toISOString().slice(0, 10)}.xlsx`}
+            label={`Abiertas en SAP, cerradas en Maximo${stats?.closed_in_maximo !== undefined ? ` (${stats.closed_in_maximo.toLocaleString('es-MX')})` : ''}`}
+            title="OC que SAP tiene abiertas pero en Maximo ya están cerradas o canceladas: ya no cuentan como entregas pendientes; descárgalas para cerrarlas en SAP"
+            disabled={stats?.closed_in_maximo === 0}
           />
           {canEdit && (
             <button
@@ -301,7 +356,8 @@ function ExpeditacionContent() {
                 <table className="w-full">
                   <thead className="bg-[#424846]">
                     <tr>
-                      <FilterTh column="po">PO</FilterTh>
+                      <FilterTh column="po_maximo">PO Maximo</FilterTh>
+                      <FilterTh column="oc_sap" title="OC de SAP (en las propias, la OC de ABENT)">OC SAP</FilterTh>
                       <FilterTh column="origen" align="center">Origen</FilterTh>
                       <FilterTh column="proveedor">Proveedor</FilterTh>
                       <FilterTh column="comprador" title="SAP no tiene comprador en sus OC: se muestra quién la capturó">Comprador</FilterTh>
@@ -319,8 +375,21 @@ function ExpeditacionContent() {
                         title={item.purchase_order_id ? undefined : 'OC del ERP: solo lectura (el seguimiento se lleva en el ERP)'}
                         className={`${item.purchase_order_id ? 'cursor-pointer' : 'cursor-default'} hover:bg-[#52AF32]/5 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                       >
-                        <td className="px-4 py-3">
-                          <span className="font-mono font-medium text-[#222D59]">{item.po_number}</span>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {item.po_maximo ? (
+                            <span className="font-mono font-medium text-[#8a6a10]">{item.po_maximo}</span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {(item.source === 'abent' ? item.po_number : item.oc_sap) ? (
+                            <span className="font-mono font-medium text-[#222D59]">
+                              {item.source === 'abent' ? item.po_number : item.oc_sap}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span
@@ -336,11 +405,10 @@ function ExpeditacionContent() {
                           </span>
                           {item.source === 'sap' && item.maximo_ponum && (
                             <span
-                              className="block mt-0.5 text-[10px] leading-tight text-[#8a6a10]"
-                              title={`OC creada en SAP desde Maximo (${item.maximo_ponum}); se muestra una sola vez, con la fecha comprometida de SAP`}
+                              className="block mt-0.5 text-[10px] leading-tight text-[#8a6a10] whitespace-nowrap"
+                              title={`Nació en Maximo (PO ${item.maximo_ponum}) y la integración la creó en SAP (OC ${item.oc_sap ?? item.po_number}). Se muestra una sola vez, con la fecha comprometida de SAP.`}
                             >
                               migrada de Maximo
-                              <span className="block font-mono">{item.maximo_ponum}</span>
                             </span>
                           )}
                         </td>
@@ -378,9 +446,7 @@ function ExpeditacionContent() {
                           <DaysCell item={item} />
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${DELIVERY_STATUS_CLASSES[item.delivery_status]}`}>
-                            {DELIVERY_STATUS_LABELS[item.delivery_status]}
-                          </span>
+                          <StatusCell item={item} />
                         </td>
                         <td className="px-4 py-3 text-center text-sm text-gray-600">
                           {item.purchase_order_id ? (item.tracking?.alert_count ?? 0) : <span className="text-gray-400">—</span>}
@@ -389,7 +455,7 @@ function ExpeditacionContent() {
                     ))}
                     {items.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                        <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                           No hay órdenes que coincidan con los filtros
                         </td>
                       </tr>

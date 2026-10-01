@@ -506,6 +506,8 @@ export interface MaximoContract extends SupplierFields {
   balance_value: number | null;
   purchview_count: number;
   has_contract: boolean;
+  /** I8 (2026-09-30): alguna OC vigente de Maximo usa esta PR. */
+  has_po?: boolean;
   last_changed_at: string | null;
   last_seen_at: string;
   raw?: unknown;
@@ -813,6 +815,76 @@ export type ContractDocumentType =
 
 export type ContractStatus = 'vigente' | 'vencido' | 'renovado' | 'cancelado';
 
+/**
+ * I6 (go-live 2026-09-30) — control de contratos de Compras: la carpeta
+ * (A3T-0003) agrupa el contrato con su carta de intención, enmiendas y
+ * convenios; el número = carpeta + sufijo del tipo (mismo criterio que el
+ * backend, contract-catalog.ts).
+ */
+export type ContractDocKind =
+  | 'contrato'
+  | 'carta_intencion'
+  | 'enmienda'
+  | 'convenio_modificatorio'
+  | 'terminacion'
+  | 'acta_recepcion'
+  | 'cesion_derechos'
+  | 'otro';
+
+export const CONTRACT_DOC_KIND_LABELS: Record<ContractDocKind, string> = {
+  contrato: 'Contrato',
+  carta_intencion: 'Carta de intención',
+  enmienda: 'Enmienda',
+  convenio_modificatorio: 'Convenio modificatorio',
+  terminacion: 'Terminación',
+  acta_recepcion: 'Acta de recepción',
+  cesion_derechos: 'Cesión de derechos',
+  otro: 'Otro',
+};
+
+const CONTRACT_DOC_KIND_SUFFIX: Record<ContractDocKind, string> = {
+  contrato: '',
+  carta_intencion: 'CI',
+  enmienda: 'E',
+  convenio_modificatorio: 'CM',
+  terminacion: 'TER',
+  acta_recepcion: 'AR',
+  cesion_derechos: 'CD',
+  otro: 'OT',
+};
+
+/** Las 11 áreas usuarias del catálogo de Compras (el responsable es el área). */
+export const CONTRACT_USER_AREAS = [
+  'Operaciones',
+  'Legal',
+  'Dirección',
+  'Recursos Humanos',
+  'Comercial',
+  'Medición',
+  'Finanzas',
+  'Servicios Generales',
+  'IT',
+  'Seguridad patrimonial',
+  'GEV',
+] as const;
+
+/** "a3t-3" → "A3T-0003"; null si no tiene la forma A3T-0000. */
+export function normalizeCarpeta(value: string): string | null {
+  const match = /^A3T\s*-?\s*(\d{1,4})$/i.exec(value.trim());
+  return match ? `A3T-${match[1].padStart(4, '0')}` : null;
+}
+
+/**
+ * Número que tendrá el documento (vista previa del alta): A3T-0003,
+ * A3T-0003-CI, A3T-0003-E2… Si ya existe, el backend le agrega -2.
+ */
+export function previewContractNumber(carpeta: string, kind: ContractDocKind, n: number | null): string | null {
+  const folder = normalizeCarpeta(carpeta);
+  if (!folder) return null;
+  if (kind === 'contrato') return folder;
+  return `${folder}-${CONTRACT_DOC_KIND_SUFFIX[kind]}${kind === 'enmienda' && n !== null ? n : ''}`;
+}
+
 export interface ContractDocument {
   id: string;
   contract_id: string;
@@ -833,8 +905,15 @@ export interface Contract {
   document_type: ContractDocumentType;
   service_description: string;
   supplier_id: string;
-  start_date: string;
-  end_date: string;
+  /** I6: null = sin fecha (permanentes, "por servicio"; sin alertas). */
+  start_date: string | null;
+  end_date: string | null;
+  /** I6: carpeta (A3T-0003), tipo literal ("Enmienda 3") y área usuaria. */
+  carpeta: string | null;
+  document_label: string | null;
+  user_area: string | null;
+  /** I6: tipo del documento dentro de la carpeta (calculado en backend). */
+  doc_kind: ContractDocKind;
   total_amount: number | null;
   /** Consumido capturado por Compras (B4); null = "No disponible". */
   consumed_amount: number | null;
@@ -854,6 +933,14 @@ export interface Contract {
   supplier?: { id: string; legal_name: string; tax_id: string } | null;
   buyer?: { id: string; full_name: string; email: string } | null;
   documents?: ContractDocument[];
+}
+
+/** I6: una carpeta con sus documentos (`group=carpeta`). */
+export interface ContractGroup {
+  key: string;
+  carpeta: string | null;
+  head: Contract;
+  documents: Contract[];
 }
 
 export interface ContractFilters {
@@ -998,9 +1085,45 @@ export type DeliveryStatus =
   | 'en_riesgo'
   | 'retrasada'
   | 'parcial'
-  | 'entregada';
+  | 'entregada'
+  | 'cancelada';
 
 export type ExpeditingSource = 'abent' | 'sap' | 'maximo';
+
+/**
+ * I1 (2026-09-30): por qué una OC del ERP ya no es entrega pendiente
+ * aunque su sistema la tenga abierta.
+ */
+export type ErpClosedBy =
+  | 'cerrada_maximo'
+  | 'cancelada_maximo'
+  | 'cerrada_sap'
+  | 'cancelada_sap'
+  | 'recepcion_completa';
+
+export const ERP_CLOSED_BY_LABELS: Record<ErpClosedBy, string> = {
+  cerrada_maximo: 'Cerrada en Maximo',
+  cancelada_maximo: 'Cancelada en Maximo',
+  cerrada_sap: 'Cerrada en SAP',
+  cancelada_sap: 'Cancelada en SAP',
+  recepcion_completa: 'Recepción completa en Maximo',
+};
+
+/** I1b: recepción de Maximo (RECEIPTS), cuando CIISA la exponga. */
+export const RECEIPT_STATUS_LABELS: Record<string, string> = {
+  COMPLETE: 'recepción completa',
+  PARTIAL: 'recepción parcial',
+  NONE: 'sin recepción',
+};
+
+/** "INPRG en Maximo · recepción completa" (tooltip del estatus). */
+export function maximoStatusText(item: { maximo_status: string | null; receipt_status: string | null }): string | null {
+  if (!item.maximo_status) return null;
+  const receipt = item.receipt_status
+    ? RECEIPT_STATUS_LABELS[item.receipt_status.toUpperCase()] ?? `recepción ${item.receipt_status}`
+    : null;
+  return `${item.maximo_status} en Maximo${receipt ? ` · ${receipt}` : ''}`;
+}
 
 export const EXPEDITING_SOURCE_LABELS: Record<ExpeditingSource, string> = {
   abent: 'ABENT',
@@ -1028,6 +1151,15 @@ export interface ExpeditingItem {
   requested_by: string | null;
   /** D1: OC de SAP que nació en Maximo (se muestra una sola vez, con este badge). */
   maximo_ponum: string | null;
+  /** I2 (2026-09-30): PO de Maximo (la propia o la que originó la de SAP). */
+  po_maximo?: string | null;
+  /** I2: OC de SAP (la propia o la copia de una PO de Maximo). */
+  oc_sap?: string | null;
+  /** I1: estatus en Maximo y recepción (RECEIPTS, null hasta que llegue). */
+  maximo_status?: string | null;
+  receipt_status?: string | null;
+  /** I1: cerrada o cancelada en el otro sistema (null = sigue abierta). */
+  closed_by?: ErpClosedBy | null;
   supplier: { id: string | null; legal_name: string; email: string | null } | null;
   /** G1 (2026-09-28): código del proveedor (SAP o efectivo de Maximo). */
   supplier_code?: string | null;
@@ -1093,6 +1225,7 @@ export const DELIVERY_STATUS_LABELS: Record<DeliveryStatus, string> = {
   retrasada: 'Retrasada',
   parcial: 'Parcial',
   entregada: 'Entregada',
+  cancelada: 'Cancelada',
 };
 
 export const DELIVERY_STATUS_CLASSES: Record<DeliveryStatus, string> = {
@@ -1102,6 +1235,7 @@ export const DELIVERY_STATUS_CLASSES: Record<DeliveryStatus, string> = {
   retrasada: 'bg-red-100 text-red-800',
   parcial: 'bg-orange-100 text-orange-800',
   entregada: 'bg-gray-200 text-gray-700',
+  cancelada: 'bg-gray-100 text-gray-500 line-through',
 };
 
 export const DELIVERY_EVENT_LABELS: Record<
@@ -1423,6 +1557,9 @@ export interface DashboardPendingSource {
   total: number;
   pendientes: number | null;
   pendientes_sin_limite: number;
+  /** I8: Maximo, PR de contrato sin OC (aparte: la OC se genera en automático). */
+  de_contrato?: number | null;
+  de_contrato_sin_limite?: number;
 }
 export interface DashboardSummary {
   /** D4: año aplicado (null = todo). */

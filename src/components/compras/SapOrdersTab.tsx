@@ -76,6 +76,8 @@ const COLUMNS: ColumnConfigs = {
   // G1: la barra del top de Reportes filtra por moneda (sin encabezado propio)
   moneda: { label: 'Moneda', type: 'text' },
   numero: { label: 'Número', type: 'text' },
+  // I2 (2026-09-30): la PO de Maximo de la migrada, igual que en Expeditación
+  po_maximo: { label: 'PO Maximo', type: 'text', emptyLabel: '(Sin PO de Maximo)' },
   origen: { label: 'Origen', type: 'text', format: (v) => ORIGIN_LABELS[v] ?? v },
   proveedor: { label: 'Proveedor', type: 'text' },
   solicitante: { label: 'Solicitante', type: 'text', emptyLabel: '(Sin solicitante)' },
@@ -105,7 +107,6 @@ function OriginBadge({ po }: { po: SapPurchaseOrder }) {
       }
     >
       <span>{exists ? 'Migrada de Maximo' : 'Ref. Maximo'}</span>
-      <span className="font-mono font-normal">{po.maximo_ponum}</span>
     </span>
   );
 }
@@ -403,6 +404,7 @@ export default function SapOrdersTab({
                   <thead className="bg-[#424846]">
                     <tr>
                       <FilterTh column="numero" className="px-3 py-3">Número</FilterTh>
+                      <FilterTh column="po_maximo" className="px-3 py-3" title="PO de Maximo de las OC que la integración creó en SAP">PO Maximo</FilterTh>
                       <FilterTh column="origen" className="px-3 py-3" title="SAP: capturada en SAP. Migrada de Maximo: creada por la integración con el PO de Maximo">Origen</FilterTh>
                       <FilterTh column="proveedor" className="px-3 py-3">Proveedor</FilterTh>
                       <FilterTh column="solicitante" className="px-3 py-3">Solicitante</FilterTh>
@@ -428,6 +430,13 @@ export default function SapOrdersTab({
                         >
                           <td className="px-3 py-3">
                             <span className="font-mono font-medium text-[#222D59]">{dash(po.doc_num)}</span>
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            {po.maximo_ponum ? (
+                              <span className="font-mono text-sm text-[#8a6a10]">{po.maximo_ponum}</span>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
                           </td>
                           <td className="px-3 py-3"><OriginBadge po={po} /></td>
                           <td className="px-3 py-3 text-sm text-gray-900 max-w-44 truncate" title={po.card_name ?? undefined}>{dash(po.card_name)}</td>
@@ -473,7 +482,7 @@ export default function SapOrdersTab({
                     })}
                     {orders.length === 0 && (
                       <tr>
-                        <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
+                        <td colSpan={12} className="px-4 py-8 text-center text-gray-500">
                           No hay órdenes de SAP que coincidan con los filtros
                         </td>
                       </tr>
