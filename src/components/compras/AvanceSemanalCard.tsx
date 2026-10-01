@@ -11,12 +11,17 @@ import PdfViewerModal from './PdfViewerModal';
  * la hoja semanal de gestiones que arma Jorge, generada por la plataforma.
  * PDF de la semana elegida, acumulado del año (una página por semana, de la
  * más nueva a la más vieja, como su archivo) y vista previa. Solo GET.
+ *
+ * I3 (go-live 2026-09-30, Ingrid): "uno de Maximo, uno de SAP y esté
+ * homologado". Por defecto, una página de Maximo y una de SAP por semana; el
+ * acumulado trae primero todas las semanas de Maximo y luego las de SAP. La
+ * suma de los dos sistemas (`todas`) ya no se ofrece aquí.
  */
 
-type Fuente = 'todas' | 'maximo' | 'sap';
+type Fuente = 'ambos' | 'maximo' | 'sap';
 
 const FUENTES: Array<[Fuente, string]> = [
-  ['todas', 'Maximo + SAP'],
+  ['ambos', 'Maximo y SAP'],
   ['maximo', 'Solo Maximo'],
   ['sap', 'Solo SAP'],
 ];
@@ -55,12 +60,13 @@ interface AvanceSemanalCardProps {
 }
 
 export default function AvanceSemanalCard({ lunes, elegida }: AvanceSemanalCardProps) {
-  const [fuente, setFuente] = useState<Fuente>('todas');
+  const [fuente, setFuente] = useState<Fuente>('ambos');
   const [preview, setPreview] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  const fq = fuente === 'todas' ? '' : `&fuente=${fuente}`;
-  const suffix = fuente === 'todas' ? '' : `_${fuente}`;
+  const fq = fuente === 'ambos' ? '' : `&fuente=${fuente}`;
+  const suffix = fuente === 'ambos' ? '' : `_${fuente}`;
+  const ambos = fuente === 'ambos';
   const anio = parseDay(lunes).getUTCFullYear();
   const desde = firstMonday(anio);
   const semanaPath = `/compras/reportes/avance-semanal/pdf?semana=${lunes}${fq}`;
@@ -94,8 +100,9 @@ export default function AvanceSemanalCard({ lunes, elegida }: AvanceSemanalCardP
         </p>
         <p className="text-xs text-gray-500 mt-0.5">
           La hoja semanal de gestiones de Compras: recibidas, cerradas, tiempos, montos
-          adjudicados y comparación anual. El acumulado trae una página por semana desde el{' '}
-          {Number(desde.slice(8))} de enero.
+          adjudicados y comparación anual, con una página de Maximo y una de SAP por
+          semana (mismo formato). El acumulado arranca el {Number(desde.slice(8))} de enero
+          {ambos ? ': primero todas las semanas de Maximo y luego las de SAP.' : '.'}
         </p>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
@@ -107,7 +114,7 @@ export default function AvanceSemanalCard({ lunes, elegida }: AvanceSemanalCardP
           value={fuente}
           onChange={(e) => setFuente(e.target.value as Fuente)}
           className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white"
-          title="El reporte de Jorge solo trae Maximo; el de la plataforma suma SAP"
+          title="Maximo y SAP: dos páginas por semana, una de cada sistema. El reporte de Jorge solo trae Maximo"
         >
           {FUENTES.map(([value, label]) => (
             <option key={value} value={value}>
@@ -127,20 +134,24 @@ export default function AvanceSemanalCard({ lunes, elegida }: AvanceSemanalCardP
           path={semanaPath}
           filename={`reporte_avance_semanal_${lunes}${suffix}.pdf`}
           label="PDF de la semana"
-          title="Una página con la semana elegida"
+          title={ambos ? 'Dos páginas: Maximo y luego SAP' : 'Una página con la semana elegida'}
         />
         <ExportExcelButton
           path={`/compras/reportes/avance-semanal/pdf?desde=${desde}&hasta=${lunes}${fq}`}
           filename={`reporte_avance_semanal_${desde}_al_${lunes}${suffix}.pdf`}
           label={`Acumulado ${anio} (PDF)`}
-          title="Una página por semana, de la más nueva a la más vieja, como el archivo de Jorge"
+          title={
+            ambos
+              ? 'Primero todas las semanas de Maximo y luego las de SAP, de la más nueva a la más vieja (índice en los marcadores del PDF)'
+              : 'Una página por semana, de la más nueva a la más vieja, como el archivo de Jorge'
+          }
         />
       </div>
       <PdfViewerModal
         isOpen={previewOpen}
         onClose={() => setPreviewOpen(false)}
         url={preview}
-        title={`Reporte de avance semanal · semana ${etiquetaSemana(lunes)}`}
+        title={`Reporte de avance semanal${ambos ? ' (Maximo y SAP)' : fuente === 'maximo' ? ' (Maximo)' : ' (SAP)'} · semana ${etiquetaSemana(lunes)}`}
       />
     </div>
   );
