@@ -112,15 +112,33 @@ export default function MaximoRequestsTab({
   const [page, setPage] = useState(1);
   const [detailKey, setDetailKey] = useState<string | null>(null);
   const [pending, setPending] = useState(pendingFrom);
+  // I8: dentro de pendientes, las PR DE CONTRATO sin OC van aparte (la OC se
+  // genera en automático; no son carga de Compras)
+  const [contractPending, setContractPending] = useState(false);
   const cf = useColumnFilters('mxPr', () => setPage(1));
 
+  const showContract = pending !== null && contractPending;
   const filters = {
     search,
     status: statuses,
     year: year ?? undefined,
-    sin_oc: pending !== null ? 'true' : undefined,
+    sin_oc: pending !== null && !showContract ? 'true' : undefined,
+    contrato_sin_oc: showContract ? 'true' : undefined,
     pr_desde: pending || undefined,
   };
+  // I8: cuántas de contrato hay en el mismo periodo (para mostrarlas aparte)
+  const contractCountQs = toQuery({
+    limit: 1,
+    year: year ?? undefined,
+    contrato_sin_oc: 'true',
+    pr_desde: pending || undefined,
+  });
+  const contractCountQ = useQuery({
+    queryKey: ['maximo-requests', 'de-contrato', contractCountQs],
+    queryFn: () => api.get<PaginatedResponse<MaximoContract>>(`/maximo/contracts?${contractCountQs}`),
+    enabled: pending !== null,
+  });
+  const contractCount = contractCountQ.data?.meta.total;
   const filterQs = toQuery({ ...filters, ...cf.params });
   const listQs = toQuery({ page, limit: PAGE_SIZE, ...filters, ...cf.params });
 
@@ -197,15 +215,37 @@ export default function MaximoRequestsTab({
               ? [
                   {
                     key: 'sin_oc',
-                    label: 'Pendientes de gestionar',
-                    value: `sin OC ni contrato${pending ? `, creadas ${periodText(pending)}` : year ? `, creadas en ${year}` : ''}`,
-                    title: 'PR sin contrato cuyo número no aparece en ninguna OC vigente de Maximo. Maximo no da la fecha de esas PR: el periodo se ubica por su folio (se numeran en orden)',
-                    onClear: () => { setPending(null); setPage(1); },
+                    label: showContract ? 'De contrato sin OC' : 'Pendientes de gestionar',
+                    value: `${showContract ? 'la OC se genera en automático' : 'sin OC ni contrato'}${pending ? `, creadas ${periodText(pending)}` : year ? `, creadas en ${year}` : ''}`,
+                    title: showContract
+                      ? 'PR de contrato cuyo número no aparece en ninguna OC vigente de Maximo: la OC se genera en automático, así que no cuentan como carga de Compras'
+                      : 'PR sin contrato cuyo número no aparece en ninguna OC vigente de Maximo. Maximo no da la fecha de esas PR: el periodo se ubica por su folio (se numeran en orden)',
+                    onClear: () => { setPending(null); setContractPending(false); setPage(1); },
                   },
                 ]
               : []
           }
         />
+        {/* I8: las de contrato no son carga de Compras: se ven aparte */}
+        {pending !== null && contractCount !== undefined && contractCount > 0 && (
+          <p className="text-xs text-gray-600">
+            {showContract ? (
+              <>
+                PR de contrato sin OC: la OC se genera en automático y no cuentan como pendientes de Compras.{' '}
+                <button type="button" onClick={() => { setContractPending(false); setPage(1); }} className="text-[#52AF32] font-medium hover:underline">
+                  Volver a las pendientes
+                </button>
+              </>
+            ) : (
+              <>
+                Aparte, <strong>{contractCount.toLocaleString('es-MX')} de contrato</strong> sin OC: la OC se genera en automático.{' '}
+                <button type="button" onClick={() => { setContractPending(true); setPage(1); }} className="text-[#52AF32] font-medium hover:underline">
+                  Ver las de contrato
+                </button>
+              </>
+            )}
+          </p>
+        )}
         <ActiveColumnFilters cf={cf} columns={COLUMNS} />
         {sinEstatus > 0 && (
           <p className="text-xs text-gray-600" title={MAXIMO_NO_STATUS_HINT}>
@@ -293,7 +333,18 @@ export default function MaximoRequestsTab({
                         <td className="px-4 py-3 text-sm text-gray-600">{dash(pr.department)}</td>
                         <td className="px-4 py-3 text-sm">
                           {pr.has_contract ? (
-                            <span className="font-mono text-gray-900">{dash(pr.contractnum)}</span>
+                            <>
+                              <span className="font-mono text-gray-900">{dash(pr.contractnum)}</span>
+                              {/* I8: PR de contrato sin OC → la OC se genera en automático */}
+                              {pr.has_po === false && (
+                                <span
+                                  className="block mt-0.5 w-fit max-w-44 px-1.5 py-0.5 text-[10px] font-semibold leading-tight rounded bg-[#222D59]/10 text-[#222D59]"
+                                  title={`Todavía sin OC; no cuenta como pendiente de Compras. Estatus en Maximo: ${pr.status ?? 'sin estatus'}`}
+                                >
+                                  De contrato: la OC se genera en automático
+                                </span>
+                              )}
+                            </>
                           ) : (
                             <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600">Sin contrato</span>
                           )}

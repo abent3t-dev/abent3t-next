@@ -397,12 +397,17 @@ export default function ComprasDashboardPage() {
             value={summary.solicitudes.pendientes.toLocaleString('es-MX')}
             sub={
               `${fuente(summary.solicitudes.por_fuente, 'pendientes')} · ` +
-              (year ? `creadas en ${year}` : `creadas ${periodText(pendingPeriod?.desde)}`)
+              (year ? `creadas en ${year}` : `creadas ${periodText(pendingPeriod?.desde)}`) +
+              // I8: las de contrato se muestran aparte (la OC se genera sola)
+              (summary.solicitudes.por_fuente.maximo.de_contrato
+                ? ` · aparte, ${summary.solicitudes.por_fuente.maximo.de_contrato.toLocaleString('es-MX')} de contrato`
+                : '')
             }
             hint={
               'Solicitudes creadas que todavía no tienen orden de compra (la gestión termina cuando nace la OC). ' +
               'SAP: solicitudes de pedido abiertas que ninguna OC usa como base. ' +
               'Maximo: PR sin contrato cuyo número no aparece en ninguna OC vigente; Maximo no da la fecha de esas PR, así que el periodo se ubica por su folio (se numeran en orden). ' +
+              'Las PR de contrato sin OC van aparte ("de contrato"): la OC se genera en automático y no son carga de Compras. ' +
               (year ? `Creadas en ${year}. ` : 'Solo las de los últimos 12 meses, para no contar solicitudes históricas que nunca se cerraron. ') +
               sinLimite
             }
