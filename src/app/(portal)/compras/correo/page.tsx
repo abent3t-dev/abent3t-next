@@ -27,7 +27,8 @@ import {
  * usa super_admin. Acceso: super_admin, lider_procura y admin_rh.
  */
 
-const PAGE_SIZE = 20;
+// Uno de los tamaños del selector de Pagination (10, 25, 50, 100)
+const PAGE_SIZE = 25;
 const REFRESH_MS = 30_000;
 
 const formatDateTime = (date: string | null) =>
