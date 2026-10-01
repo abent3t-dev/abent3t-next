@@ -63,7 +63,8 @@ interface Resumen {
     entregadas: number;
     retraso_promedio_dias: number | null;
   };
-  contratos: { por_vencer_30_dias: number; valor_vigentes: number };
+  /** I6: el valor de los vigentes va por moneda (nunca sumado). */
+  contratos: { por_vencer_30_dias: number; valor_vigentes_por_moneda: CurrencyAmount[] };
   proveedores: { bloqueados: number };
   todas_las_fuentes: {
     solicitudes: {
@@ -136,7 +137,7 @@ interface ContratosReport {
     end_date: string;
     total_amount: number | null;
   }>;
-  vigentes: { total: number; valor_total: number };
+  vigentes: { total: number; por_moneda: CurrencyAmount[] };
   promedio_consumo_pct: number | null;
 }
 
@@ -449,12 +450,22 @@ function VendorTop({
               {combined && (
                 <span className="block text-xs">
                   {row.por_fuente.sap.count > 0 && (
-                    <button type="button" onClick={() => go('sap')} className="text-[#52AF32] hover:underline mr-2">
+                    <button
+                      type="button"
+                      onClick={() => go('sap')}
+                      className="text-[#52AF32] hover:underline mr-2"
+                      title={`SAP: ${formatCurrencyAmount(row.por_fuente.sap.monto, row.currency)} en ${row.por_fuente.sap.count} OC`}
+                    >
                       SAP {row.por_fuente.sap.count}
                     </button>
                   )}
                   {row.por_fuente.maximo.count > 0 && (
-                    <button type="button" onClick={() => go('maximo')} className="text-[#222D59] hover:underline">
+                    <button
+                      type="button"
+                      onClick={() => go('maximo')}
+                      className="text-[#222D59] hover:underline"
+                      title={`Maximo: ${formatCurrencyAmount(row.por_fuente.maximo.monto, row.currency)} en ${row.por_fuente.maximo.count} OC`}
+                    >
                       Maximo {row.por_fuente.maximo.count}
                     </button>
                   )}
@@ -469,7 +480,14 @@ function VendorTop({
             >
               <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
             </button>
-            <div className="w-28 lg:w-48 lg:whitespace-nowrap text-sm text-right text-gray-700">
+            <div
+              className="w-28 lg:w-48 lg:whitespace-nowrap text-sm text-right text-gray-700"
+              title={
+                combined
+                  ? `SAP: ${formatCurrencyAmount(row.por_fuente.sap.monto, row.currency)} (${row.por_fuente.sap.count} OC) · Maximo: ${formatCurrencyAmount(row.por_fuente.maximo.monto, row.currency)} (${row.por_fuente.maximo.count} OC)`
+                  : undefined
+              }
+            >
               {formatCurrencyAmount(row.monto, row.currency)} · {row.count}
             </div>
           </div>
@@ -792,7 +810,7 @@ export default function ReportesComprasPage() {
             label="Contratos por vencer (30 días)"
             value={resumen.todas_las_fuentes.contratos_por_vencer_30_dias.total}
             sub={`ABENT ${resumen.todas_las_fuentes.contratos_por_vencer_30_dias.por_fuente.abent} · Maximo ${resumen.todas_las_fuentes.contratos_por_vencer_30_dias.por_fuente.maximo}`}
-            lines={resumen.contratos.valor_vigentes > 0 ? [`Vigentes: ${formatCurrencyAmount(resumen.contratos.valor_vigentes, 'MXN')}`] : undefined}
+            lines={resumen.contratos.valor_vigentes_por_moneda.length > 0 ? [`Vigentes: ${formatAmountLines(resumen.contratos.valor_vigentes_por_moneda).join(' · ')}`] : undefined}
             border="border-[#222D59]"
           />
           <KpiCard
@@ -803,6 +821,55 @@ export default function ReportesComprasPage() {
           />
         </div>
       )}
+
+      {/* I4 (go-live 2026-09-30, Ingrid): UN solo top 10, SAP + Maximo contado
+          una vez (lo migrado de Maximo a SAP no se cuenta dos veces); el
+          desglose por sistema va en cada fila y los tops por sistema, en el
+          desplegable */}
+      <Section
+        title="Top 10 proveedores (SAP + Maximo, contado una vez)"
+        note="una OC migrada de Maximo a SAP cuenta una sola vez · por moneda, nunca sumadas"
+      >
+        {erpQ.isError ? (
+          <p className="text-sm text-red-600">No se pudo cargar el reporte de los ERPs.</p>
+        ) : !erp ? (
+          <Empty />
+        ) : (
+          <div className="space-y-4">
+            <VendorTop rows={erp.combinado.top_proveedores} range={range} combined color="bg-[#DFA922]" />
+            <details className="group rounded-lg border border-gray-200 bg-gray-50/60">
+              <summary className="cursor-pointer select-none px-4 py-2 text-sm font-medium text-[#424846]">
+                Por sistema (SAP y Maximo por separado)
+              </summary>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 px-4 pb-4 pt-2">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-[#424846]" title="Por proveedor y moneda. Sin las OC migradas desde Maximo que existen allá: esas cuentan en el top de Maximo.">
+                    SAP (sin las migradas de Maximo)
+                  </p>
+                  <VendorTop rows={erp.sap.top_proveedores} range={range} />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                    <p
+                      className="text-sm font-medium text-[#424846]"
+                      title="Proveedor según SAP cuando la OC ya migró a SAP o cuando las OC migradas de su código de Maximo quedaron a nombre de un proveedor de SAP; si no, el nombre del maestro de Maximo."
+                    >
+                      Maximo (proveedor efectivo)
+                    </p>
+                    <ExportExcelButton
+                      path="/maximo/vendor-xref/export"
+                      filename={`proveedores_maximo_vs_sap_${iso(new Date())}.xlsx`}
+                      label="Nombres distintos Maximo vs SAP"
+                      title="Proveedores cuyo nombre en el maestro de Maximo no es el de SAP (por sus OC migradas), para corregirlos en Maximo"
+                    />
+                  </div>
+                  <VendorTop rows={erp.maximo.top_proveedores} range={range} color="bg-[#222D59]" />
+                </div>
+              </div>
+            </details>
+          </div>
+        )}
+      </Section>
 
       {/* SAP + Maximo por periodo (sprint 2026-09-22, B2) */}
       <Section title="SAP Business One — órdenes y solicitudes en el periodo" note="montos por moneda, nunca sumados entre monedas">
@@ -823,12 +890,6 @@ export default function ReportesComprasPage() {
             <div className="space-y-2">
               <p className="text-sm font-medium text-[#424846]">Órdenes por mes</p>
               <ErpMonths serie={erp.sap.ordenes.serie_mensual} />
-            </div>
-            <div className="lg:col-span-3 space-y-2">
-              <p className="text-sm font-medium text-[#424846]" title="Por proveedor y moneda. Sin las OC migradas desde Maximo que existen allá: esas cuentan en el top de Maximo.">
-                Top proveedores por monto (OC)
-              </p>
-              <VendorTop rows={erp.sap.top_proveedores} range={range} />
             </div>
           </div>
         )}
@@ -853,38 +914,7 @@ export default function ReportesComprasPage() {
               <p className="text-sm font-medium text-[#424846]">Órdenes por mes</p>
               <ErpMonths serie={erp.maximo.ordenes.serie_mensual} />
             </div>
-            <div className="lg:col-span-3 space-y-2">
-              <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                <p
-                  className="text-sm font-medium text-[#424846]"
-                  title="Proveedor según SAP cuando la OC ya migró a SAP o cuando las OC migradas de su código de Maximo quedaron a nombre de un proveedor de SAP; si no, el nombre del maestro de Maximo."
-                >
-                  Top proveedores por monto (OC) — proveedor efectivo
-                </p>
-                <ExportExcelButton
-                  path="/maximo/vendor-xref/export"
-                  filename={`proveedores_maximo_vs_sap_${iso(new Date())}.xlsx`}
-                  label="Nombres distintos Maximo vs SAP"
-                  title="Proveedores cuyo nombre en el maestro de Maximo no es el de SAP (por sus OC migradas), para corregirlos en Maximo"
-                />
-              </div>
-              <VendorTop rows={erp.maximo.top_proveedores} range={range} color="bg-[#222D59]" />
-            </div>
           </div>
-        )}
-      </Section>
-
-      {/* G1: el top que Ingrid realmente quiere — SAP + Maximo contado una vez */}
-      <Section
-        title="Top proveedores — SAP + Maximo"
-        note="contado una vez: una OC migrada de Maximo a SAP cuenta una sola vez · por moneda"
-      >
-        {erpQ.isError ? (
-          <p className="text-sm text-red-600">No se pudo cargar el reporte de los ERPs.</p>
-        ) : !erp ? (
-          <Empty />
-        ) : (
-          <VendorTop rows={erp.combinado.top_proveedores} range={range} combined color="bg-[#DFA922]" />
         )}
       </Section>
 
@@ -1013,7 +1043,7 @@ export default function ReportesComprasPage() {
           ) : (
             <div className="space-y-3">
               <div className="flex gap-6 text-sm text-gray-600 flex-wrap">
-                <span><strong>Vigentes:</strong> {contratos.vigentes.total} ({contratos.vigentes.total > 0 && contratos.vigentes.valor_total === 0 ? 'monto no disponible' : formatCurrency(contratos.vigentes.valor_total)})</span>
+                <span><strong>Vigentes:</strong> {contratos.vigentes.total} ({contratos.vigentes.por_moneda.length === 0 ? 'monto no disponible' : formatAmountLines(contratos.vigentes.por_moneda).join(' · ')})</span>
                 <span><strong>Consumo prom.:</strong> {contratos.promedio_consumo_pct === null ? 'No disponible' : `${contratos.promedio_consumo_pct}%`}</span>
               </div>
               {contratos.por_vencer_30_dias.length === 0 ? (
