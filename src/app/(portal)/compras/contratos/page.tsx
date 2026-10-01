@@ -9,10 +9,12 @@ import type { PaginatedResponse } from '@/types/pagination';
 import {
   Contract,
   ContractStatus,
-  CONTRACT_DOCUMENT_TYPE_LABELS,
+  CONTRACT_DOC_KIND_LABELS,
   CONTRACT_STATUS_LABELS,
 } from '@/types/purchases';
 import ContractModal from '@/components/compras/ContractModal';
+import ContractGroupsView from '@/components/compras/ContractGroupsView';
+import { ContractVigencia, formatContractMoney } from '@/components/compras/ContractVigencia';
 import ResultChips from '@/components/compras/ResultChips';
 import ExportExcelButton from '@/components/compras/ExportExcelButton';
 import ContractStatusBadge from '@/components/compras/ContractStatusBadge';
@@ -34,6 +36,10 @@ import { toQuery } from '@/lib/compras-format';
  *
  * E1 (2026-09-25, pedido por César e Ingrid): filtro "tipo Excel" por
  * columna en las dos pestañas (URL, total y Excel con el mismo filtro).
+ *
+ * I6 (go-live 2026-09-30, base real de Diana): agrupados por carpeta por
+ * defecto (el contrato con su CI, enmiendas y convenios), área usuaria (la
+ * responsable del contrato) y comprador en la tabla, y "Sin fecha de fin".
  */
 
 type ContractsTab = 'abent' | 'maximo';
@@ -44,15 +50,12 @@ const TABS: { id: ContractsTab; label: string }[] = [
 ];
 
 const PAGE_SIZE = 15;
-const EXPIRY_WARNING_DAYS = 30;
 
 const COLUMNS: ColumnConfigs = {
   numero: { label: 'Número', type: 'text' },
-  tipo: {
-    label: 'Tipo',
-    type: 'text',
-    format: (v) => CONTRACT_DOCUMENT_TYPE_LABELS[v as keyof typeof CONTRACT_DOCUMENT_TYPE_LABELS] ?? v,
-  },
+  carpeta: { label: 'Carpeta', type: 'text', emptyLabel: '(Sin carpeta)' },
+  tipo: { label: 'Tipo de documento', type: 'text' },
+  area: { label: 'Área usuaria', type: 'text', emptyLabel: '(Sin área)' },
   servicio: { label: 'Servicio', type: 'text' },
   proveedor: { label: 'Proveedor', type: 'text' },
   fin: { label: 'Fin de vigencia', type: 'date' },
@@ -68,70 +71,13 @@ const COLUMNS: ColumnConfigs = {
   responsable: { label: 'Responsable', type: 'text', emptyLabel: '(Sin responsable)' },
 };
 
-const formatDate = (date: string) =>
-  new Date(date).toLocaleDateString('es-MX', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-
-const formatMoney = (amount: number | null, currency: string | null) => {
-  if (amount === null) return '—';
-  try {
-    return new Intl.NumberFormat(
-      'es-MX',
-      currency ? { style: 'currency', currency } : { minimumFractionDigits: 2 },
-    ).format(amount);
-  } catch {
-    return `${amount.toLocaleString('es-MX')} ${currency ?? ''}`.trim();
-  }
-};
-
-/** Días naturales de hoy (UTC) a la fecha de fin; negativo = ya venció. */
-const daysToEnd = (contract: Contract): number => {
-  const today = new Date();
-  const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
-  return Math.round((new Date(contract.end_date).getTime() - todayUtc) / 86_400_000);
-};
-
-/** Vence en < 30 dias (ambar). */
-const expiresSoon = (contract: Contract): boolean => {
-  if (contract.status !== 'vigente') return false;
-  const days = daysToEnd(contract);
-  return days >= 0 && days < EXPIRY_WARNING_DAYS;
-};
-
-/**
- * Línea bajo la vigencia (pedido de Ingrid 2026-09-22): rojo si ya venció
- * (por estatus o por fecha), ámbar si vence en menos de 30 días.
- */
-function ExpiryLine({ contract }: { contract: Contract }) {
-  const days = daysToEnd(contract);
-  if (contract.status === 'vencido' || days < 0) {
-    const ago = Math.abs(days);
-    return (
-      <p className="mt-1 text-xs font-medium text-red-600">
-        Venció el {formatDate(contract.end_date)}
-        {' '}<span className="whitespace-nowrap">{ago > 0 ? `(hace ${ago} ${ago === 1 ? 'día' : 'días'})` : '(hoy)'}</span>
-      </p>
-    );
-  }
-  if (expiresSoon(contract)) {
-    return (
-      <p className="mt-1 text-xs font-medium text-amber-700">
-        Vence en {days} {days === 1 ? 'día' : 'días'}
-      </p>
-    );
-  }
-  return null;
-}
-
 function ContratosContent() {
   const { hasRole } = useAuth();
   const canEdit = hasRole(...PURCHASE_TEAM_ROLES);
 
   const [activeTab, setActiveTab] = useState<ContractsTab>('abent');
+  // I6: por carpeta (contrato + CI, enmiendas y convenios) por defecto
+  const [grouped, setGrouped] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ContractStatus | ''>('');
   const [expiryFilter, setExpiryFilter] = useState('');
@@ -140,7 +86,13 @@ function ContratosContent() {
   const [selected, setSelected] = useState<Contract | null>(null);
   const cf = useColumnFilters('ct', () => setPage(1));
 
-  const baseQuery = { search, status: statusFilter, vence_en_dias: expiryFilter };
+  // I6: "Sin fecha de fin" va en el mismo selector de vigencia
+  const baseQuery = {
+    search,
+    status: statusFilter,
+    vence_en_dias: expiryFilter === 'sin_fin' ? '' : expiryFilter,
+    sin_fin: expiryFilter === 'sin_fin' ? 'true' : '',
+  };
   const listQs = toQuery({ page, limit: PAGE_SIZE, ...baseQuery, ...cf.params });
 
   const { data, isLoading, isError } = useQuery({
@@ -148,7 +100,7 @@ function ContratosContent() {
     queryFn: () => api.get<PaginatedResponse<Contract>>(`/compras/contratos?${listQs}`),
     // E1: la tabla anterior se queda en pantalla mientras llega la nueva
     placeholderData: keepPreviousData,
-    enabled: activeTab === 'abent',
+    enabled: activeTab === 'abent' && !grouped,
   });
 
   const contracts = data?.data ?? [];
@@ -243,7 +195,20 @@ function ContratosContent() {
                 <option value="">Cualquier vigencia</option>
                 <option value="30">Vence en 30 días</option>
                 <option value="7">Vence en 7 días</option>
+                <option value="sin_fin">Sin fecha de fin</option>
               </select>
+              <label className="inline-flex items-center gap-2 text-sm text-[#424846] select-none" title="Una fila por carpeta: el contrato con su carta de intención, enmiendas y convenios">
+                <input
+                  type="checkbox"
+                  checked={grouped}
+                  onChange={(e) => {
+                    setGrouped(e.target.checked);
+                    setPage(1);
+                  }}
+                  className="rounded border-gray-300 text-[#52AF32] focus:ring-[#52AF32]"
+                />
+                Agrupar por carpeta
+              </label>
             </div>
             <div className="mt-3">
               <ActiveColumnFilters cf={cf} columns={COLUMNS} />
@@ -252,7 +217,16 @@ function ContratosContent() {
 
           {/* Tabla */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            {isLoading ? (
+            {grouped ? (
+              <ColumnFilterProvider value={{ cf, columns: COLUMNS, facetsPath: '/compras/contratos/facets', baseQuery }}>
+                <ContractGroupsView
+                  params={{ ...baseQuery, ...cf.params }}
+                  page={page}
+                  setPage={setPage}
+                  onOpen={openContract}
+                />
+              </ColumnFilterProvider>
+            ) : isLoading ? (
               <div className="p-8 text-center">
                 <div className="w-8 h-8 border-4 border-[#52AF32] border-t-transparent rounded-full animate-spin mx-auto" />
               </div>
@@ -288,13 +262,13 @@ function ContratosContent() {
                         <FilterTh column="tipo">Tipo</FilterTh>
                         <FilterTh column="servicio">Servicio</FilterTh>
                         <FilterTh column="proveedor">Proveedor</FilterTh>
+                        <FilterTh column="area" title="El área usuaria es la responsable del contrato">Área usuaria</FilterTh>
                         <FilterTh column="fin" align="center" title="Filtra y ordena por el fin de la vigencia">Vigencia</FilterTh>
                         <FilterTh column="estatus" align="center">Estatus</FilterTh>
                         <FilterTh column="monto" align="right">Monto</FilterTh>
                         <FilterTh column="consumido" align="right">Consumido</FilterTh>
                         <FilterTh column="saldo" align="right">Saldo</FilterTh>
                         <FilterTh column="comprador">Comprador</FilterTh>
-                        <FilterTh column="responsable">Responsable</FilterTh>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -326,8 +300,8 @@ function ContratosContent() {
                               <p className="text-xs text-gray-400">{contract.tomo}</p>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
-                            {CONTRACT_DOCUMENT_TYPE_LABELS[contract.document_type]}
+                          <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                            {contract.document_label ?? CONTRACT_DOC_KIND_LABELS[contract.doc_kind]}
                           </td>
                           <td
                             className="px-4 py-3 text-sm text-gray-900 max-w-48 truncate"
@@ -338,11 +312,11 @@ function ContratosContent() {
                           <td className="px-4 py-3 text-sm text-gray-900">
                             {contract.supplier?.legal_name ?? '—'}
                           </td>
+                          <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                            {contract.user_area ?? '—'}
+                          </td>
                           <td className="px-4 py-3 text-center text-sm text-gray-600">
-                            <span className="whitespace-nowrap">
-                              {formatDate(contract.start_date)} – {formatDate(contract.end_date)}
-                            </span>
-                            <ExpiryLine contract={contract} />
+                            <ContractVigencia contract={contract} />
                           </td>
                           <td className="px-4 py-3 text-center">
                             <ContractStatusBadge status={contract.status} />
@@ -351,14 +325,14 @@ function ContratosContent() {
                             {contract.total_amount === null ? (
                               <span className="text-gray-500 italic text-xs whitespace-nowrap">No disponible</span>
                             ) : (
-                              formatMoney(contract.total_amount, contract.currency)
+                              formatContractMoney(contract.total_amount, contract.currency)
                             )}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-900 text-right">
                             {contract.consumed_amount === null ? (
                               <span className="text-gray-500 italic text-xs whitespace-nowrap" title="Captura manual de Compras pendiente">No disponible</span>
                             ) : (
-                              formatMoney(contract.consumed_amount, contract.currency)
+                              formatContractMoney(contract.consumed_amount, contract.currency)
                             )}
                           </td>
                           <td className="px-4 py-3 text-sm text-right">
@@ -366,15 +340,12 @@ function ContratosContent() {
                               <span className="text-gray-500 italic text-xs whitespace-nowrap" title="Requiere monto y consumido">No disponible</span>
                             ) : (
                               <span className={contract.balance_amount < 0 ? 'font-semibold text-red-600' : 'text-gray-900'}>
-                                {formatMoney(contract.balance_amount, contract.currency)}
+                                {formatContractMoney(contract.balance_amount, contract.currency)}
                               </span>
                             )}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
                             {contract.buyer?.full_name ?? '—'}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
-                            {contract.responsible_user_name ?? '—'}
                           </td>
                         </tr>
                       ))}

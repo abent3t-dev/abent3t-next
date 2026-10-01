@@ -6,11 +6,14 @@ import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
 import {
   Contract,
+  ContractDocKind,
   ContractDocument,
-  ContractDocumentType,
   ContractStatus,
-  CONTRACT_DOCUMENT_TYPE_LABELS,
+  CONTRACT_DOC_KIND_LABELS,
   CONTRACT_STATUS_LABELS,
+  CONTRACT_USER_AREAS,
+  normalizeCarpeta,
+  previewContractNumber,
 } from '@/types/purchases';
 import ContractStatusBadge from './ContractStatusBadge';
 import ContractFileUploader from './ContractFileUploader';
@@ -21,6 +24,11 @@ import { usePurchaseUsers } from '@/hooks/usePurchaseUsers';
  * Fase §15 — Alta/edicion de contrato + documentos. En modo SOLO LECTURA
  * (canEdit=false: cualquier usuario fuera de PURCHASE_TEAM) muestra la
  * metadata y permite descargar el PDF, sin botones de mutacion.
+ *
+ * I6 (go-live 2026-09-30): el alta pide carpeta y tipo de documento y el
+ * número se arma solo (A3T-0003, A3T-0003-CI, A3T-0003-E2…), igual que la
+ * carga del control de contratos; área usuaria (la responsable) y fechas
+ * opcionales: sin fecha de fin no hay alertas de vencimiento.
  */
 
 interface ContractModalProps {
@@ -38,8 +46,11 @@ interface Supplier {
 
 const EMPTY_FORM = {
   contract_number: '',
+  carpeta: '',
+  doc_kind: 'contrato' as ContractDocKind,
+  doc_number: '',
+  user_area: '',
   tomo: '',
-  document_type: 'contrato' as ContractDocumentType,
   service_description: '',
   supplier_id: '',
   start_date: '',
@@ -118,12 +129,15 @@ function ContractModalBody({
     contract
       ? {
           contract_number: contract.contract_number,
+          carpeta: contract.carpeta ?? '',
+          doc_kind: contract.doc_kind,
+          doc_number: /(\d+)$/.exec(contract.document_label ?? '')?.[1] ?? '',
+          user_area: contract.user_area ?? '',
           tomo: contract.tomo ?? '',
-          document_type: contract.document_type,
           service_description: contract.service_description,
           supplier_id: contract.supplier_id,
-          start_date: contract.start_date.split('T')[0] ?? '',
-          end_date: contract.end_date.split('T')[0] ?? '',
+          start_date: contract.start_date?.split('T')[0] ?? '',
+          end_date: contract.end_date?.split('T')[0] ?? '',
           total_amount:
             contract.total_amount === null
               ? ''
@@ -167,14 +181,28 @@ function ContractModalBody({
   const suppliers = suppliersData?.data ?? [];
   const buyers = buyersData ?? [];
 
+  // I6: con carpeta el número se arma solo; sin ella, se captura a mano
+  const carpetaOk = normalizeCarpeta(formData.carpeta);
+  const docNumber = formData.doc_number === '' ? null : Number(formData.doc_number);
+  const numberPreview = carpetaOk
+    ? previewContractNumber(formData.carpeta, formData.doc_kind, formData.doc_kind === 'enmienda' ? docNumber : null)
+    : null;
+
   const buildPayload = () => ({
-    contract_number: formData.contract_number.trim(),
+    ...(formData.carpeta.trim()
+      ? {
+          carpeta: formData.carpeta.trim(),
+          ...(formData.doc_kind === 'enmienda' && docNumber !== null ? { doc_number: docNumber } : {}),
+        }
+      : { contract_number: formData.contract_number.trim() }),
+    doc_kind: formData.doc_kind,
+    user_area: formData.user_area || null,
     tomo: formData.tomo.trim() || undefined,
-    document_type: formData.document_type,
     service_description: formData.service_description.trim(),
     supplier_id: formData.supplier_id,
-    start_date: formData.start_date,
-    end_date: formData.end_date,
+    // I6: vacías = sin fecha (sin fecha de fin no hay alertas)
+    start_date: formData.start_date || null,
+    end_date: formData.end_date || null,
     total_amount:
       formData.total_amount === '' ? undefined : Number(formData.total_amount),
     consumed_amount:
@@ -217,8 +245,12 @@ function ContractModalBody({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.contract_number.trim()) {
-      notify.error('El número de contrato es obligatorio');
+    if (formData.carpeta.trim() && !carpetaOk) {
+      notify.error('La carpeta debe tener la forma A3T-0000 (por ejemplo A3T-0167)');
+      return;
+    }
+    if (!formData.carpeta.trim() && !formData.contract_number.trim()) {
+      notify.error('Indica la carpeta (o el número del contrato)');
       return;
     }
     if (!formData.supplier_id) {
@@ -229,11 +261,7 @@ function ContractModalBody({
       notify.error('La descripción del servicio es obligatoria');
       return;
     }
-    if (!formData.start_date || !formData.end_date) {
-      notify.error('La vigencia (inicio y fin) es obligatoria');
-      return;
-    }
-    if (formData.end_date < formData.start_date) {
+    if (formData.start_date && formData.end_date && formData.end_date < formData.start_date) {
       notify.error('La fecha de fin no puede ser anterior a la de inicio');
       return;
     }
@@ -410,14 +438,19 @@ function ContractModalBody({
                 <div className="flex items-center gap-3">
                   <ContractStatusBadge status={view.status} />
                   <span className="text-sm text-gray-500">
-                    {CONTRACT_DOCUMENT_TYPE_LABELS[view.document_type]}
+                    {view.document_label ?? CONTRACT_DOC_KIND_LABELS[view.doc_kind]}
+                    {view.carpeta ? ` · carpeta ${view.carpeta}` : ''}
                     {view.tomo ? ` · ${view.tomo}` : ''}
                   </span>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <Field label="Servicio" value={view.service_description} />
                   <Field label="Proveedor" value={dash(view.supplier?.legal_name)} />
-                  <Field label="Vigencia" value={`${formatDate(view.start_date)} – ${formatDate(view.end_date)}`} />
+                  <Field label="Área usuaria" value={dash(view.user_area)} />
+                  <Field
+                    label="Vigencia"
+                    value={`${formatDate(view.start_date)} – ${view.end_date ? formatDate(view.end_date) : 'Sin fecha de fin'}`}
+                  />
                   <Field label="Monto total" value={view.total_amount === null ? 'No disponible' : formatMoney(view.total_amount, view.currency)} />
                   <Field label="Consumido" value={view.consumed_amount === null || view.consumed_amount === undefined ? 'No disponible' : formatMoney(view.consumed_amount, view.currency)} />
                   <Field
@@ -488,41 +521,89 @@ function ContractModalBody({
 
         <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-140px)]">
           <div className="px-6 py-4 space-y-4">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Número de contrato *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Carpeta *</label>
                 <input
                   type="text"
-                  value={formData.contract_number}
-                  onChange={(e) => setFormData({ ...formData, contract_number: e.target.value })}
+                  value={formData.carpeta}
+                  onChange={(e) => setFormData({ ...formData, carpeta: e.target.value })}
                   className={`${inputClass} font-mono`}
-                  placeholder="A3T001"
-                  required
+                  placeholder="A3T-0167"
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de documento *</label>
+                <select
+                  value={formData.doc_kind}
+                  onChange={(e) => setFormData({ ...formData, doc_kind: e.target.value as ContractDocKind })}
+                  className={`${inputClass} bg-white`}
+                >
+                  {Object.entries(CONTRACT_DOC_KIND_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </div>
+              {formData.doc_kind === 'enmienda' ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Núm. de enmienda</label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={formData.doc_number}
+                    onChange={(e) => setFormData({ ...formData, doc_number: e.target.value })}
+                    className={inputClass}
+                    placeholder="La siguiente"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tomo</label>
+                  <input
+                    type="text"
+                    value={formData.tomo}
+                    onChange={(e) => setFormData({ ...formData, tomo: e.target.value })}
+                    className={inputClass}
+                    placeholder="Tomo 17"
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
+                {formData.carpeta.trim() ? (
+                  <p
+                    className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 font-mono text-sm text-[#222D59]"
+                    title="Se arma con la carpeta y el tipo; si ya existe, se le agrega -2"
+                  >
+                    {numberPreview ?? 'Carpeta A3T-0000'}
+                    {isEditing && numberPreview && contract.contract_number !== numberPreview && !contract.contract_number.startsWith(`${numberPreview}-`) && (
+                      <span className="block text-[11px] font-sans text-amber-700">antes {contract.contract_number}</span>
+                    )}
+                  </p>
+                ) : (
+                  <input
+                    type="text"
+                    value={formData.contract_number}
+                    onChange={(e) => setFormData({ ...formData, contract_number: e.target.value })}
+                    className={`${inputClass} font-mono`}
+                    placeholder="Sin carpeta: el número"
+                  />
+                )}
+              </div>
+            </div>
+            {formData.doc_kind === 'enmienda' && (
+              <div className="max-w-xs">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tomo</label>
                 <input
                   type="text"
                   value={formData.tomo}
                   onChange={(e) => setFormData({ ...formData, tomo: e.target.value })}
                   className={inputClass}
-                  placeholder="Tomo 1"
+                  placeholder="Tomo 17"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de documento *</label>
-                <select
-                  value={formData.document_type}
-                  onChange={(e) => setFormData({ ...formData, document_type: e.target.value as ContractDocumentType })}
-                  className={`${inputClass} bg-white`}
-                >
-                  {Object.entries(CONTRACT_DOCUMENT_TYPE_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Servicio *</label>
@@ -556,40 +637,60 @@ function ContractModalBody({
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Estatus</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as ContractStatus })}
-                  className={`${inputClass} bg-white`}
-                >
-                  {Object.entries(CONTRACT_STATUS_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Área usuaria</label>
+                  <select
+                    value={formData.user_area}
+                    onChange={(e) => setFormData({ ...formData, user_area: e.target.value })}
+                    className={`${inputClass} bg-white`}
+                    title="El área usuaria es la responsable del contrato"
+                  >
+                    <option value="">Sin asignar</option>
+                    {/* un área que no está en el catálogo se muestra igual */}
+                    {formData.user_area && !(CONTRACT_USER_AREAS as readonly string[]).includes(formData.user_area) && (
+                      <option value={formData.user_area}>{formData.user_area}</option>
+                    )}
+                    {CONTRACT_USER_AREAS.map((area) => (
+                      <option key={area} value={area}>{area}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Estatus</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as ContractStatus })}
+                    className={`${inputClass} bg-white`}
+                    title="Con fecha de fin, vigente o vencido sale de la fecha; renovado y cancelado se respetan"
+                  >
+                    {Object.entries(CONTRACT_STATUS_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Inicio vigencia *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Inicio vigencia</label>
                 <input
                   type="date"
                   value={formData.start_date}
                   onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
                   className={inputClass}
-                  required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fin vigencia *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fin vigencia</label>
                 <input
                   type="date"
                   value={formData.end_date}
                   onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                   className={inputClass}
-                  required
                 />
+                <p className="text-xs text-gray-500 mt-1">Vacía = sin fecha de fin (permanente o por servicio): sin alertas</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Monto total</label>
@@ -656,7 +757,7 @@ function ContractModalBody({
                 <p className="text-xs text-gray-500 mt-1">Recibe las alertas de vencimiento</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email usuario responsable</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email usuario responsable (opcional)</label>
                 <input
                   type="email"
                   value={formData.responsible_user_email}
@@ -666,7 +767,7 @@ function ContractModalBody({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre usuario responsable</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre usuario responsable (opcional)</label>
                 <input
                   type="text"
                   value={formData.responsible_user_name}
