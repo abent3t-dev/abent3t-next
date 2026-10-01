@@ -239,13 +239,15 @@ function CommitteeModalBody({
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Descripción / agenda</label>
+              {/* I7 (go-live 2026-09-30, Ingrid): el comité lleva título, agenda y PDF */}
+              <label className="block text-sm font-medium text-gray-700 mb-1">Agenda</label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 disabled={!editable}
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900 disabled:bg-gray-100"
+                rows={5}
+                placeholder="Temas a tratar, uno por renglón"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] text-gray-900 disabled:bg-gray-100 whitespace-pre-wrap"
               />
             </div>
 
