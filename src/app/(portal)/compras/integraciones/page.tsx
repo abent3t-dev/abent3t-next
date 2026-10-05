@@ -254,10 +254,11 @@ export default function IntegracionesPage() {
                       <span>{formatDateTime(lastRun.started_at)}</span>
                       <span
                         className="text-xs text-gray-500"
-                        title="insertados / actualizados / sin cambio / fallidos"
+                        title="insertados / actualizados / re-mapeados (mismo dato en Maximo, no es cambio) / sin cambio / fallidos"
                       >
                         +{lastRun.records_inserted} / ~{lastRun.records_updated} /
-                        ={lastRun.records_unchanged} / !{lastRun.records_failed}
+                        ↻{lastRun.records_remapped} / ={lastRun.records_unchanged} /
+                        !{lastRun.records_failed}
                       </span>
                     </div>
                   ) : (
@@ -296,7 +297,7 @@ export default function IntegracionesPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase">Inicio</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Duración</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Estado</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase" title="descargados / insertados / actualizados / sin cambio / fallidos">Registros</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase" title="descargados / insertados / actualizados / re-mapeados (mismo dato en Maximo, no es cambio) / sin cambio / fallidos">Registros</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-white uppercase">Detalle</th>
                   </tr>
                 </thead>
@@ -386,7 +387,7 @@ function RunRow({
           <RunBadge status={run.status} />
         </td>
         <td className="px-4 py-3 text-center text-sm text-gray-600 font-mono whitespace-nowrap">
-          {run.records_fetched} / +{run.records_inserted} / ~{run.records_updated} / ={run.records_unchanged} / !{run.records_failed}
+          {run.records_fetched} / +{run.records_inserted} / ~{run.records_updated} / ↻{run.records_remapped} / ={run.records_unchanged} / !{run.records_failed}
         </td>
         <td className="px-4 py-3 text-center">
           {hasDetail && (

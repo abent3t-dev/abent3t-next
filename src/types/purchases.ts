@@ -562,6 +562,8 @@ export interface MaximoSyncRun {
   records_fetched: number;
   records_inserted: number;
   records_updated: number;
+  /** K8: mismo rowstamp, re-mapeadas por mapper o hash nuevos (no es cambio real). */
+  records_remapped: number;
   records_unchanged: number;
   records_failed: number;
   filter_warnings: unknown;
@@ -586,6 +588,8 @@ export interface MaximoSummaryLastRun {
   finished_at: string | null;
   records_inserted: number;
   records_updated: number;
+  /** K8: re-mapeos sin cambio real. */
+  records_remapped: number;
   records_unchanged: number;
   records_failed: number;
 }
