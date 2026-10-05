@@ -8,6 +8,7 @@ import type { PaginatedResponse } from '@/types/pagination';
 import {
   MAXIMO_STATUS_BADGE_CLASSES,
   MaximoContractGroup,
+  maximoPrStatusBadge,
   maximoStatusBadgeClass,
   maximoStatusLabel,
   maximoStatusTitle,
@@ -33,6 +34,8 @@ import type { ColumnConfigs } from '@/lib/column-filters';
  * número de solicitudes (PR) que lo usan; al expandir se ven sus PR. Antes
  * el mismo contrato salía una vez por PR (el 1051, 8 veces). Los totales
  * cuentan contratos, no PR.
+ * K7.8 (2026-10-05): las PR del contrato con su propio estatus (`pr_status`)
+ * y sus fechas (ISSUEDATE y primer APPR), no las del contrato.
  */
 
 const PAGE_SIZE = 15;
@@ -290,34 +293,44 @@ export default function MaximoContractGroupsView({
                                     <thead>
                                       <tr className="text-xs uppercase text-gray-500">
                                         <th className="py-1 pr-4 text-left font-medium">PR</th>
-                                        <th className="py-1 pr-4 text-left font-medium">Estatus</th>
+                                        <th className="py-1 pr-4 text-left font-medium" title="Estatus de la solicitud (PR) en Maximo">Estatus PR</th>
                                         <th className="py-1 pr-4 text-left font-medium">Solicitado por</th>
-                                        <th className="py-1 pr-4 text-left font-medium">F. Solicitud</th>
-                                        <th className="py-1 text-left font-medium">F. Aprobación</th>
+                                        <th className="py-1 pr-4 text-left font-medium" title="Fecha de la PR en Maximo (ISSUEDATE)">F. Solicitud</th>
+                                        <th className="py-1 text-left font-medium" title="Primera aprobación de la PR (APPR): su llegada a Compras">F. Aprobación</th>
                                       </tr>
                                     </thead>
                                     <tbody>
-                                      {group.prs.map((pr) => (
-                                        <tr key={pr.prnum ?? 'sin-pr'} className="border-t border-gray-200/70">
-                                          <td className="py-1.5 pr-4">
-                                            {pr.prnum ? (
-                                              <button
-                                                type="button"
-                                                onClick={() => setDetailKey(pr.prnum)}
-                                                className="font-mono font-medium text-[#222D59] hover:text-[#52AF32] hover:underline"
+                                      {group.prs.map((pr) => {
+                                        const prBadge = maximoPrStatusBadge(pr.pr_status);
+                                        return (
+                                          <tr key={pr.prnum ?? 'sin-pr'} className="border-t border-gray-200/70">
+                                            <td className="py-1.5 pr-4">
+                                              {pr.prnum ? (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => setDetailKey(pr.prnum)}
+                                                  className="font-mono font-medium text-[#222D59] hover:text-[#52AF32] hover:underline"
+                                                >
+                                                  {pr.prnum}
+                                                </button>
+                                              ) : '—'}
+                                            </td>
+                                            <td className="py-1.5 pr-4">
+                                              <span
+                                                className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap ${prBadge.className}`}
+                                                title={prBadge.title}
                                               >
-                                                {pr.prnum}
-                                              </button>
-                                            ) : '—'}
-                                          </td>
-                                          <td className="py-1.5 pr-4">{maximoStatusLabel(pr.status)}</td>
-                                          <td className="py-1.5 pr-4 text-gray-700" title={pr.requested_by ?? undefined}>
-                                            {pr.requested_by_name ?? dash(pr.requested_by)}
-                                          </td>
-                                          <td className="py-1.5 pr-4 text-gray-600">{formatDate(pr.created_at_source)}</td>
-                                          <td className="py-1.5 text-gray-600">{formatDate(pr.approved_at)}</td>
-                                        </tr>
-                                      ))}
+                                                {prBadge.label}
+                                              </span>
+                                            </td>
+                                            <td className="py-1.5 pr-4 text-gray-700" title={pr.requested_by ?? undefined}>
+                                              {pr.requested_by_name ?? dash(pr.requested_by)}
+                                            </td>
+                                            <td className="py-1.5 pr-4 text-gray-600">{formatDate(pr.pr_issue_date)}</td>
+                                            <td className="py-1.5 text-gray-600">{formatDate(pr.pr_approved_at)}</td>
+                                          </tr>
+                                        );
+                                      })}
                                     </tbody>
                                   </table>
                                 )}

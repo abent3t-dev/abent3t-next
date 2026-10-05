@@ -4,16 +4,17 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { toQuery } from '@/lib/compras-format';
+import { NO_DISPONIBLE, toQuery } from '@/lib/compras-format';
 import { useAuth } from '@/contexts/AuthContext';
 import { PURCHASE_ADMIN_ROLES } from '@/types/auth';
 import type { PaginatedResponse } from '@/types/pagination';
 import {
-  MAXIMO_NO_STATUS_HINT,
-  MAXIMO_STATUS_BADGE_CLASSES,
+  MAXIMO_PR_STATUS_NOT_AVAILABLE,
+  MAXIMO_PR_STATUS_OPTIONS,
   MaximoContract,
   MaximoSummary,
-  maximoStatusBadgeClass,
+  maximoPrStatusBadge,
+  maximoPrStatusLabel,
   maximoStatusLabel,
 } from '@/types/purchases';
 import MaximoContractDetailModal from './MaximoContractDetailModal';
@@ -33,16 +34,17 @@ import type { ColumnConfigs } from '@/lib/column-filters';
 
 /**
  * Sprint 2026-09-22 (A7) — Pestana "Solicitudes Maximo" en /compras/solicitudes.
- * Las filas de `maximo_contracts` tienen como raiz la PR (prnum, estatus,
- * fecha WAPPR = solicitud, fecha APPR = aprobacion, depto, contrato si ya lo
- * tiene), asi que GET /maximo/contracts ya sirve como listado de solicitudes.
- * Solo lectura; los dias se calculan aprobacion − solicitud (null = N/D).
+ * GET /maximo/contracts sirve como listado de solicitudes. Solo lectura; los
+ * dias se calculan aprobacion − solicitud (null = N/D).
  *
- * Bloque 2026-09-23: D2 "Sin estatus en Maximo" explicado (la OS no expone
- * el estatus de la PR sin contrato); D7 monto de la PR (`pr_total`, "No
- * disponible" mientras la OS no lo traiga); D6 solicitante con nombre si hay
- * alias; D4 año.
+ * Bloque 2026-09-23: D7 monto de la PR (`pr_total`); D6 solicitante con
+ * nombre si hay alias; D4 año.
  * E1 (2026-09-25): filtro "tipo Excel" por columna (URL, chips y Excel).
+ * K7.6 (2026-10-05): siempre con `vista=solicitudes` (una fila por PR, K4.4):
+ * estatus, fechas y días DE LA PR (`pr_status`, ISSUEDATE y primer APPR =
+ * llegada a Compras); con contrato, su estatus va en el title. Las PR en
+ * aprobación (WAPPR) todavía no llegan a Compras: se cuentan aparte y se ven
+ * con `en_aprobacion`.
  */
 
 const formatMoney = (amount: number | null, currency: string | null) => {
@@ -59,26 +61,28 @@ const formatMoney = (amount: number | null, currency: string | null) => {
 
 const PAGE_SIZE = 15;
 
+// K7.6: columnas de la vista de solicitudes (MAXIMO_REQUEST_FILTER_COLUMNS
+// del API): `estatus_pr` y las fechas y días son los DE LA PR
 const COLUMNS: ColumnConfigs = {
   pr: { label: 'PR', type: 'text' },
-  estatus: {
-    label: 'Estatus',
+  estatus_pr: {
+    label: 'Estatus de la PR',
     type: 'text',
-    format: (v) => `${maximoStatusLabel(v)} (${v})`,
-    emptyLabel: 'Sin estatus en Maximo',
+    format: (v) => `${maximoPrStatusLabel(v)} (${v})`,
+    emptyLabel: MAXIMO_PR_STATUS_NOT_AVAILABLE,
   },
-  solicitud: { label: 'Fecha de solicitud', type: 'date' },
-  aprobacion: { label: 'Fecha de aprobación', type: 'date' },
-  dias: { label: 'Días', type: 'number' },
-  monto_pr: { label: 'Monto', type: 'number' },
+  solicitud: { label: 'Fecha de la PR', type: 'date' },
+  aprobacion: { label: 'Aprobación de la PR', type: 'date' },
+  dias: { label: 'Días de aprobación', type: 'number' },
+  monto_pr: { label: 'Monto de la PR (Maximo)', type: 'number' },
   solicitante: { label: 'Solicitado por', type: 'text', emptyLabel: '(Sin solicitante)' },
   depto: { label: 'Departamento', type: 'text' },
   contrato: { label: 'Contrato', type: 'text', emptyLabel: 'Sin contrato' },
 };
 
-const STATUS_OPTIONS = Object.keys(MAXIMO_STATUS_BADGE_CLASSES).map((value) => ({
+const STATUS_OPTIONS = MAXIMO_PR_STATUS_OPTIONS.map(({ value, label }) => ({
   value,
-  label: `${maximoStatusLabel(value)} (${value})`,
+  label: `${label} (${value})`,
 }));
 
 const dash = (value: string | number | null | undefined) =>
@@ -95,50 +99,79 @@ const daysBetween = (from: string | null, to: string | null): number | null => {
   return d < 0 ? null : d;
 };
 
+/** K7.6: estatus del contrato para los title; sin estatus, "No disponible". */
+const contractStatusText = (status: string | null) =>
+  status ? `${maximoStatusLabel(status)} (${status})` : NO_DISPONIBLE;
+
+/** K7.6: title del badge: el estatus de la PR con su etiqueta y, con contrato, el del contrato. */
+const prStatusTitle = (pr: MaximoContract) =>
+  [
+    pr.pr_status
+      ? `PR: ${maximoPrStatusLabel(pr.pr_status)} (${pr.pr_status})`
+      : maximoPrStatusBadge(null).title,
+    pr.has_contract ? `Contrato: ${contractStatusText(pr.status)}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
 export default function MaximoRequestsTab({
-  initialStatus = [],
+  initialPrStatus = [],
   year = null,
   pendingFrom = null,
 }: {
-  initialStatus?: string[];
-  /** D4: año (created_at_source). */
+  /** K7.6: estatus DE LA PR (`pr_status`) desde la URL (pie del tablero). */
+  initialPrStatus?: string[];
+  /** D4: año (K4.4: por la fecha de la PR; en pendientes, por su aprobación). */
   year?: number | null;
-  /** G3 (2026-09-28): solo PR sin OC ni contrato, creadas desde esta fecha ('' = sin fecha). */
+  /** G3 (2026-09-28): solo pendientes de gestionar, aprobadas desde esta fecha ('' = sin fecha). */
   pendingFrom?: string | null;
 }) {
   const { hasRole } = useAuth();
   const [search, setSearch] = useState('');
-  const [statuses, setStatuses] = useState<string[]>(initialStatus);
+  const [prStatuses, setPrStatuses] = useState<string[]>(initialPrStatus);
   const [page, setPage] = useState(1);
   const [detailKey, setDetailKey] = useState<string | null>(null);
   const [pending, setPending] = useState(pendingFrom);
   // I8: dentro de pendientes, las PR DE CONTRATO sin OC van aparte (la OC se
   // genera en automático; no son carga de Compras)
   const [contractPending, setContractPending] = useState(false);
+  // K7.6: las PR en aprobación (WAPPR) todavía no llegan a Compras: aparte
+  const [inApproval, setInApproval] = useState(false);
   const cf = useColumnFilters('mxPr', () => setPage(1));
 
-  const showContract = pending !== null && contractPending;
+  const showContract = pending !== null && contractPending && !inApproval;
   const filters = {
+    // K7.6: sin `vista`, la ruta responde Contratos (una fila por revisión)
+    vista: 'solicitudes',
     search,
-    status: statuses,
+    pr_status: prStatuses,
     year: year ?? undefined,
-    sin_oc: pending !== null && !showContract ? 'true' : undefined,
+    sin_oc: pending !== null && !showContract && !inApproval ? 'true' : undefined,
     contrato_sin_oc: showContract ? 'true' : undefined,
+    en_aprobacion: inApproval ? 'true' : undefined,
     pr_desde: pending || undefined,
   };
-  // I8: cuántas de contrato hay en el mismo periodo (para mostrarlas aparte)
-  const contractCountQs = toQuery({
+  // I8 y K7.6: cuántas de contrato y cuántas en aprobación hay en el mismo
+  // periodo (para mostrarlas aparte)
+  const periodQuery = {
+    vista: 'solicitudes',
     limit: 1,
     year: year ?? undefined,
-    contrato_sin_oc: 'true',
     pr_desde: pending || undefined,
-  });
+  };
+  const contractCountQs = toQuery({ ...periodQuery, contrato_sin_oc: 'true' });
   const contractCountQ = useQuery({
     queryKey: ['maximo-requests', 'de-contrato', contractCountQs],
     queryFn: () => api.get<PaginatedResponse<MaximoContract>>(`/maximo/contracts?${contractCountQs}`),
     enabled: pending !== null,
   });
   const contractCount = contractCountQ.data?.meta.total;
+  const inApprovalCountQs = toQuery({ ...periodQuery, en_aprobacion: 'true' });
+  const inApprovalCountQ = useQuery({
+    queryKey: ['maximo-requests', 'en-aprobacion', inApprovalCountQs],
+    queryFn: () => api.get<PaginatedResponse<MaximoContract>>(`/maximo/contracts?${inApprovalCountQs}`),
+    enabled: pending !== null,
+  });
   const filterQs = toQuery({ ...filters, ...cf.params });
   const listQs = toQuery({ page, limit: PAGE_SIZE, ...filters, ...cf.params });
 
@@ -152,32 +185,59 @@ export default function MaximoRequestsTab({
     queryKey: ['maximo', 'summary', year],
     queryFn: () => api.get<MaximoSummary>(`/maximo/summary${year ? `?year=${year}` : ''}`),
   });
-  // E1: chips por estatus con los demás filtros (sin el propio estatus)
+  // E1/K7.6: chips por estatus de la PR con los demás filtros (sin el propio)
   const statusFacet = useColumnFacet(
     '/maximo/contracts/facets',
-    { ...filters, status: undefined, ...cf.params },
-    'estatus',
+    { ...filters, pr_status: undefined, ...cf.params },
+    'estatus_pr',
   );
   const statusCounts = facetCounts(statusFacet.data);
 
   const rows = data?.data ?? [];
   const meta = data?.meta;
-  const hasFilters = !!search || statuses.length > 0 || !!year || pending !== null || cf.activeCount > 0;
-  const sinEstatus = statusFacet.data ? (statusCounts.get(null) ?? 0) : 0;
+  const hasFilters =
+    !!search || prStatuses.length > 0 || !!year || pending !== null || inApproval || cf.activeCount > 0;
   const canSeeIntegrations = hasRole(...PURCHASE_ADMIN_ROLES, 'executive');
-  const summary = summaryQ.data?.contracts;
+  // K4.4: una por PR (con año, por su fecha), como la tabla
+  const summary = summaryQ.data?.requests;
+  // K7.6: en pendientes, las WAPPR del mismo periodo; si no, las de la faceta
+  const inApprovalCount =
+    pending !== null
+      ? inApprovalCountQ.data?.meta.total
+      : statusFacet.data
+        ? (statusCounts.get('WAPPR') ?? 0)
+        : undefined;
   const chips = [...statusCounts.entries()]
     .filter((entry): entry is [string, number] => entry[0] !== null)
-    .map(([status, count]) => ({
-      key: status,
-      label: maximoStatusLabel(status),
-      count,
-      className: maximoStatusBadgeClass(status),
-    }));
+    .map(([status, count]) => {
+      const badge = maximoPrStatusBadge(status);
+      return { key: status, label: badge.label, count, className: badge.className };
+    });
   const toggleStatus = (key: string) => {
-    setStatuses(statuses.includes(key) ? statuses.filter((s) => s !== key) : [...statuses, key]);
+    setPrStatuses(prStatuses.includes(key) ? prStatuses.filter((s) => s !== key) : [...prStatuses, key]);
     setPage(1);
   };
+  const periodo = pending ? periodText(pending) : year ? `en ${year}` : '';
+  const pendingChip = inApproval
+    ? {
+        label: 'En aprobación (WAPPR)',
+        value: `todavía no llegan a Compras${periodo ? `, creadas ${periodo}` : ''}`,
+        title:
+          'PR en aprobación (WAPPR) en Maximo: todavía no llegan a Compras, así que no cuentan como pendientes de gestionar. El periodo va por la fecha de la PR',
+      }
+    : showContract
+      ? {
+          label: 'De contrato sin OC',
+          value: `la OC se genera en automático${periodo ? `, aprobadas ${periodo}` : ''}`,
+          title:
+            'PR de contrato aprobadas (APPR) cuyo número no aparece en ninguna OC vigente de Maximo: la OC se genera en automático, así que no cuentan como carga de Compras',
+        }
+      : {
+          label: 'Pendientes de gestionar',
+          value: `sin OC ni contrato${periodo ? `, aprobadas ${periodo}` : ''}`,
+          title:
+            'PR aprobadas (APPR: ya llegaron a Compras) sin contrato y cuyo número no aparece en ninguna OC vigente de Maximo. El periodo va por su aprobación (llegada a Compras)',
+        };
 
   return (
     <div className="space-y-4">
@@ -192,8 +252,9 @@ export default function MaximoRequestsTab({
           />
           <StatusMultiSelect
             options={STATUS_OPTIONS}
-            value={statuses}
-            onChange={(next) => { setStatuses(next); setPage(1); }}
+            value={prStatuses}
+            onChange={(next) => { setPrStatuses(next); setPage(1); }}
+            placeholder="Todos los estatus de la PR"
           />
           <ExportExcelButton
             path={`/maximo/contracts/export${filterQs ? `?${filterQs}` : ''}`}
@@ -205,7 +266,7 @@ export default function MaximoRequestsTab({
           filteredTotal={meta?.total}
           grandTotal={summary?.total}
           statuses={chips}
-          activeStatuses={statuses}
+          activeStatuses={prStatuses}
           onToggleStatus={toggleStatus}
           loading={isLoading}
         />
@@ -215,19 +276,20 @@ export default function MaximoRequestsTab({
               ? [
                   {
                     key: 'sin_oc',
-                    label: showContract ? 'De contrato sin OC' : 'Pendientes de gestionar',
-                    value: `${showContract ? 'la OC se genera en automático' : 'sin OC ni contrato'}${pending ? `, creadas ${periodText(pending)}` : year ? `, creadas en ${year}` : ''}`,
-                    title: showContract
-                      ? 'PR de contrato cuyo número no aparece en ninguna OC vigente de Maximo: la OC se genera en automático, así que no cuentan como carga de Compras'
-                      : 'PR sin contrato cuyo número no aparece en ninguna OC vigente de Maximo. Maximo no da la fecha de esas PR: el periodo se ubica por su folio (se numeran en orden)',
-                    onClear: () => { setPending(null); setContractPending(false); setPage(1); },
+                    ...pendingChip,
+                    onClear: () => {
+                      setPending(null);
+                      setContractPending(false);
+                      setInApproval(false);
+                      setPage(1);
+                    },
                   },
                 ]
               : []
           }
         />
         {/* I8: las de contrato no son carga de Compras: se ven aparte */}
-        {pending !== null && contractCount !== undefined && contractCount > 0 && (
+        {pending !== null && !inApproval && contractCount !== undefined && contractCount > 0 && (
           <p className="text-xs text-gray-600">
             {showContract ? (
               <>
@@ -246,12 +308,37 @@ export default function MaximoRequestsTab({
             )}
           </p>
         )}
-        <ActiveColumnFilters cf={cf} columns={COLUMNS} />
-        {sinEstatus > 0 && (
-          <p className="text-xs text-gray-600" title={MAXIMO_NO_STATUS_HINT}>
-            <strong>{sinEstatus.toLocaleString('es-MX')} sin estatus en Maximo:</strong> {MAXIMO_NO_STATUS_HINT}
+        {/* K7.6: las PR en aprobación (WAPPR) todavía no llegan a Compras: aparte */}
+        {inApproval ? (
+          <p className="text-xs text-gray-600">
+            PR en aprobación (WAPPR): todavía no llegan a Compras
+            {pending !== null ? ' y no cuentan como pendientes de gestionar' : ''}.{' '}
+            <button type="button" onClick={() => { setInApproval(false); setPage(1); }} className="text-[#52AF32] font-medium hover:underline">
+              {pending !== null ? 'Volver a las pendientes' : 'Ver todas'}
+            </button>
           </p>
+        ) : (
+          inApprovalCount !== undefined &&
+          inApprovalCount > 0 && (
+            <p className="text-xs text-gray-600">
+              {pending !== null ? 'Aparte, ' : ''}
+              <strong>{inApprovalCount.toLocaleString('es-MX')} en aprobación (WAPPR)</strong>, todavía no llegan a Compras.{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setInApproval(true);
+                  setContractPending(false);
+                  setPrStatuses([]);
+                  setPage(1);
+                }}
+                className="text-[#52AF32] font-medium hover:underline"
+              >
+                Ver
+              </button>
+            </p>
+          )
         )}
+        <ActiveColumnFilters cf={cf} columns={COLUMNS} />
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -280,11 +367,11 @@ export default function MaximoRequestsTab({
                 <thead className="bg-[#424846]">
                   <tr>
                     <FilterTh column="pr">PR</FilterTh>
-                    <FilterTh column="estatus" align="center">Estatus</FilterTh>
-                    <FilterTh column="solicitud" align="center">F. Solicitud</FilterTh>
-                    <FilterTh column="aprobacion" align="center">F. Aprobación</FilterTh>
-                    <FilterTh column="dias" align="center">Días</FilterTh>
-                    <FilterTh column="monto_pr" align="right" title="Monto de la solicitud en Maximo (PR.TOTALCOST). 'No disponible' mientras la Object Structure no lo exponga">Monto</FilterTh>
+                    <FilterTh column="estatus_pr" align="center" title="Estatus de la solicitud (PR) en Maximo; con contrato, el del contrato va en el tooltip">Estatus PR</FilterTh>
+                    <FilterTh column="solicitud" align="center" title="Fecha de la PR en Maximo (ISSUEDATE)">F. Solicitud</FilterTh>
+                    <FilterTh column="aprobacion" align="center" title="Primera aprobación de la PR (APPR): su llegada a Compras">F. Aprobación</FilterTh>
+                    <FilterTh column="dias" align="center" title="Días de la fecha de la PR a su aprobación (APPR)">Días</FilterTh>
+                    <FilterTh column="monto_pr" align="right" title="Monto de la PR en Maximo (TOTALCOST). No se combina con las solicitudes de SAP">Monto PR</FilterTh>
                     <FilterTh column="solicitante">Solicitado por</FilterTh>
                     <FilterTh column="depto">Depto.</FilterTh>
                     <FilterTh column="contrato">Contrato</FilterTh>
@@ -293,7 +380,9 @@ export default function MaximoRequestsTab({
                 <tbody className="divide-y divide-gray-200">
                   {rows.map((pr, idx) => {
                     const key = pr.prnum ?? pr.contractnum;
-                    const days = daysBetween(pr.created_at_source, pr.approved_at);
+                    // K7.6: días DE LA PR (ISSUEDATE → primer APPR), la columna `dias` del API
+                    const days = daysBetween(pr.pr_issue_date, pr.pr_approved_at);
+                    const badge = maximoPrStatusBadge(pr.pr_status);
                     return (
                       <tr
                         key={pr.id}
@@ -305,26 +394,26 @@ export default function MaximoRequestsTab({
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span
-                            className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${maximoStatusBadgeClass(pr.status)}`}
-                            title={pr.status ?? MAXIMO_NO_STATUS_HINT}
+                            className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full whitespace-nowrap ${badge.className}`}
+                            title={prStatusTitle(pr)}
                           >
-                            {maximoStatusLabel(pr.status)}
+                            {badge.label}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-center text-sm text-gray-600">{formatDate(pr.created_at_source)}</td>
-                        <td className="px-4 py-3 text-center text-sm text-gray-600">{formatDate(pr.approved_at)}</td>
+                        <td className="px-4 py-3 text-center text-sm text-gray-600">{formatDate(pr.pr_issue_date)}</td>
+                        <td className="px-4 py-3 text-center text-sm text-gray-600">{formatDate(pr.pr_approved_at)}</td>
                         <td className="px-4 py-3 text-center text-sm">
                           {days === null ? (
-                            <span className="text-gray-500 italic" title="Sin fecha de solicitud o de aprobación en Maximo">N/D</span>
+                            <span className="text-gray-500 italic" title="Sin fecha de la PR o sin aprobación (APPR) en Maximo">N/D</span>
                           ) : (
                             <span className="text-gray-700">{days}</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-right whitespace-nowrap">
                           {pr.pr_total === null ? (
-                            <span className="text-gray-500 italic" title="La Object Structure de Maximo aún no expone el monto de la PR (pedido a CIISA)">No disponible</span>
+                            <span className="text-gray-500 italic" title="Maximo no trae el monto (TOTALCOST) de esta PR">No disponible</span>
                           ) : (
-                            <span className="text-gray-900">{formatMoney(pr.pr_total, pr.currency)}</span>
+                            <span className="text-gray-900" title="Monto de la PR en Maximo (TOTALCOST)">{formatMoney(pr.pr_total, pr.currency)}</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600" title={pr.requested_by ?? undefined}>
@@ -335,11 +424,11 @@ export default function MaximoRequestsTab({
                           {pr.has_contract ? (
                             <>
                               <span className="font-mono text-gray-900">{dash(pr.contractnum)}</span>
-                              {/* I8: PR de contrato sin OC → la OC se genera en automático */}
-                              {pr.has_po === false && (
+                              {/* I8/K7.6: PR de contrato aprobada (APPR) sin OC → la OC se genera en automático */}
+                              {pr.has_po === false && pr.pr_status === 'APPR' && (
                                 <span
                                   className="block mt-0.5 w-fit max-w-44 px-1.5 py-0.5 text-[10px] font-semibold leading-tight rounded bg-[#222D59]/10 text-[#222D59]"
-                                  title={`Todavía sin OC; no cuenta como pendiente de Compras. Estatus en Maximo: ${pr.status ?? 'sin estatus'}`}
+                                  title={`PR aprobada (APPR) y todavía sin OC; no cuenta como pendiente de Compras. Contrato: ${contractStatusText(pr.status)}`}
                                 >
                                   De contrato: la OC se genera en automático
                                 </span>

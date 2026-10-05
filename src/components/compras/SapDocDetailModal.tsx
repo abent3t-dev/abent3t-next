@@ -265,6 +265,13 @@ export default function SapDocDetailModal({
                   label={isPo ? 'Monto (con IVA)' : 'Monto (sin IVA)'}
                   value={formatMoney(doc.doc_total, doc.currency)}
                 />
+                {/* K6: suma de las líneas; sin estimar si falta alguna */}
+                {isPo && (
+                  <Field
+                    label="Subtotal (sin IVA)"
+                    value={!poDoc || poDoc.subtotal === null ? <NoDisponible /> : formatMoney(poDoc.subtotal, doc.currency)}
+                  />
+                )}
                 {isPo && <Field label="Saldo disponible" value={saldo} />}
                 <Field label="Moneda" value={dash(doc.currency)} />
                 <Field label="Fecha documento" value={formatDate(doc.doc_date)} />

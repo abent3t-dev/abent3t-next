@@ -5,9 +5,17 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { formatAmountLines, formatDays, NO_DISPONIBLE } from '@/lib/compras-format';
+import {
+  AmountLine,
+  formatAmountLines,
+  formatDays,
+  formatOrderAmountLines,
+  NO_DISPONIBLE,
+  subtotalNota,
+} from '@/lib/compras-format';
 import { SHOW_INTERNAL_REQUISITIONS } from '@/lib/features';
 import { PieChart } from '@/components/charts/PieChart';
+import AmountList from '@/components/compras/AmountList';
 import { AbentLevels, SapPendingApprovers } from '@/components/compras/ApprovalDelays';
 import { MaximoChainSummary, useCadenaMaximo } from '@/components/compras/MaximoChain';
 import YearChips from '@/components/compras/YearChips';
@@ -17,11 +25,11 @@ import {
   DashboardSummary,
   GestionStats,
   groupMaximoStatusCounts,
-  MAXIMO_NO_STATUS_HINT,
   MAXIMO_RUN_STATUS_LABELS,
   MAXIMO_STATUS_CHART_COLORS,
   MaximoSummary,
   maximoGroupLabel,
+  maximoPrStatusLabel,
   SAP_STATUS_CHART_COLORS,
   SapSummary,
   sapStatusLabel,
@@ -43,7 +51,8 @@ import { periodText } from '@/components/compras/LinkedFilterChips';
  *  - D1: las OC migradas de Maximo a SAP se cuentan una vez (desglose en la
  *    tarjeta de órdenes).
  *  - D3: días de gestión de OC SAP = OC − solicitud de pedido, con N visible.
- *  - D2: "Sin estatus en Maximo" explicado en el pie de solicitudes Maximo.
+ *  - D2: "Sin estatus en Maximo" explicado en el pie de solicitudes Maximo
+ *    (K7 lo quita: el pie va por el estatus de la PR).
  *  - D7: el bloque del flujo propio solo se muestra si hay niveles con
  *    persona asignada (o si la captura propia está activa).
  *
@@ -54,6 +63,15 @@ import { periodText } from '@/components/compras/LinkedFilterChips';
  *  - G3: "Pendientes de gestionar" = solicitudes sin OC (año o 12 meses) y
  *    navega a esas mismas solicitudes.
  *  - G7: WAPPR / APPRn / APPRnREV de Maximo se juntan como "En aprobación".
+ *
+ * Bloque K (2026-10-05, K7.9):
+ *  - pie "Solicitudes Maximo (PR)" por el estatus DE LA PR
+ *    (`maximo.requests`); el clic manda `pr_status` a Solicitudes;
+ *  - Maximo en Solicitudes totales con "N llegaron a Compras"; Pendientes =
+ *    PR aprobadas (APPR) sin OC ni contrato, con las WAPPR aparte;
+ *  - días de gestión de Maximo con el dato "desde la aprobación";
+ *  - montos de OC con su base (`monto_nota`) y el subtotal sin IVA por
+ *    moneda como dato secundario (K6.3).
  */
 
 const Icons = {
@@ -94,8 +112,8 @@ function KpiCard({
 }: {
   label: string;
   value: string | number;
-  /** Un renglón por dato (p. ej. un monto por moneda). */
-  lines?: string[];
+  /** Un renglón por dato (p. ej. un monto por moneda); K6: `sub` en letra chica. */
+  lines?: Array<string | AmountLine>;
   sub?: string;
   hint: string;
   icon: React.ReactNode;
@@ -124,15 +142,7 @@ function KpiCard({
         </div>
         <div className={`${color} shrink-0`}>{icon}</div>
       </div>
-      {lines && lines.length > 0 && (
-        <ul className="mt-2 space-y-0.5">
-          {lines.map((line) => (
-            <li key={line} className="text-sm text-gray-800 tabular-nums break-words">
-              {line}
-            </li>
-          ))}
-        </ul>
-      )}
+      {lines && lines.length > 0 && <AmountList lines={lines} className="mt-2 space-y-0.5 text-sm text-gray-800" />}
       {sub && <p className="text-xs text-gray-600 mt-2 leading-snug">{sub}</p>}
       {clickable && <p className="text-xs text-[#52AF32] mt-1">Ver detalle →</p>}
     </div>
@@ -147,7 +157,6 @@ function StatusPie({
   onSlice,
   emptyText,
   noun,
-  nullHint,
 }: {
   title: string;
   data: Array<{ status: string | null; count: number; codes?: string[] }>;
@@ -158,8 +167,6 @@ function StatusPie({
   emptyText: string;
   /** "órdenes" / "solicitudes": texto del centro y de la ayuda. */
   noun: string;
-  /** D2: explicación cuando hay un segmento sin estatus (no es error nuestro). */
-  nullHint?: string;
 }) {
   const rows = data
     .filter((d) => d.count > 0)
@@ -170,7 +177,6 @@ function StatusPie({
     rows.map((r) => r.status),
     colorOf,
   );
-  const hasNull = rows.some((r) => r.status === null);
   return (
     <div className="bg-white p-6 rounded-lg shadow">
       <div className="flex items-baseline justify-between gap-3 mb-2">
@@ -196,11 +202,6 @@ function StatusPie({
           <p className="mt-2 text-xs text-gray-600 text-center">
             Clic en un estatus para ver esas {noun} en su tabla
           </p>
-          {hasNull && nullHint && (
-            <p className="mt-2 text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded px-3 py-2" title={nullHint}>
-              <strong>{labelOf(null)}:</strong> {nullHint}
-            </p>
-          )}
         </>
       )}
     </div>
@@ -210,21 +211,32 @@ function StatusPie({
 const kpiNumber = (v: number | null | undefined) =>
   v === null ? NO_DISPONIBLE : (v ?? 0).toLocaleString('es-MX');
 
+/** `maximoExtra` va pegado al número de Maximo (K7.9: "(N llegaron a Compras)"). */
 const fuente = (
   s: { sap: SourceKpi; maximo: SourceKpi; abent: SourceKpi },
   key: 'total' | 'count' | 'pendientes',
+  maximoExtra = '',
 ) =>
-  `SAP ${kpiNumber(s.sap[key])} · Maximo ${kpiNumber(s.maximo[key])}` +
+  `SAP ${kpiNumber(s.sap[key])} · Maximo ${kpiNumber(s.maximo[key])}${maximoExtra}` +
   (SHOW_INTERNAL_REQUISITIONS || (s.abent[key] ?? 0) > 0 ? ` · ABENT ${kpiNumber(s.abent[key])}` : '');
 
 const GESTION_HINT =
   'Días naturales desde que se crea la solicitud hasta que se crea la orden de compra (la fecha de la OC cierra la gestión). ' +
   'SAP: fecha de la solicitud de pedido (la más antigua, si hay varias) → fecha de la OC; solo OC que nacieron de una solicitud. ' +
-  'Maximo: fecha de creación de la solicitud (PR) → fecha de la OC en Maximo; solo OC con PR. ' +
+  'Maximo: fecha de creación de la solicitud (PR) → fecha de la OC en Maximo; solo OC con PR. Si la línea de la OC no trae la fecha de su PR, se toma la de la PR (la más antigua, si hay varias). ' +
+  'Maximo "desde la aprobación": de que la PR llega a Compras (su primera aprobación, APPR) a la fecha de la OC. ' +
   'La mediana es el caso típico: las OC capturadas meses después suben el promedio. Con año, cuentan las OC creadas ese año.';
 
+type GestionRow = {
+  label: string;
+  stats: GestionStats | null;
+  abent?: number | null;
+  /** K7.9: dato secundario (Maximo desde la aprobación de la PR). */
+  secondary?: { label: string; stats: GestionStats };
+};
+
 /** G2: un número por sistema (promedio y mediana) con su N. */
-function GestionCard({ rows }: { rows: Array<{ label: string; stats: GestionStats | null; abent?: number | null }> }) {
+function GestionCard({ rows }: { rows: GestionRow[] }) {
   return (
     <div className="bg-white p-4 rounded-lg shadow border-l-4 border-[#DFA922]" title={GESTION_HINT}>
       <div className="flex items-start justify-between gap-2">
@@ -235,7 +247,7 @@ function GestionCard({ rows }: { rows: Array<{ label: string; stats: GestionStat
         <div className="text-[#DFA922] shrink-0">{Icons.clock}</div>
       </div>
       <ul className="mt-1 space-y-2">
-        {rows.map(({ label, stats, abent }) => {
+        {rows.map(({ label, stats, abent, secondary }) => {
           const promedio = stats ? stats.promedio_dias : (abent ?? null);
           return (
             <li key={label}>
@@ -250,6 +262,14 @@ function GestionCard({ rows }: { rows: Array<{ label: string; stats: GestionStat
                   {stats.total === 0
                     ? 'sin OC con solicitud'
                     : `mediana ${formatDays(stats.mediana_dias)} · ${stats.total.toLocaleString('es-MX')} OC con solicitud`}
+                </p>
+              )}
+              {secondary && (
+                <p className="pl-[4.5rem] text-xs text-gray-500 tabular-nums" title={secondary.stats.definicion}>
+                  {secondary.label}:{' '}
+                  {secondary.stats.promedio_dias === null
+                    ? NO_DISPONIBLE
+                    : `${formatDays(secondary.stats.promedio_dias)} · mediana ${formatDays(secondary.stats.mediana_dias)} · ${secondary.stats.total.toLocaleString('es-MX')} OC`}
                 </p>
               )}
             </li>
@@ -309,10 +329,9 @@ export default function ComprasDashboardPage() {
   };
   const goSapRequests = (status: string | null) =>
     router.push(`/compras/solicitudes?tab=sap_pr${status ? `&status=${status}` : ''}${yearParam}`);
-  const goMaximoRequests = (status: string | null, codes?: string[]) => {
-    const list = codes && codes.length > 0 ? codes.join(',') : status;
-    router.push(`/compras/solicitudes?tab=maximo_pr${list ? `&status=${list}` : ''}${yearParam}`);
-  };
+  // K7.9: el pie de solicitudes de Maximo va por el estatus DE LA PR
+  const goMaximoRequests = (status: string | null) =>
+    router.push(`/compras/solicitudes?tab=maximo_pr${status ? `&pr_status=${status}` : ''}${yearParam}`);
   // G3: pendientes = solicitudes sin OC del periodo (cada pestaña con su filtro)
   const pendingPeriod = summary?.solicitudes.pendientes_periodo;
   const goPending = () =>
@@ -321,18 +340,30 @@ export default function ComprasDashboardPage() {
         (year ? yearParam : pendingPeriod ? `&desde=${pendingPeriod.desde}` : ''),
     );
 
-  const gestionRows: Array<{ label: string; stats: GestionStats | null; abent?: number | null }> = summary
+  const gestionRows: GestionRow[] = summary
     ? [
         { label: 'SAP', stats: summary.dias_gestion.sap },
-        { label: 'Maximo', stats: summary.dias_gestion.maximo },
+        {
+          label: 'Maximo',
+          stats: summary.dias_gestion.maximo,
+          secondary: { label: 'desde la aprobación', stats: summary.dias_gestion.maximo_desde_aprobacion },
+        },
         ...(SHOW_INTERNAL_REQUISITIONS || summary.dias_gestion.abent !== null
           ? [{ label: 'ABENT', stats: null, abent: summary.dias_gestion.abent }]
           : []),
       ]
     : [];
-  const sinLimite = summary
-    ? `Sin límite de fecha: SAP ${summary.solicitudes.por_fuente.sap.pendientes_sin_limite.toLocaleString('es-MX')} · Maximo ${summary.solicitudes.por_fuente.maximo.pendientes_sin_limite.toLocaleString('es-MX')}.`
+  // K4/K7.9: Maximo cuenta PR (llegada a Compras = primer APPR; WAPPR aparte)
+  const maximoPr = summary?.solicitudes.por_fuente.maximo;
+  const llegaron = maximoPr
+    ? maximoPr.llegaron_a_compras === null
+      ? ' (llegada a Compras no disponible)'
+      : ` (${maximoPr.llegaron_a_compras.toLocaleString('es-MX')} llegaron a Compras)`
     : '';
+  const sinLimite =
+    summary && maximoPr
+      ? `Sin límite de fecha: SAP ${summary.solicitudes.por_fuente.sap.pendientes_sin_limite.toLocaleString('es-MX')} · Maximo ${maximoPr.pendientes_sin_limite.toLocaleString('es-MX')} (y ${maximoPr.en_aprobacion_sin_limite.toLocaleString('es-MX')} en aprobación).`
+      : '';
   const migradas = summary?.ordenes.migradas;
   // G6: los niveles 1/2/3 y Director General son del Comité (CCC), no de
   // las aprobaciones de SAP/Maximo: solo se muestran con la captura propia
@@ -366,7 +397,9 @@ export default function ComprasDashboardPage() {
         <div className="bg-white px-4 py-3 rounded-lg shadow flex flex-wrap items-center justify-between gap-3">
           <YearChips years={summary.datos.anios} value={year} onChange={setYear} />
           <span className="text-xs text-gray-500">
-            {year ? `Tarjetas, gráficas y montos acotados a ${year} (SAP por fecha del documento, Maximo por fecha de la orden).` : 'Todos los años sincronizados.'}
+            {year
+              ? `Tarjetas, gráficas y montos acotados a ${year} (SAP por fecha del documento; Maximo: órdenes por su fecha y solicitudes por la fecha de la PR).`
+              : 'Todos los años sincronizados.'}
           </span>
         </div>
       )}
@@ -385,8 +418,11 @@ export default function ComprasDashboardPage() {
           <KpiCard
             label="Solicitudes totales"
             value={summary.solicitudes.total.toLocaleString('es-MX')}
-            sub={fuente(summary.solicitudes.por_fuente, 'total')}
-            hint="Solicitudes de pedido de SAP + solicitudes (PR) de Maximo. Fuente: staging sincronizado de cada ERP."
+            sub={fuente(summary.solicitudes.por_fuente, 'total', llegaron)}
+            hint={
+              'Solicitudes de pedido de SAP (por su fecha) + solicitudes (PR) de Maximo, una por PR, por su fecha de creación (ISSUEDATE). ' +
+              '"Llegaron a Compras" = las PR de Maximo que ya se aprobaron (APPR). Fuente: staging sincronizado de cada ERP.'
+            }
             icon={Icons.document}
             border="border-blue-500"
             color="text-blue-500"
@@ -395,20 +431,26 @@ export default function ComprasDashboardPage() {
           <KpiCard
             label="Pendientes de gestionar"
             value={summary.solicitudes.pendientes.toLocaleString('es-MX')}
-            sub={
-              `${fuente(summary.solicitudes.por_fuente, 'pendientes')} · ` +
-              (year ? `creadas en ${year}` : `creadas ${periodText(pendingPeriod?.desde)}`) +
+            sub={[
+              fuente(summary.solicitudes.por_fuente, 'pendientes'),
+              year ? `de ${year}` : periodText(pendingPeriod?.desde),
               // I8: las de contrato se muestran aparte (la OC se genera sola)
-              (summary.solicitudes.por_fuente.maximo.de_contrato
-                ? ` · aparte, ${summary.solicitudes.por_fuente.maximo.de_contrato.toLocaleString('es-MX')} de contrato`
-                : '')
-            }
+              summary.solicitudes.por_fuente.maximo.de_contrato
+                ? `aparte, ${summary.solicitudes.por_fuente.maximo.de_contrato.toLocaleString('es-MX')} de contrato`
+                : '',
+              // K7.9: las WAPPR todavía no llegan a Compras (no son pendientes)
+              summary.solicitudes.por_fuente.maximo.en_aprobacion !== null
+                ? `${summary.solicitudes.por_fuente.maximo.en_aprobacion.toLocaleString('es-MX')} en aprobación`
+                : '',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
             hint={
-              'Solicitudes creadas que todavía no tienen orden de compra (la gestión termina cuando nace la OC). ' +
-              'SAP: solicitudes de pedido abiertas que ninguna OC usa como base. ' +
-              'Maximo: PR sin contrato cuyo número no aparece en ninguna OC vigente; Maximo no da la fecha de esas PR, así que el periodo se ubica por su folio (se numeran en orden). ' +
+              'Solicitudes que todavía no tienen orden de compra (la gestión termina cuando nace la OC). ' +
+              'SAP: solicitudes de pedido abiertas que ninguna OC usa como base, por su fecha. ' +
+              'Maximo: PR aprobadas (APPR, ya en Compras) sin OC ni contrato, por fecha de aprobación; las que están en aprobación (WAPPR) van aparte. ' +
               'Las PR de contrato sin OC van aparte ("de contrato"): la OC se genera en automático y no son carga de Compras. ' +
-              (year ? `Creadas en ${year}. ` : 'Solo las de los últimos 12 meses, para no contar solicitudes históricas que nunca se cerraron. ') +
+              (year ? `Del ${year}. ` : 'Solo las de los últimos 12 meses, para no contar solicitudes históricas que nunca se cerraron. ') +
               sinLimite
             }
             icon={Icons.clock}
@@ -420,7 +462,7 @@ export default function ComprasDashboardPage() {
           <KpiCard
             label="Órdenes de compra"
             value={summary.ordenes.total.toLocaleString('es-MX')}
-            lines={formatAmountLines(summary.ordenes.monto_por_moneda)}
+            lines={formatOrderAmountLines(summary.ordenes.monto_por_moneda, summary.ordenes.monto_base)}
             sub={
               fuente(summary.ordenes.por_fuente, 'count') +
               (migradas && migradas.total > 0
@@ -430,7 +472,10 @@ export default function ComprasDashboardPage() {
                     : '')
                 : '')
             }
-            hint="OC no canceladas de SAP (DocTotal) + OC vigentes de Maximo (TOTALCOST). Una OC que Maximo migró a SAP se cuenta una sola vez (del lado de Maximo). Montos por moneda: nunca se suman MXN con USD."
+            hint={
+              `OC no canceladas de SAP + OC vigentes de Maximo. Montos ${summary.ordenes.monto_nota}. ${subtotalNota(summary.ordenes.monto_base)} ` +
+              'Una OC que Maximo migró a SAP se cuenta una sola vez (del lado de Maximo). Montos por moneda: nunca se suman MXN con USD.'
+            }
             icon={Icons.check}
             border="border-[#52AF32]"
             color="text-[#52AF32]"
@@ -441,7 +486,10 @@ export default function ComprasDashboardPage() {
             value={summary.por_recibir.total.toLocaleString('es-MX')}
             lines={formatAmountLines(summary.por_recibir.monto_por_moneda)}
             sub={fuente(summary.por_recibir.por_fuente, 'count')}
-            hint="SAP no reporta 'en tránsito': se usan las OC abiertas (bost_Open, no canceladas), contadas una vez si vienen de Maximo. Maximo: OC en APPR o INPRG."
+            hint={
+              "SAP no reporta 'en tránsito': se usan las OC abiertas (bost_Open, no canceladas), contadas una vez si vienen de Maximo. Maximo: OC en APPR o INPRG. " +
+              `Montos ${summary.por_recibir.monto_nota}.`
+            }
             icon={Icons.truck}
             border="border-orange-500"
             color="text-orange-500"
@@ -485,14 +533,14 @@ export default function ComprasDashboardPage() {
           noun="órdenes"
           emptyText={maximo && !maximo.syncEnabled ? 'Sincronización de Maximo pendiente de activación' : 'Sin órdenes sincronizadas'}
         />
+        {/* K7.9: una por PR, por su estatus (WAPPR, APPR, CLOSE, CAN); sin agrupar */}
         <StatusPie
-          title={`Solicitudes / contratos Maximo — por estatus${year ? ` (${year})` : ''}`}
-          data={groupMaximoStatusCounts(maximo?.contracts.byStatus ?? [])}
-          labelOf={maximoGroupLabel}
+          title={`Solicitudes Maximo (PR) — por estatus${year ? ` (${year})` : ''}`}
+          data={maximo?.requests.byStatus ?? []}
+          labelOf={maximoPrStatusLabel}
           colorOf={MAXIMO_STATUS_CHART_COLORS}
           onSlice={goMaximoRequests}
           noun="solicitudes"
-          nullHint={MAXIMO_NO_STATUS_HINT}
           emptyText={maximo && !maximo.syncEnabled ? 'Sincronización de Maximo pendiente de activación' : 'Sin solicitudes sincronizadas'}
         />
       </div>
@@ -512,11 +560,12 @@ export default function ComprasDashboardPage() {
             <div>
               <p className="text-sm text-gray-500">Órdenes de compra</p>
               <p className="text-2xl font-bold text-[#424846]">{sap.purchaseOrders.total.toLocaleString('es-MX')}</p>
-              <ul className="mt-1 text-xs text-gray-600 tabular-nums">
-                {formatAmountLines(sap.purchaseOrders.montoPorMoneda).map((l) => (
-                  <li key={l}>{l}</li>
-                ))}
-              </ul>
+              <div title={`Montos ${sap.purchaseOrders.montoBase === 'sin_iva' ? 'sin IVA' : 'con IVA (DocTotal)'}. ${subtotalNota(sap.purchaseOrders.montoBase)}`}>
+                <AmountList
+                  lines={formatOrderAmountLines(sap.purchaseOrders.montoPorMoneda, sap.purchaseOrders.montoBase)}
+                  className="mt-1 text-xs text-gray-600"
+                />
+              </div>
               <p className="mt-2 text-xs text-gray-500">
                 {sap.purchaseOrders.linesClassified > 0
                   ? `${sap.purchaseOrders.linesClassified.toLocaleString('es-MX')} de ${sap.purchaseOrders.linesTotal.toLocaleString('es-MX')} líneas clasificadas`
@@ -533,7 +582,8 @@ export default function ComprasDashboardPage() {
             <div>
               <p className="text-sm text-gray-500">Solicitudes de pedido</p>
               <p className="text-2xl font-bold text-[#424846]">{sap.purchaseRequests.total.toLocaleString('es-MX')}</p>
-              <ul className="mt-1 text-xs text-gray-600 tabular-nums">
+              {/* K6: las solicitudes de SAP ya son sin IVA (suma de sus líneas) */}
+              <ul className="mt-1 text-xs text-gray-600 tabular-nums" title="Montos sin IVA (suma de las líneas de la solicitud)">
                 {formatAmountLines(sap.purchaseRequests.montoPorMoneda).map((l) => (
                   <li key={l}>{l}</li>
                 ))}
@@ -583,7 +633,7 @@ export default function ComprasDashboardPage() {
               </span>
             )}
           </div>
-          {maximo.purchaseOrders.total === 0 && maximo.contracts.total === 0 && !maximo.syncEnabled ? (
+          {maximo.purchaseOrders.total === 0 && maximo.contracts.total === 0 && maximo.requests.total === 0 && !maximo.syncEnabled ? (
             <p className="text-sm text-gray-500">
               Sincronización pendiente de activación (configuración del servidor). Los datos de Maximo aparecerán aquí en cuanto se habilite.
             </p>
@@ -593,11 +643,15 @@ export default function ComprasDashboardPage() {
                 <p className="text-sm text-gray-500">Órdenes de Maximo</p>
                 <p className="text-2xl font-bold text-[#424846]">{maximo.purchaseOrders.total.toLocaleString('es-MX')}</p>
               </div>
+              {/* K7.9: una por PR, como el pie; los contratos van aparte (otra fecha) */}
               <div>
-                <p className="text-sm text-gray-500">Solicitudes / contratos de Maximo</p>
-                <p className="text-2xl font-bold text-[#424846]">
-                  {maximo.contracts.total.toLocaleString('es-MX')}
-                  <span className="ml-2 text-sm font-normal text-gray-500">({maximo.contracts.withContract.toLocaleString('es-MX')} con contrato)</span>
+                <p className="text-sm text-gray-500">Solicitudes (PR) de Maximo</p>
+                <p className="text-2xl font-bold text-[#424846]">{maximo.requests.total.toLocaleString('es-MX')}</p>
+                <p
+                  className="mt-1 text-xs text-gray-500"
+                  title={year ? 'Contratos por su fecha; las solicitudes, por la fecha de la PR' : undefined}
+                >
+                  Contratos: {maximo.contracts.withContract.toLocaleString('es-MX')}
                 </p>
               </div>
               <div>

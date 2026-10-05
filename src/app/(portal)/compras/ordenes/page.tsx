@@ -243,6 +243,7 @@ function OrdenesPageInner({
         <SapOrdersTab
           initialStatus={initialTab === 'sap_po' ? initialStatus : []}
           initialOrigin={initialTab === 'sap_po' ? initialOrigin : ''}
+          initialSearch={initialTab === 'sap_po' ? initialSearch : ''}
           year={year}
           linkedVendor={
             initialTab === 'sap_po' && linked?.key.startsWith('sap:')
@@ -451,7 +452,9 @@ function OrdenesPageInner({
 
 /**
  * Pestana/estatus iniciales desde la URL (?tab=sap_po&status=open&year=2025
- * &origin=maximo&search=PO1234); Suspense por useSearchParams. G1: desde el
+ * &origin=maximo&search=PO1234); Suspense por useSearchParams. `search` va a
+ * Maximo (PONUM, desde la OC de SAP migrada) o a SAP (número de la OC,
+ * desde el detalle de la PO de Maximo, K7). G1: desde el
  * top de Reportes llegan `proveedor` (sap:P0000219 / maximo:P0000440),
  * `proveedor_nombre`, `contadas_una_vez`, `from` y `to`.
  */

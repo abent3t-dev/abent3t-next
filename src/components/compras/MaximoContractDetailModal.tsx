@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import MaximoSupplierCell from './MaximoSupplierCell';
 import {
   MaximoContractDetail,
+  maximoPrStatusBadge,
   maximoStatusBadgeClass,
   maximoStatusLabel,
   maximoStatusTitle,
@@ -15,6 +16,10 @@ import {
  * Fase INT-5 — Detalle SOLO LECTURA de un contrato/PR de Maximo (staging).
  * `contractKey` es el prnum, o el contractnum cuando el registro no trae PR.
  * Lineas e historial vienen derivados del raw por el backend.
+ *
+ * K7.7 (2026-10-05): la PR y el contrato por separado: badge de cada uno,
+ * fechas y días DE LA PR (K3) e historial de la PR (PRSTATUS) aparte del
+ * historial del contrato, que solo sale con contrato.
  */
 
 interface MaximoContractDetailModalProps {
@@ -70,15 +75,24 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 /** MAXVOL no lo expone la Object Structure de AB_CONTRATOS (pendiente
- *  CIISA): null → "No disponible", nunca 0 ni "—". */
-const NotAvailable = () => (
-  <span
-    className="text-gray-400 italic"
-    title="La Object Structure de Maximo aún no expone este campo (ajuste pendiente con CIISA)"
-  >
+ *  CIISA): null → "No disponible", nunca 0 ni "—". K7.7: `hint` para los
+ *  campos que sí llegan pero vienen vacíos (monto de la PR). */
+const NotAvailable = ({
+  hint = 'La Object Structure de Maximo aún no expone este campo (ajuste pendiente con CIISA)',
+}: {
+  hint?: string;
+}) => (
+  <span className="text-gray-400 italic" title={hint}>
     No disponible
   </span>
 );
+
+/** K7.7: días de la PR (ISSUEDATE → primer APPR), la misma regla que la columna `dias` del API. */
+const daysBetween = (from: string | null, to: string | null): number | null => {
+  if (!from || !to) return null;
+  const d = Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86_400_000);
+  return d < 0 ? null : d;
+};
 
 export default function MaximoContractDetailModal({
   isOpen,
@@ -98,6 +112,8 @@ export default function MaximoContractDetailModal({
 
   if (!isOpen || !contractKey) return null;
   const current = data?.current;
+  const prBadge = maximoPrStatusBadge(current?.pr_status);
+  const prDays = current ? daysBetween(current.pr_issue_date, current.pr_approved_at) : null;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -138,13 +154,23 @@ export default function MaximoContractDetailModal({
             <>
               {/* Cabecera */}
               <div className="flex items-center gap-3 flex-wrap">
-                <span
-                  className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${maximoStatusBadgeClass(current.status)}`}
-                  title={maximoStatusTitle(current.status)}
-                >
-                  {maximoStatusLabel(current.status)}
-                </span>
-                {!current.has_contract && (
+                {/* K7.7: estatus DE LA PR y, con contrato, el del contrato */}
+                {current.prnum && (
+                  <span
+                    className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${prBadge.className}`}
+                    title={prBadge.title}
+                  >
+                    Solicitud: {prBadge.label}
+                  </span>
+                )}
+                {current.has_contract ? (
+                  <span
+                    className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${maximoStatusBadgeClass(current.status)}`}
+                    title={maximoStatusTitle(current.status)}
+                  >
+                    Contrato: {maximoStatusLabel(current.status)}
+                  </span>
+                ) : (
                   <span className="inline-flex px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
                     Sin contrato
                   </span>
@@ -171,7 +197,7 @@ export default function MaximoContractDetailModal({
                     )
                   }
                 />
-                <Field label="Monto" value={formatMoney(current.total_cost, current.currency)} />
+                <Field label="Monto del contrato" value={formatMoney(current.total_cost, current.currency)} />
                 <Field label="Moneda" value={dash(current.currency)} />
                 <Field label="Vigencia inicio" value={formatDate(current.start_date)} />
                 <Field label="Vigencia fin" value={formatDate(current.end_date)} />
@@ -203,12 +229,93 @@ export default function MaximoContractDetailModal({
                   }
                 />
                 <Field
-                  label="Monto de la PR"
-                  value={current.pr_total === null ? <NotAvailable /> : formatMoney(current.pr_total, current.currency)}
+                  label="Monto de la PR (Maximo)"
+                  value={
+                    current.pr_total === null ? (
+                      <NotAvailable hint="Maximo no trae el monto (TOTALCOST) de esta PR" />
+                    ) : (
+                      <span title="Monto de la PR en Maximo (TOTALCOST). No se combina con las solicitudes de SAP">
+                        {formatMoney(current.pr_total, current.currency)}
+                      </span>
+                    )
+                  }
                 />
-                <Field label="Fecha aprobación"value={formatDate(current.approved_at)} />
-                <Field label="Fecha en Maximo" value={formatDate(current.created_at_source)} />
+                {/* K7.7: fechas y días DE LA PR (K3); sin PR (contrato directo) no hay */}
+                {current.prnum && (
+                  <>
+                    <Field label="Fecha de la PR" value={formatDate(current.pr_issue_date)} />
+                    <Field label="Estatus desde" value={formatDate(current.pr_status_date)} />
+                    <Field label="Aprobación de la PR" value={formatDate(current.pr_approved_at)} />
+                    <Field
+                      label="Días de aprobación"
+                      value={
+                        prDays === null ? (
+                          <span className="text-gray-400 italic" title="Sin fecha de la PR o sin aprobación (APPR) en Maximo">
+                            N/D
+                          </span>
+                        ) : (
+                          `${prDays} ${prDays === 1 ? 'día' : 'días'}`
+                        )
+                      }
+                    />
+                  </>
+                )}
+                {/* Fechas del contrato (WAPPR y APPR de CONTRACTSTATUS): solo con contrato */}
+                {current.has_contract && (
+                  <>
+                    <Field label="Solicitud del contrato" value={formatDate(current.created_at_source)} />
+                    <Field label="Aprobación del contrato" value={formatDate(current.approved_at)} />
+                  </>
+                )}
               </div>
+
+              {/* K7.7: historial DE LA PR (PRSTATUS), en el orden de la API (fecha y PRSTATUSID) */}
+              {current.prnum && (
+                <div>
+                  <h4 className="text-sm font-semibold text-[#424846] mb-2">
+                    Historial de la solicitud (PR) ({data.prStatusHistory.length})
+                  </h4>
+                  {data.prStatusHistory.length === 0 ? (
+                    <p className="text-sm text-gray-500">Sin historial de la PR en Maximo</p>
+                  ) : (
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Estatus</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fecha y hora</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Usuario</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nota</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {data.prStatusHistory.map((entry, idx) => {
+                            const badge = maximoPrStatusBadge(entry.status);
+                            return (
+                              <tr key={idx}>
+                                <td className="px-3 py-2">
+                                  <span
+                                    className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap ${badge.className}`}
+                                    title={badge.title}
+                                  >
+                                    {badge.label}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{formatDateTime(entry.changedAt)}</td>
+                                {/* D6: nombre por alias; el código de Maximo en el title */}
+                                <td className="px-3 py-2 text-gray-700" title={entry.changedBy ?? undefined}>
+                                  {entry.changedByName ?? dash(entry.changedBy)}
+                                </td>
+                                <td className="px-3 py-2 text-gray-600">{dash(entry.memo)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Lineas del contrato (derivadas de raw.CONTRACTLINE) */}
               <div>
@@ -247,29 +354,31 @@ export default function MaximoContractDetailModal({
                 )}
               </div>
 
-              {/* Historial de estatus (derivado de raw.CONTRACTSTATUS) */}
-              <div>
-                <h4 className="text-sm font-semibold text-[#424846] mb-2">
-                  Historial de estatus ({data.statusHistory.length})
-                </h4>
-                {data.statusHistory.length === 0 ? (
-                  <p className="text-sm text-gray-500">Sin historial en el registro de Maximo</p>
-                ) : (
-                  <ol className="space-y-1">
-                    {data.statusHistory.map((entry, idx) => (
-                      <li key={idx} className="flex items-center gap-3 text-sm">
-                        <span
-                          className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${maximoStatusBadgeClass(entry.status)}`}
-                          title={maximoStatusTitle(entry.status)}
-                        >
-                          {maximoStatusLabel(entry.status)}
-                        </span>
-                        <span className="text-gray-500">{formatDateTime(entry.changedAt)}</span>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </div>
+              {/* Historial del contrato (derivado de raw.CONTRACTSTATUS); K7.7: solo con contrato */}
+              {current.has_contract && (
+                <div>
+                  <h4 className="text-sm font-semibold text-[#424846] mb-2">
+                    Historial del contrato ({data.statusHistory.length})
+                  </h4>
+                  {data.statusHistory.length === 0 ? (
+                    <p className="text-sm text-gray-500">Sin historial en el registro de Maximo</p>
+                  ) : (
+                    <ol className="space-y-1">
+                      {data.statusHistory.map((entry, idx) => (
+                        <li key={idx} className="flex items-center gap-3 text-sm">
+                          <span
+                            className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${maximoStatusBadgeClass(entry.status)}`}
+                            title={maximoStatusTitle(entry.status)}
+                          >
+                            {maximoStatusLabel(entry.status)}
+                          </span>
+                          <span className="text-gray-500">{formatDateTime(entry.changedAt)}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              )}
 
               {/* Revisiones */}
               <div>

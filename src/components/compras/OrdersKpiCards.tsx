@@ -10,6 +10,10 @@ import type { OrdersKpiSource, OrdersKpis } from '@/types/purchases';
  * y "CAPEX / OPEX" (casita), SAP + Maximo por moneda. Respetan el año (D4)
  * y no cuentan dos veces las OC migradas (D1). Sin captura → "No disponible
  * (sin captura)", nunca 0.
+ *
+ * K6/K7 (2026-10-05): CAPEX/OPEX va sin IVA en las dos fuentes; las OC de
+ * Maximo clasificadas sin subtotal cuentan en OC pero no en el monto, y se
+ * dicen (`sin_subtotal`; la nota de la API va en el tooltip).
  */
 
 const Icons = {
@@ -73,7 +77,7 @@ export default function OrdersKpiCards({ year }: { year: number | null }) {
               <>
                 <p className="text-2xl font-bold text-gray-500 italic">{NO_DISPONIBLE}</p>
                 <p className="text-xs text-gray-600 mt-1">
-                  Sin captura de ahorro en SAP ni Maximo todavía (SAP: campo obligatorio solicitado a Henry; Maximo: pendiente CIISA).
+                  Sin ahorro capturado en SAP ni en Maximo todavía (SAP: U_Imp_ahorro por línea; Maximo: AB_AHORRO de la OC).
                 </p>
               </>
             ) : (
@@ -97,12 +101,13 @@ export default function OrdersKpiCards({ year }: { year: number | null }) {
       {/* CAPEX / OPEX */}
       <div
         className="bg-white p-4 rounded-lg shadow border-l-4 border-[#222D59]"
-        title={kpis?.clasificacion.nota ?? 'Clasificación CAPEX/OPEX de las OC (SAP por línea; Maximo AB_CLASFPO)'}
+        title={kpis?.clasificacion.nota ?? 'Clasificación CAPEX/OPEX de las OC, montos sin IVA (SAP por línea; Maximo AB_CLASFPO)'}
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 w-full">
             <p className="text-sm text-gray-600">
               CAPEX / OPEX{year ? ` ${year}` : ''}
+              <span className="ml-1 text-xs text-gray-500">sin IVA</span>
               <span className="ml-1 text-gray-400 cursor-help" aria-label="Definición">ⓘ</span>
             </p>
             {!kpis ? (
@@ -110,7 +115,7 @@ export default function OrdersKpiCards({ year }: { year: number | null }) {
             ) : !kpis.clasificacion.disponible ? (
               <>
                 <p className="text-2xl font-bold text-gray-500 italic">{NO_DISPONIBLE}</p>
-                <p className="text-xs text-gray-600 mt-1">Sin OC clasificadas como CAPEX u OPEX todavía (captura de Compras en SAP; Maximo pendiente CIISA).</p>
+                <p className="text-xs text-gray-600 mt-1">Sin OC clasificadas como CAPEX u OPEX todavía (SAP: U_Clas_gts por línea; Maximo: AB_CLASFPO de la OC).</p>
               </>
             ) : (
               <div className="grid grid-cols-2 gap-3 mt-1">
@@ -132,6 +137,15 @@ export default function OrdersKpiCards({ year }: { year: number | null }) {
                     <p className="text-xs text-gray-600 mt-1">
                       {c.data.documentos.toLocaleString('es-MX')} OC · SAP {c.data.por_fuente.sap.documentos.toLocaleString('es-MX')} · Maximo {c.data.por_fuente.maximo.documentos.toLocaleString('es-MX')}
                     </p>
+                    {/* K6: OC de Maximo sin subtotal: cuentan en OC, no en el monto */}
+                    {c.data.sin_subtotal > 0 && (
+                      <p
+                        className="text-xs text-amber-700"
+                        title="OC de Maximo clasificadas sin subtotal (sin líneas o con alguna sin LINECOST): cuentan en OC, no en el monto; no se estima con el total"
+                      >
+                        {c.data.sin_subtotal.toLocaleString('es-MX')} OC de Maximo sin subtotal, fuera del monto
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>

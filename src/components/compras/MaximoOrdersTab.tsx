@@ -9,10 +9,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { PURCHASE_ADMIN_ROLES } from '@/types/auth';
 import type { PaginatedResponse } from '@/types/pagination';
 import {
+  MAXIMO_INTEGRATION_LABELS,
+  MAXIMO_INTEGRATION_NO_DATA,
   MAXIMO_STATUS_BADGE_CLASSES,
   MaximoPurchaseOrder,
   MaximoSummary,
   buyerLabel,
+  maximoIntegrationBadge,
+  maximoReceiptBadge,
   maximoStatusBadgeClass,
   maximoStatusLabel,
   maximoStatusTitle,
@@ -37,9 +41,8 @@ import type { ColumnConfigs } from '@/lib/column-filters';
  * Fase INT-5 (T6) — Pestana "Ordenes Maximo" dentro de /compras/ordenes.
  * Lista la vista actual del staging (GET /maximo/purchase-orders). Solo
  * lectura; nulls se muestran como "—" (decision 20.A.1), EXCEPTO los campos
- * que la Object Structure de Maximo aun no expone (AB_AHORRO / AB_TIPOCOMP /
- * AB_CLASFPO, ajuste pendiente con CIISA): esos van como "No disponible",
- * nunca 0 — cuando CIISA los exponga, los valores se pintan sin tocar UI.
+ * AB_* (AB_AHORRO / AB_TIPOCOMP / AB_CLASFPO) sin captura en Maximo: esos
+ * van como "No disponible", nunca 0.
  *
  * Sprint 2026-09-22: filtro multi-estatus (A5), chips (A4), export (B1),
  * filtro inicial desde la URL (clic en un pie del dashboard, A2).
@@ -54,12 +57,17 @@ import type { ColumnConfigs } from '@/lib/column-filters';
  * distinto) y clic desde el top de Reportes (proveedor + periodo); G7
  * estatus en aprobación por nivel (APPRn / APPRnREV) con el código en el
  * tooltip.
+ *
+ * K7 (2026-10-05): columnas Recepción (RECEIPTS) e Integración SAP (PO5,
+ * con la OC de SAP debajo), Subtotal sin IVA (Σ LINECOST; "No disponible"
+ * si falta, no se estima) y Total con IVA (TOTALCOST); chips "Integración
+ * con SAP" sobre la faceta `integracion`; el buscador también encuentra la
+ * PO por la OC de SAP.
  */
 
 const PAGE_SIZE = 15;
 
-const OS_FIELD_HINT =
-  'La Object Structure de Maximo aun no expone este campo (ajuste pendiente con CIISA)';
+const AB_FIELD_HINT = 'Sin captura en Maximo';
 
 const STATUS_OPTIONS = Object.keys(MAXIMO_STATUS_BADGE_CLASSES).map((value) => ({
   value,
@@ -77,8 +85,14 @@ const COLUMNS: ColumnConfigs = {
     format: (v) => `${maximoStatusLabel(v)} (${v})`,
     emptyLabel: 'Sin estatus en Maximo',
   },
+  // K7: la API manda las etiquetas de Expeditación ("Completa", "Sin dato"…)
+  recepcion: { label: 'Recepción', type: 'text' },
+  integracion: { label: 'Integración SAP', type: 'text' },
+  // K7: sin encabezado propio (va bajo Integración SAP); el buscador también la encuentra
+  oc_sap: { label: 'OC SAP', type: 'text', emptyLabel: '(Sin OC de SAP)' },
   proveedor: { label: 'Proveedor', type: 'text' },
-  monto: { label: 'Monto', type: 'number' },
+  subtotal: { label: 'Subtotal (sin IVA)', type: 'number' },
+  monto: { label: 'Total (con IVA)', type: 'number' },
   solicitante: { label: 'Solicitante', type: 'text', emptyLabel: '(Sin solicitante)' },
   comprador: { label: 'Comprador', type: 'text', emptyLabel: '(Sin comprador)' },
   depto: { label: 'Departamento', type: 'text' },
@@ -90,12 +104,47 @@ const COLUMNS: ColumnConfigs = {
 const dash = (value: string | number | null | undefined) =>
   value === null || value === undefined || value === '' ? '—' : String(value);
 
-/** Campos AB_* no expuestos por la Object Structure: null → "No disponible". */
-const NotAvailable = () => (
-  <span className="text-gray-500 italic whitespace-nowrap" title={OS_FIELD_HINT}>
+/** Campos AB_* sin captura en Maximo: null → "No disponible". */
+const NotAvailable = ({ title = AB_FIELD_HINT }: { title?: string }) => (
+  <span className="text-gray-500 italic whitespace-nowrap" title={title}>
     No disponible
   </span>
 );
+
+const SUBTOTAL_MISSING_HINT =
+  'Sin subtotal: la OC no trae líneas o alguna no trae LINECOST (no se estima con el total)';
+
+/** K2: código de PO5 a partir de la etiqueta de la faceta (para el color del chip), como en Expeditación. */
+const integrationCodeOf = (label: string): string | null =>
+  Object.keys(MAXIMO_INTEGRATION_LABELS).find((code) => MAXIMO_INTEGRATION_LABELS[code] === label) ??
+  (label === MAXIMO_INTEGRATION_NO_DATA ? null : label);
+
+/** K7: badge de recepción (RECEIPTS) de la OC. */
+function ReceiptBadge({ status }: { status: string | null }) {
+  const badge = maximoReceiptBadge(status);
+  return (
+    <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap ${badge.className}`} title={badge.title}>
+      {badge.label}
+    </span>
+  );
+}
+
+/** K7: integración con SAP (PO5) y, debajo, la OC que la copió en SAP. */
+function IntegrationCell({ po }: { po: MaximoPurchaseOrder }) {
+  const badge = maximoIntegrationBadge(po.integration_status);
+  return (
+    <div className="leading-tight">
+      <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap ${badge.className}`} title={badge.title}>
+        {badge.label}
+      </span>
+      {po.oc_sap !== null && (
+        <span className="block mt-0.5 font-mono text-xs text-[#222D59]" title="OC de SAP que copió esta PO (la de menor número si hay varias)">
+          OC {po.oc_sap}
+        </span>
+      )}
+    </div>
+  );
+}
 
 const formatMoney = (amount: number | null, currency: string | null) => {
   if (amount === null) return '—';
@@ -196,6 +245,24 @@ export default function MaximoOrdersTab({
     setStatuses(statuses.includes(key) ? statuses.filter((s) => s !== key) : [...statuses, key]);
     setPage(1);
   };
+  // K7: chips de integración con SAP (PO5) con los demás filtros aplicados
+  // (la faceta no se filtra a sí misma); clic = filtro de columna
+  const integrationFacet = useColumnFacet(
+    '/maximo/purchase-orders/facets',
+    { ...filters, ...cf.params },
+    'integracion',
+  );
+  const integrationFilter = cf.filters.integracion;
+  const activeIntegrations = integrationFilter && 'in' in integrationFilter ? integrationFilter.in : [];
+  const integrationChips = [...facetCounts(integrationFacet.data).entries()].filter(
+    (entry): entry is [string, number] => entry[0] !== null,
+  );
+  const toggleIntegration = (label: string) => {
+    const next = activeIntegrations.includes(label)
+      ? activeIntegrations.filter((v) => v !== label)
+      : [...activeIntegrations, label];
+    cf.setFilter('integracion', next.length ? { in: next } : null);
+  };
 
   return (
     <div className="space-y-4">
@@ -206,7 +273,7 @@ export default function MaximoOrdersTab({
             type="text"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Buscar por PONUM o descripción..."
+            placeholder="Buscar por PONUM, OC de SAP o descripción..."
             className="flex-1 min-w-48 px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#52AF32] focus:border-[#52AF32] text-gray-900 placeholder:text-gray-400"
           />
           <StatusMultiSelect
@@ -278,6 +345,30 @@ export default function MaximoOrdersTab({
               : []),
           ]}
         />
+        {/* K7: integración con SAP (PO5) de la OC; clic = filtrar */}
+        {integrationChips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-gray-500">Integración con SAP (PO5):</span>
+            {integrationChips.map(([label, count]) => {
+              const badge = maximoIntegrationBadge(integrationCodeOf(label));
+              const active = activeIntegrations.includes(label);
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => toggleIntegration(label)}
+                  title={`${badge.title}. Clic para filtrar`}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full transition-colors hover:opacity-80 ${badge.className} ${
+                    active ? 'ring-2 ring-[#52AF32] ring-offset-1' : ''
+                  }`}
+                >
+                  {label}
+                  <span className="font-bold">{count.toLocaleString('es-MX')}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
         <ActiveColumnFilters cf={cf} columns={COLUMNS} />
       </div>
 
@@ -310,8 +401,15 @@ export default function MaximoOrdersTab({
                     <FilterTh column="ponum" className="px-3 py-3">PONUM</FilterTh>
                     <FilterTh column="descripcion" className="px-3 py-3">Descripción</FilterTh>
                     <FilterTh column="estatus" align="center" className="px-3 py-3">Estatus</FilterTh>
+                    <FilterTh column="recepcion" align="center" className="px-3 py-3" title="Recepción de la OC en Maximo (RECEIPTS)">Recepción</FilterTh>
+                    <FilterTh column="integracion" className="px-3 py-3" title="Integración con SAP (PO5) y, debajo, la OC de SAP que copió esta PO">Integración SAP</FilterTh>
                     <FilterTh column="proveedor" className="px-3 py-3" title="Proveedor según SAP cuando la OC migró o por el cruce de su código; si no, el de Maximo">Proveedor</FilterTh>
-                    <FilterTh column="monto" align="right" className="px-3 py-3">Monto</FilterTh>
+                    <FilterTh column="subtotal" align="right" className="px-3 py-3" title='Suma de LINECOST de las líneas, sin IVA. "No disponible" si la OC no trae líneas o alguna no trae LINECOST'>
+                      Subtotal<span className="block text-[10px] font-normal normal-case text-white/70">sin IVA</span>
+                    </FilterTh>
+                    <FilterTh column="monto" align="right" className="px-3 py-3" title="TOTALCOST de Maximo, con IVA">
+                      Total<span className="block text-[10px] font-normal normal-case text-white/70">con IVA</span>
+                    </FilterTh>
                     <FilterTh column="solicitante" className="px-3 py-3">Solicitante</FilterTh>
                     <FilterTh column="comprador" className="px-3 py-3" title="Comprador de la OC en Maximo (PURCHASEAGENT)">Comprador</FilterTh>
                     <FilterTh column="depto" className="px-3 py-3">Depto.</FilterTh>
@@ -339,10 +437,19 @@ export default function MaximoOrdersTab({
                           {maximoStatusLabel(po.status)}
                         </span>
                       </td>
+                      <td className="px-3 py-3 text-center">
+                        <ReceiptBadge status={po.receipt_status} />
+                      </td>
+                      <td className="px-3 py-3">
+                        <IntegrationCell po={po} />
+                      </td>
                       <td className="px-3 py-3 text-sm">
                         <MaximoSupplierCell po={po} />
                       </td>
-                      <td className="px-3 py-3 text-sm text-gray-900 text-right font-medium">
+                      <td className="px-3 py-3 text-sm text-gray-900 text-right whitespace-nowrap">
+                        {po.subtotal === null ? <NotAvailable title={SUBTOTAL_MISSING_HINT} /> : formatMoney(po.subtotal, po.currency)}
+                      </td>
+                      <td className="px-3 py-3 text-sm text-gray-900 text-right font-medium whitespace-nowrap">
                         {formatMoney(po.total_cost, po.currency)}
                       </td>
                       <td className="px-3 py-3 text-sm text-gray-700 max-w-36 truncate" title={po.requested_by ?? undefined}>
@@ -372,7 +479,7 @@ export default function MaximoOrdersTab({
                   ))}
                   {orders.length === 0 && (
                     <tr>
-                      <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={14} className="px-4 py-8 text-center text-gray-500">
                         No hay órdenes de Maximo que coincidan con los filtros
                       </td>
                     </tr>

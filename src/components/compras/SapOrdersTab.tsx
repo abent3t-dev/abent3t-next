@@ -58,6 +58,12 @@ import type { ColumnConfigs } from '@/lib/column-filters';
  * G1 (2026-09-28): clic en una barra del top de proveedores de Reportes →
  * proveedor exacto (`card_code`), "contadas una vez" (sin las migradas que
  * ya cuenta Maximo, D1) y el periodo, como chips que se pueden quitar.
+ *
+ * K6/K7 (2026-10-05): columna "Subtotal" sin IVA (suma de las líneas;
+ * "No disponible" si falta alguna, no se estima) con filtro numérico, y
+ * "Total" rotulado con IVA (DocTotal). Búsqueda inicial desde la URL
+ * (`initialSearch`), para el link "OC en SAP" del detalle de una PO de
+ * Maximo.
  */
 
 const ORIGIN_OPTIONS: Array<{ value: 'sap' | 'maximo' | ''; label: string }> = [
@@ -83,7 +89,9 @@ const COLUMNS: ColumnConfigs = {
   solicitante: { label: 'Solicitante', type: 'text', emptyLabel: '(Sin solicitante)' },
   comprador: { label: 'Comprador', type: 'text', emptyLabel: '(Sin comprador)' },
   estatus: { label: 'Estatus', type: 'text', format: sapStatusLabel },
-  monto: { label: 'Monto', type: 'number' },
+  // K6: sin IVA (suma de las líneas); null = "No disponible" (vacías)
+  subtotal: { label: 'Subtotal (sin IVA)', type: 'number' },
+  monto: { label: 'Total (con IVA)', type: 'number' },
   saldo: { label: 'Saldo disponible', type: 'number' },
   fecha: { label: 'Fecha del documento', type: 'date' },
   entrega: { label: 'Fecha de entrega', type: 'date' },
@@ -127,6 +135,10 @@ const formatMoney = (amount: number | null, currency: string | null) => {
     return `${amount.toLocaleString('es-MX')} ${currency ?? ''}`.trim();
   }
 };
+
+/** K6: por qué una OC no tiene subtotal (no se estima con el total). */
+const SUBTOTAL_MISSING_HINT =
+  'Sin subtotal: la OC no trae líneas, alguna no trae importe o no se ha vuelto a sincronizar desde SAP';
 
 /** Saldo disponible: una cancelada no tiene; sin calcular = "No disponible". */
 function SaldoCell({ po }: { po: SapPurchaseOrder }) {
@@ -218,6 +230,7 @@ const formatDate = (date: string | null) =>
 export default function SapOrdersTab({
   initialStatus = [],
   initialOrigin = '',
+  initialSearch = '',
   year = null,
   linkedVendor = null,
   initialFrom = '',
@@ -226,6 +239,8 @@ export default function SapOrdersTab({
   initialStatus?: string[];
   /** D1: filtro inicial de origen (desde el dashboard). */
   initialOrigin?: 'sap' | 'maximo' | '';
+  /** K7: número de la OC prefiltrado desde el detalle de una PO de Maximo. */
+  initialSearch?: string;
   /** D4: año (lo controla la página de Órdenes). */
   year?: number | null;
   /** G1: proveedor de la barra del top de Reportes (código de SAP). */
@@ -235,7 +250,7 @@ export default function SapOrdersTab({
   initialTo?: string;
 }) {
   const { hasRole } = useAuth();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
   const [statuses, setStatuses] = useState<string[]>(initialStatus);
   const [origin, setOrigin] = useState<'sap' | 'maximo' | ''>(initialOrigin);
   const [from, setFrom] = useState(initialFrom);
@@ -410,7 +425,12 @@ export default function SapOrdersTab({
                       <FilterTh column="solicitante" className="px-3 py-3">Solicitante</FilterTh>
                       <FilterTh column="comprador" className="px-3 py-3" title="SAP no registra comprador en sus OC: la migrada muestra el de Maximo y las demás quién la capturó">Comprador</FilterTh>
                       <FilterTh column="estatus" align="center" className="px-3 py-3">Estatus</FilterTh>
-                      <FilterTh column="monto" align="right" className="px-3 py-3">Monto</FilterTh>
+                      <FilterTh column="subtotal" align="right" className="px-3 py-3" title='Suma de las líneas, sin IVA, en la moneda del documento. "No disponible" si la OC no trae líneas o alguna no trae importe'>
+                        Subtotal<span className="block text-[10px] font-normal normal-case text-white/70">sin IVA</span>
+                      </FilterTh>
+                      <FilterTh column="monto" align="right" className="px-3 py-3" title="DocTotal de SAP, con IVA">
+                        Total<span className="block text-[10px] font-normal normal-case text-white/70">con IVA</span>
+                      </FilterTh>
                       <FilterTh column="saldo" align="right" className="px-3 py-3" title="Lo que falta por recibir o facturar de la OC, con IVA">Saldo disponible</FilterTh>
                       <FilterTh column="fecha" align="center" className="px-3 py-3" title="Fecha del documento y, abajo, fecha de entrega">Fechas</FilterTh>
                       {/* En pantallas angostas van al detalle y al Excel (casi todas
@@ -451,6 +471,13 @@ export default function SapOrdersTab({
                               {sapStatusLabel(status)}
                             </span>
                           </td>
+                          <td className="px-3 py-3 text-sm text-gray-900 text-right whitespace-nowrap">
+                            {po.subtotal === null ? (
+                              <span className="text-gray-400 italic" title={SUBTOTAL_MISSING_HINT}>No disponible</span>
+                            ) : (
+                              formatMoney(po.subtotal, po.currency)
+                            )}
+                          </td>
                           <td className="px-3 py-3 text-sm text-gray-900 text-right font-medium whitespace-nowrap">
                             {formatMoney(po.doc_total, po.currency)}
                           </td>
@@ -482,7 +509,7 @@ export default function SapOrdersTab({
                     })}
                     {orders.length === 0 && (
                       <tr>
-                        <td colSpan={12} className="px-4 py-8 text-center text-gray-500">
+                        <td colSpan={13} className="px-4 py-8 text-center text-gray-500">
                           No hay órdenes de SAP que coincidan con los filtros
                         </td>
                       </tr>

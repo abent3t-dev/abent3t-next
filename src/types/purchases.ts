@@ -402,8 +402,23 @@ export interface MaximoPurchaseOrder extends SupplierFields {
   description: string | null;
   vendor_id: string | null;
   vendor_name: string | null;
+  /** TOTALCOST de Maximo, con IVA. */
   total_cost: number | null;
   currency: string | null;
+  /**
+   * K6/K7 (2026-10-05): sin IVA = Σ POLINE.LINECOST, solo si todas las
+   * líneas lo traen; null = "No disponible" (no se estima con TOTALCOST).
+   */
+  subtotal: number | null;
+  /** K1/K7: recepción en Maximo (RECEIPTS); null = "No disponible" (`maximoReceiptBadge`). */
+  receipt_status: string | null;
+  /** K2/K7: integración con SAP (PO5, literal); null = "Sin dato" (`maximoIntegrationBadge`). */
+  integration_status: string | null;
+  /**
+   * K7: OC de SAP que copió esta PO (la menor `doc_num` con su
+   * `maximo_ponum`, misma regla que Expeditación); null = no está en SAP.
+   */
+  oc_sap: number | null;
   ab_ahorro: number | null;
   ab_tipocomp: string | null;
   ab_clasfpo: string | null;
@@ -440,9 +455,27 @@ export interface MaximoRevision {
   last_seen_at: string;
 }
 
+/**
+ * K7 (2026-10-05): línea de la PO (POLINE del raw canonizado). Sin cantidad
+ * pedida: ORDERQTY no llega en AB_COMPRAS.
+ */
+export interface MaximoPurchaseOrderLine {
+  line_num: number | null;
+  item_num: string | null;
+  description: string | null;
+  /** RECEIVEDQTY. */
+  received_qty: number | null;
+  /** LINECOST: importe sin IVA, en la moneda de la OC. */
+  line_cost: number | null;
+  /** RECEIPTSCOMPLETE: la línea ya se recibió completa. */
+  receipts_complete: boolean | null;
+}
+
 export interface MaximoPurchaseOrderDetail {
   current: MaximoPurchaseOrder;
   revisions: MaximoRevision[];
+  /** K7: vacío si la OC no trae líneas. */
+  lines: MaximoPurchaseOrderLine[];
 }
 
 /**
@@ -469,6 +502,10 @@ export interface MaximoContractGroup extends SupplierFields {
   prs: Array<{
     prnum: string | null;
     status: string | null;
+    /** K4.4 (2026-10-05): estatus y fechas DE LA PR (ver `MaximoContract`). */
+    pr_status: string | null;
+    pr_issue_date: string | null;
+    pr_approved_at: string | null;
     requested_by: string | null;
     requested_by_name: string | null;
     created_at_source: string | null;
@@ -481,6 +518,7 @@ export interface MaximoContract extends SupplierFields {
   prnum: string | null;
   contractnum: string | null;
   revisionnum: number | null;
+  /** Estatus del contrato; sin contrato, el de la PR (el de la PR va en `pr_status`). */
   status: string | null;
   maxvol: number | null;
   total_cost: number | null;
@@ -496,9 +534,24 @@ export interface MaximoContract extends SupplierFields {
   approved_by: string | null;
   approved_by_name: string | null;
   created_at_source: string | null;
+  /**
+   * K3/K4 (2026-10-05): estatus DE LA PR (raíz de AB_CONTRATOS: WAPPR, APPR,
+   * CLOSE, CAN; etiquetas en `maximoPrStatusBadge`), aparte de `status`.
+   * null = sin dato (antes del primer full con el mapper de K3).
+   */
+  pr_status: string | null;
+  /** K3: ISSUEDATE de la PR (su creación). */
+  pr_issue_date: string | null;
+  /** K3: STATUSDATE de la PR (desde cuándo está en su estatus). */
+  pr_status_date: string | null;
+  /** K3: primer APPR de la PR = llegada a Compras; null = sin APPR. */
+  pr_approved_at: string | null;
   contract_ref_num: string | null;
   contract_value: number | null;
-  /** D7: monto de la PR; null = la Object Structure no lo expone ("No disponible"). */
+  /**
+   * D7: monto de la PR en Maximo (PR.TOTALCOST, base desconocida: no se
+   * combina con las solicitudes de SAP); null = sin dato ("No disponible").
+   */
   pr_total: number | null;
   /** D8: consumido del contrato; null = no expuesto por la OS. */
   consumed_value: number | null;
@@ -537,11 +590,29 @@ export interface MaximoContractStatusEntry {
   changedAt: string | null;
 }
 
+/**
+ * K3 (2026-10-05): cambio de estatus de la PR (PRSTATUS), una vez por PR,
+ * ordenado por fecha y PRSTATUSID.
+ */
+export interface MaximoPrStatusEntry {
+  status: string;
+  changedAt: string | null;
+  /** Usuario de Maximo (CHANGEBY). */
+  changedBy: string | null;
+  /** D6: nombre según los alias de Maximo; null = sin alias (se muestra el código). */
+  changedByName: string | null;
+  /** MEMO (p. ej. el motivo de la cancelación). */
+  memo: string | null;
+}
+
 export interface MaximoContractDetail {
   current: MaximoContract;
   revisions: MaximoContractRevision[];
   lines: MaximoContractLine[];
+  /** Historial del CONTRATO (CONTRACTSTATUS); vacío sin contrato. */
   statusHistory: MaximoContractStatusEntry[];
+  /** K3: historial de la PR; vacío sin prnum (contrato directo). */
+  prStatusHistory: MaximoPrStatusEntry[];
 }
 
 export interface MaximoStatusCount {
@@ -599,11 +670,17 @@ export interface MaximoSummary {
   /** D4: año aplicado (null = todo). */
   year: number | null;
   purchaseOrders: { total: number; byStatus: MaximoStatusCount[] };
+  /** Filas de AB_CONTRATOS por `status` (el del contrato; sin contrato, el de la PR). */
   contracts: {
     total: number;
     withContract: number;
     byStatus: MaximoStatusCount[];
   };
+  /**
+   * K4.4 (2026-10-05): solicitudes (PR) por el estatus DE LA PR, una por PR;
+   * con año, por su creación (`pr_issue_date`). null en `status` = sin dato.
+   */
+  requests: { total: number; byStatus: MaximoStatusCount[] };
   lastSync: Record<MaximoSyncTarget, MaximoSummaryLastRun | null>;
 }
 
@@ -649,13 +726,56 @@ export const MAXIMO_STATUS_LABELS: Record<string, string> = {
 };
 
 /**
- * D2 (2026-09-23): las PR de Maximo sin contrato no traen estatus porque la
- * Object Structure AB_CONTRATOS no expone el de la PR (pendiente CIISA) —
- * no es un error de la plataforma, por eso se nombra explícitamente.
+ * D2 (2026-09-23): etiqueta de `maximoStatusLabel` cuando la OC o el
+ * contrato no traen estatus. K7 (2026-10-05): la PR ya trae el suyo
+ * (`pr_status`, K3) y se rotula con `maximoPrStatusLabel`, no con esta.
  */
 export const MAXIMO_NO_STATUS_LABEL = 'Sin estatus en Maximo';
-export const MAXIMO_NO_STATUS_HINT =
-  'La Object Structure de Maximo (AB_CONTRATOS) no expone el estatus de la solicitud sin contrato; pedido a CIISA. Las pendientes de gestionar no dependen de este estatus: son las solicitudes que todavía no tienen OC.';
+
+// ── K7 (2026-10-05): estatus DE LA PR (`pr_status`, raíz de AB_CONTRATOS),
+// con etiquetas propias: para Compras, APPR es la llegada de la solicitud.
+// Las OC y los contratos siguen con `maximoStatusLabel`.
+
+export type MaximoPrStatus = 'WAPPR' | 'APPR' | 'CLOSE' | 'CAN';
+
+/** K7: opciones del filtro `pr_status` (multiselect y chips), con su badge. */
+export const MAXIMO_PR_STATUS_OPTIONS: Array<{ value: MaximoPrStatus; label: string; className: string }> = [
+  { value: 'WAPPR', label: 'En aprobación', className: 'bg-yellow-100 text-yellow-800' },
+  { value: 'APPR', label: 'Aprobada: llegó a Compras', className: 'bg-green-100 text-green-800' },
+  { value: 'CLOSE', label: 'Cerrada', className: 'bg-gray-200 text-gray-700' },
+  { value: 'CAN', label: 'Cancelada', className: 'bg-red-100 text-red-800' },
+];
+
+/** La PR no trae estatus (null: antes del primer full con el mapper de K3). */
+export const MAXIMO_PR_STATUS_NOT_AVAILABLE = 'No disponible';
+
+function maximoPrStatusOption(status: string) {
+  const key = status.toUpperCase();
+  return MAXIMO_PR_STATUS_OPTIONS.find((o) => o.value === key);
+}
+
+/** Estatus de la PR; null = "No disponible"; un valor desconocido sale tal cual. */
+export function maximoPrStatusLabel(status: string | null | undefined): string {
+  if (!status) return MAXIMO_PR_STATUS_NOT_AVAILABLE;
+  return maximoPrStatusOption(status)?.label ?? status;
+}
+
+/** Estatus de la PR como badge; el title lleva el código. */
+export function maximoPrStatusBadge(status: string | null | undefined): MaximoBadge {
+  if (!status) {
+    return {
+      label: MAXIMO_PR_STATUS_NOT_AVAILABLE,
+      className: 'bg-gray-50 text-gray-400',
+      title: 'Maximo no trae el estatus (STATUS) de esta PR',
+    };
+  }
+  const option = maximoPrStatusOption(status);
+  return {
+    label: option?.label ?? status,
+    className: option?.className ?? 'bg-gray-100 text-gray-700',
+    title: `Estatus de la PR en Maximo (STATUS): ${status}`,
+  };
+}
 
 const MAXIMO_LEVEL_STATUS = /^APPR(\d+)$/;
 const MAXIMO_LEVEL_REVISION_STATUS = /^APPR(\d+)REV$/;
@@ -1397,6 +1517,12 @@ export interface SapPurchaseOrder {
   card_name: string | null;
   /** Total con IVA en la moneda del documento. */
   doc_total: number | null;
+  /**
+   * K6 (2026-10-05): sin IVA = suma de las líneas en la moneda del
+   * documento, solo si todas traen importe; null = "No disponible" (sin
+   * líneas, alguna sin importe o sync anterior a 1.3.0; no se estima).
+   */
+  subtotal: number | null;
   currency: string | null;
   lines_total: number;
   lines_classified: number;
@@ -1527,21 +1653,46 @@ export interface SapSummaryLastRun {
   records_failed: number;
 }
 
+/**
+ * K6 (2026-10-05): base de un monto de OC: con IVA (DocTotal de SAP,
+ * TOTALCOST de Maximo) o sin IVA (suma de las líneas).
+ */
+export type MontoBase = 'con_iva' | 'sin_iva';
+
 export interface CurrencyAmount {
   currency: string | null;
   total: number;
   count: number;
+  /**
+   * K6: solo en montos de OC (no en por recibir, ahorro ni CAPEX/OPEX):
+   * suma sin IVA de las OC que tienen subtotal y cuántas no lo tienen (no
+   * suman; no se estima).
+   */
+  subtotal?: number;
+  sin_subtotal?: number;
 }
 
-export interface SapEntitySummary {
+/** K6: monto de OC por moneda, con el subtotal sin IVA siempre presente. */
+export interface OrderCurrencyAmount extends CurrencyAmount {
+  subtotal: number;
+  sin_subtotal: number;
+}
+
+/** `T` = OrderCurrencyAmount en las OC (K6: con su subtotal sin IVA). */
+export interface SapEntitySummary<T extends CurrencyAmount = CurrencyAmount> {
   total: number;
   /** Conteo por estatus DERIVADO: 'open' | 'close' | 'cancelled'. */
   byStatus: SapStatusCount[];
+  /**
+   * K6: base de `montoTotal` y `montoPorMoneda`: OC = la del tablero (con
+   * IVA hasta que conteste Ingrid); solicitudes = sin IVA.
+   */
+  montoBase: MontoBase;
   montoTotal: number;
   /** Montos por moneda (nunca sumados entre monedas). */
-  montoPorMoneda: CurrencyAmount[];
-  /** Abiertas no canceladas ("por recibir"). */
-  abiertas: { count: number; montoPorMoneda: CurrencyAmount[] };
+  montoPorMoneda: T[];
+  /** Abiertas no canceladas ("por recibir"); K6: sin cambio y sin subtotal. */
+  abiertas: { count: number; montoBase: MontoBase; montoPorMoneda: CurrencyAmount[] };
   linesTotal: number;
   linesClassified: number;
   docsConAhorro: number;
@@ -1555,7 +1706,7 @@ export interface SapSummary {
   year: number | null;
   /** D1: OC creadas desde Maximo (NumAtCard = PONUM) y cuántas existen allá. */
   migradas: { total: number; en_maximo: number };
-  purchaseOrders: SapEntitySummary;
+  purchaseOrders: SapEntitySummary<OrderCurrencyAmount>;
   purchaseRequests: SapEntitySummary;
   approvalRequests: { total: number; pending: number };
   lastSync: {
@@ -1626,9 +1777,10 @@ export interface DashboardSourceCount {
   total: number;
   pendientes: number;
 }
-export interface DashboardSourceOrders {
+/** `T` = OrderCurrencyAmount en Órdenes (K6: con su subtotal sin IVA). */
+export interface DashboardSourceOrders<T extends CurrencyAmount = CurrencyAmount> {
   count: number;
-  monto_por_moneda: CurrencyAmount[];
+  monto_por_moneda: T[];
 }
 /**
  * G2 (2026-09-28): días de gestión de un sistema = de que se crea la RQ a
@@ -1644,14 +1796,31 @@ export interface GestionStats {
   sin_solicitud?: number;
   definicion?: string;
 }
-/** G3: RQ sin OC; Maximo null = sin fechas de PR para ubicar el periodo. */
+/** G3: RQ sin OC (pendientes de gestionar) y `sin_limite` = sin periodo. */
 export interface DashboardPendingSource {
   total: number;
   pendientes: number | null;
   pendientes_sin_limite: number;
-  /** I8: Maximo, PR de contrato sin OC (aparte: la OC se genera en automático). */
-  de_contrato?: number | null;
-  de_contrato_sin_limite?: number;
+}
+/**
+ * K4 (2026-10-05): Maximo, una fila por PR. `total` = PR creadas en el
+ * periodo (`pr_issue_date`); `pendientes` = APPR sin OC ni contrato, por
+ * fecha de aprobación. null en los del periodo = ninguna PR trae estatus
+ * todavía (antes del primer full), nunca 0. Aparte, sin sumarse:
+ * pendientes + de_contrato + aprobadas_con_oc = las APPR del periodo.
+ */
+export interface DashboardMaximoPendingSource extends DashboardPendingSource {
+  /** De `total`, las que llegaron a Compras (con primer APPR). */
+  llegaron_a_compras: number | null;
+  /** I8: APPR de contrato sin OC (la OC se genera en automático). */
+  de_contrato: number | null;
+  de_contrato_sin_limite: number;
+  /** APPR que ya tienen OC, con o sin contrato (solo como dato). */
+  aprobadas_con_oc: number | null;
+  aprobadas_con_oc_sin_limite: number;
+  /** WAPPR (todavía no llegan a Compras), por su emisión. */
+  en_aprobacion: number | null;
+  en_aprobacion_sin_limite: number;
 }
 export interface DashboardSummary {
   /** D4: año aplicado (null = todo). */
@@ -1659,7 +1828,7 @@ export interface DashboardSummary {
   solicitudes: {
     total: number;
     pendientes: number;
-    por_fuente: { sap: DashboardPendingSource; maximo: DashboardPendingSource; abent: DashboardSourceCount };
+    por_fuente: { sap: DashboardPendingSource; maximo: DashboardMaximoPendingSource; abent: DashboardSourceCount };
     /** G3: periodo de los pendientes (año elegido o últimos 12 meses). */
     pendientes_periodo: { desde: string; hasta: string | null };
   };
@@ -1667,19 +1836,33 @@ export interface DashboardSummary {
   dias_gestion: {
     sap: GestionStats;
     maximo: GestionStats;
+    /** K4.3: dato secundario de Maximo, desde la aprobación de la PR (primer APPR). */
+    maximo_desde_aprobacion: GestionStats;
     abent: number | null;
   };
   ordenes: {
     total: number;
-    monto_por_moneda: CurrencyAmount[];
-    por_fuente: { sap: DashboardSourceOrders; maximo: DashboardSourceOrders; abent: DashboardSourceOrders };
+    /** En la base de `monto_base`, con el subtotal sin IVA como dato secundario (K6). */
+    monto_por_moneda: OrderCurrencyAmount[];
+    por_fuente: {
+      sap: DashboardSourceOrders<OrderCurrencyAmount>;
+      maximo: DashboardSourceOrders<OrderCurrencyAmount>;
+      /** K6: base desconocida → subtotal 0 y todas en `sin_subtotal`. */
+      abent: DashboardSourceOrders<OrderCurrencyAmount>;
+    };
     /** D1: OC de SAP creadas desde Maximo; `en_maximo` = descontadas del total. */
     migradas: { total: number; en_maximo: number };
+    /** K6: base de `total` (con IVA hasta que conteste Ingrid) y su texto para tooltips. */
+    monto_base: MontoBase;
+    monto_nota: string;
   };
   por_recibir: {
     total: number;
     monto_por_moneda: CurrencyAmount[];
     por_fuente: { sap: DashboardSourceOrders; maximo: DashboardSourceOrders; abent: DashboardSourceOrders };
+    /** K6: se queda con IVA, sin subtotal. */
+    monto_base: MontoBase;
+    monto_nota: string;
   };
   /** D4: desde cuándo hay datos y última sincronización exitosa. */
   datos: {
@@ -1706,13 +1889,24 @@ export interface OrdersKpis {
     por_fuente: { sap: OrdersKpiSource; maximo: OrdersKpiSource };
     nota: string;
   };
+  /** K6 (2026-10-05): montos sin IVA en las dos fuentes. */
   clasificacion: {
     disponible: boolean;
-    capex: { por_moneda: CurrencyAmount[]; documentos: number; por_fuente: { sap: OrdersKpiSource; maximo: OrdersKpiSource } };
-    opex: { por_moneda: CurrencyAmount[]; documentos: number; por_fuente: { sap: OrdersKpiSource; maximo: OrdersKpiSource } };
+    capex: OrdersKpiClass;
+    opex: OrdersKpiClass;
     nota: string;
   };
   generated_at: string;
+}
+/**
+ * K6: CAPEX u OPEX. `sin_subtotal` = OC de Maximo clasificadas sin
+ * subtotal: cuentan en `documentos`, no en el monto.
+ */
+export interface OrdersKpiClass {
+  por_moneda: CurrencyAmount[];
+  documentos: number;
+  sin_subtotal: number;
+  por_fuente: { sap: OrdersKpiSource; maximo: OrdersKpiSource & { sin_subtotal: number } };
 }
 
 /** D6 — equivalencias de usuarios de SAP/Maximo (/compras/erp-aliases). */

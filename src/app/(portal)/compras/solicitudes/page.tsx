@@ -25,8 +25,9 @@ import { SHOW_INTERNAL_REQUISITIONS } from '@/lib/features';
 
 // Bloque 2026-09-23 (D7): la pestaña de requisiciones propias se OCULTA
 // (Ingrid: "no la vamos a ocupar"); backend y rutas intactos, bandera
-// NEXT_PUBLIC_SHOW_INTERNAL_REQUISITIONS=true la devuelve. D4: `year` y
-// `maximo_status` desde la URL (tarjeta de pendientes del dashboard).
+// NEXT_PUBLIC_SHOW_INTERNAL_REQUISITIONS=true la devuelve. D4: `year` desde
+// la URL; K7.6 (2026-10-05): `pr_status` (estatus DE LA PR, pie del tablero)
+// para la pestaña de Maximo, en lugar de `maximo_status`.
 // Int-4 (T6): pestanas por fuente, mismo patron que /compras/ordenes.
 // Modelo "ver todos, actuar por rol" (junta 2026-09-17): la lectura —
 // pestana SAP incluida — es para cualquier autenticado; los botones de
@@ -104,13 +105,14 @@ const getStatusBadgeClass = (status: RequisitionStatus) => {
 function SolicitudesPageInner({
   initialTab,
   initialStatus,
-  initialMaximoStatus,
+  initialPrStatus,
   initialYear,
   pendingFrom,
 }: {
   initialTab: RequestsTab | null;
   initialStatus: string[];
-  initialMaximoStatus: string[];
+  /** K7.6: estatus de la PR de Maximo (`pr_status`). */
+  initialPrStatus: string[];
   initialYear: number | null;
   /** G3: "pendientes de gestionar" (sin OC) desde la tarjeta del dashboard; '' = sin fecha (con año). */
   pendingFrom: string | null;
@@ -216,7 +218,7 @@ function SolicitudesPageInner({
       )}
       {activeTab === 'maximo_pr' && (
         <MaximoRequestsTab
-          initialStatus={initialTab === 'maximo_pr' ? initialStatus : initialMaximoStatus}
+          initialPrStatus={initialPrStatus}
           year={initialYear}
           pendingFrom={pendingFrom}
         />
@@ -425,8 +427,9 @@ function SolicitudesFromUrl() {
   const tabParam = params.get('tab');
   const initialTab = TAB_IDS.includes(tabParam as RequestsTab) ? (tabParam as RequestsTab) : null;
   const initialStatus = (params.get('status') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-  // D4: la tarjeta de pendientes manda SAP=open y Maximo=WAPPR,PNDREV a la vez
-  const initialMaximoStatus = (params.get('maximo_status') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  // K7.6: el pie de solicitudes de Maximo del tablero manda el estatus DE LA
+  // PR (WAPPR, APPR, CLOSE, CAN); solo lo usa la pestaña de Maximo
+  const initialPrStatus = (params.get('pr_status') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   const yearParam = Number(params.get('year'));
   const initialYear = Number.isInteger(yearParam) && yearParam > 2000 ? yearParam : null;
   // G3: tarjeta "Pendientes de gestionar" → solicitudes sin OC del periodo
@@ -435,10 +438,10 @@ function SolicitudesFromUrl() {
     params.get('sin_oc') === 'true' ? (/^\d{4}-\d{2}-\d{2}$/.test(desde) ? desde : '') : null;
   return (
     <SolicitudesPageInner
-      key={`${initialTab ?? ''}|${initialStatus.join(',')}|${initialMaximoStatus.join(',')}|${initialYear ?? ''}|${pendingFrom ?? ''}`}
+      key={`${initialTab ?? ''}|${initialStatus.join(',')}|${initialPrStatus.join(',')}|${initialYear ?? ''}|${pendingFrom ?? ''}`}
       initialTab={initialTab}
       initialStatus={initialStatus}
-      initialMaximoStatus={initialMaximoStatus}
+      initialPrStatus={initialPrStatus}
       initialYear={initialYear}
       pendingFrom={pendingFrom}
     />
