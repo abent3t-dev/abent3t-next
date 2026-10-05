@@ -14,7 +14,11 @@ import {
   EXPEDITING_SOURCE_LABELS,
   ExpeditingItem,
   ExpeditingSource,
+  MAXIMO_INTEGRATION_LABELS,
+  MAXIMO_INTEGRATION_NO_DATA,
   buyerLabel,
+  maximoIntegrationBadge,
+  maximoReceiptBadge,
   maximoStatusText,
 } from '@/types/purchases';
 import ExpeditingModal from '@/components/compras/ExpeditingModal';
@@ -24,6 +28,8 @@ import {
   ActiveColumnFilters,
   ColumnFilterProvider,
   FilterTh,
+  facetCounts,
+  useColumnFacet,
 } from '@/components/ui/ColumnFilter';
 import { useColumnFilters } from '@/hooks/useColumnFilters';
 import type { ColumnConfigs } from '@/lib/column-filters';
@@ -48,6 +54,11 @@ import { toQuery } from '@/lib/compras-format';
  * es entrega pendiente (badge "Cerrada en Maximo"…; el estatus de Maximo en
  * el tooltip) y el export para depurarlas en SAP; I2 "PO Maximo" y "OC SAP"
  * en columnas propias, y la búsqueda por cualquiera de los dos números.
+ *
+ * Bloque K (2026-10-05): K1 columna "Recepción" filtrable, export aparte de
+ * las abiertas en SAP con recepción completa en Maximo y chip "Solo
+ * pendientes"; K2 integración con SAP (PO5) en un badge bajo la PO de Maximo,
+ * con sus chips para filtrar.
  */
 
 const PAGE_SIZE = 15;
@@ -64,6 +75,8 @@ interface ExpeditingStats {
   avg_delay_by_source?: Record<ExpeditingSource, number | null>;
   /** I1a: abiertas en SAP que ya están cerradas o canceladas en Maximo. */
   closed_in_maximo?: number;
+  /** K1: abiertas en SAP con recepción completa en Maximo. */
+  received_in_maximo?: number;
 }
 
 const ORIGIN_LABELS: Record<string, string> = {
@@ -73,9 +86,15 @@ const ORIGIN_LABELS: Record<string, string> = {
   maximo: 'Maximo',
 };
 
+/** K1/K2: Recepción e Integración no aplican sin OC de Maximo detrás. */
+const NOT_APPLICABLE = '—';
+const notApplicable = (v: string) => (v === NOT_APPLICABLE ? '— (sin OC de Maximo)' : v);
+
 const COLUMNS: ColumnConfigs = {
   // I2: los dos números; la OC propia de ABENT va en la columna de la OC
   po_maximo: { label: 'PO Maximo', type: 'text', emptyLabel: '(Sin PO de Maximo)' },
+  // K2: badge bajo la PO de Maximo; se filtra con los chips de arriba
+  integracion: { label: 'Integración SAP', type: 'text', format: notApplicable },
   oc_sap: { label: 'OC SAP', type: 'text', emptyLabel: '(Sin OC de SAP)' },
   origen: { label: 'Origen', type: 'text', format: (v) => ORIGIN_LABELS[v] ?? v },
   proveedor: { label: 'Proveedor', type: 'text' },
@@ -87,8 +106,21 @@ const COLUMNS: ColumnConfigs = {
     type: 'text',
     format: (v) => DELIVERY_STATUS_LABELS[v as DeliveryStatus] ?? v,
   },
+  // I1: el badge de cierre vive en la celda de Estatus
+  cierre: { label: 'Cierre', type: 'text', emptyLabel: '(Abierta en su sistema)' },
+  // K1: RECEIPTS de Maximo ("No disponible" si su OC no lo trae)
+  recepcion: { label: 'Recepción', type: 'text', format: notApplicable },
   alertas: { label: 'Alertas', type: 'number' },
 };
+
+/** K1/K2: la fila tiene una OC de Maximo detrás (la propia o la que originó la de SAP). */
+const hasMaximoPo = (item: ExpeditingItem) =>
+  item.source === 'maximo' || (item.source === 'sap' && !!item.maximo_ponum);
+
+/** K2: código de PO5 a partir de la etiqueta de la faceta (para el color del chip). */
+const integrationCodeOf = (label: string): string | null =>
+  Object.keys(MAXIMO_INTEGRATION_LABELS).find((code) => MAXIMO_INTEGRATION_LABELS[code] === label) ??
+  (label === MAXIMO_INTEGRATION_NO_DATA ? null : label);
 
 const formatDate = (date: string | null) =>
   date
@@ -126,19 +158,14 @@ function DaysCell({ item }: { item: ExpeditingItem }) {
 
 /**
  * I1: estatus derivado y, si la OC ya se cerró o canceló en el otro sistema,
- * el badge que lo explica. Tooltip: estatus en Maximo y recepción.
+ * el badge que lo explica. Tooltip: el cierre y el estatus en Maximo (K1: la
+ * recepción tiene su columna y no se repite aquí).
  */
 function StatusCell({ item }: { item: ExpeditingItem }) {
-  const maximo = maximoStatusText({
-    maximo_status: item.maximo_status ?? null,
-    receipt_status: item.receipt_status ?? null,
-  });
+  const maximo = maximoStatusText({ maximo_status: item.maximo_status ?? null });
   const closedBy = item.closed_by ? ERP_CLOSED_BY_LABELS[item.closed_by] : null;
   const partial = !item.closed_by && item.receipt_status?.toUpperCase() === 'PARTIAL';
-  const title = [
-    closedBy && item.source === 'sap' ? `Abierta en SAP; ${closedBy.toLowerCase()}` : closedBy,
-    maximo,
-  ]
+  const title = [closedBy && item.source === 'sap' ? 'Abierta en SAP' : null, closedBy, maximo]
     .filter(Boolean)
     .join(' · ');
   return (
@@ -160,6 +187,27 @@ function StatusCell({ item }: { item: ExpeditingItem }) {
   );
 }
 
+/** K1: recepción en Maximo; "—" en ABENT y en la OC de SAP sola. */
+function ReceiptCell({ item }: { item: ExpeditingItem }) {
+  if (!hasMaximoPo(item)) return <span className="text-gray-400">—</span>;
+  const badge = maximoReceiptBadge(item.receipt_status);
+  return (
+    <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap ${badge.className}`} title={badge.title}>
+      {badge.label}
+    </span>
+  );
+}
+
+/** K2: integración con SAP (PO5), badge chico bajo la PO de Maximo. */
+function IntegrationBadge({ status }: { status: string | null | undefined }) {
+  const badge = maximoIntegrationBadge(status);
+  return (
+    <span className={`block w-fit mt-0.5 px-1.5 py-0.5 text-[10px] font-semibold leading-tight rounded whitespace-nowrap ${badge.className}`} title={badge.title}>
+      {badge.label}
+    </span>
+  );
+}
+
 const STAT_CARDS: Array<{ key: DeliveryStatus; border: string }> = [
   { key: 'en_tiempo', border: 'border-[#52AF32]' },
   { key: 'en_riesgo', border: 'border-yellow-500' },
@@ -178,6 +226,8 @@ function ExpeditacionContent() {
   const [statusFilter, setStatusFilter] = useState<DeliveryStatus | ''>('');
   const [sourceFilter, setSourceFilter] = useState<ExpeditingSource | ''>('');
   const [onlyMine, setOnlyMine] = useState(false);
+  // K1: chip "Solo pendientes" (sin entregadas ni canceladas), apagado
+  const [onlyPending, setOnlyPending] = useState(false);
   const [page, setPage] = useState(1);
   const [selectedPoId, setSelectedPoId] = useState<string | null>(null);
   const cf = useColumnFilters('exp', () => setPage(1));
@@ -188,9 +238,13 @@ function ExpeditacionContent() {
     status: statusFilter,
     source: sourceFilter,
     buyer_id: onlyMine && user?.id ? user.id : '',
+    solo_pendientes: onlyPending ? 'true' : '',
   };
   const filteredQs = toQuery({ ...baseQuery, ...cf.params });
   const listQs = toQuery({ page, limit: PAGE_SIZE, ...baseQuery, ...cf.params });
+  // I1a/K1: las dos listas para SAP son entregadas o canceladas: sin el chip
+  const sapListQuery = (list: 'closed_in_maximo' | 'received_in_maximo') =>
+    toQuery({ ...baseQuery, solo_pendientes: '', ...cf.params, [list]: 'true' });
 
   const listQuery = useQuery({
     queryKey: ['expediting', listQs],
@@ -205,10 +259,25 @@ function ExpeditacionContent() {
     queryFn: () => api.get<ExpeditingStats>(`/compras/expeditacion/stats${filteredQs ? `?${filteredQs}` : ''}`),
   });
 
+  // K2: chips de integración con SAP (PO5) con los demás filtros aplicados
+  const integrationFacet = useColumnFacet('/compras/expeditacion/facets', { ...baseQuery, ...cf.params }, 'integracion');
+  const integrationFilter = cf.filters.integracion;
+  const activeIntegrations = integrationFilter && 'in' in integrationFilter ? integrationFilter.in : [];
+  const integrationChips = [...facetCounts(integrationFacet.data).entries()].filter(
+    (entry): entry is [string, number] => entry[0] !== null && entry[0] !== NOT_APPLICABLE,
+  );
+  const toggleIntegration = (label: string) => {
+    const next = activeIntegrations.includes(label)
+      ? activeIntegrations.filter((v) => v !== label)
+      : [...activeIntegrations, label];
+    cf.setFilter('integracion', next.length ? { in: next } : null);
+  };
+
   const items = listQuery.data?.data ?? [];
   const meta = listQuery.data?.meta;
   const stats = statsQuery.data;
-  const hasFilters = !!search || !!statusFilter || !!sourceFilter || onlyMine || cf.activeCount > 0;
+  const hasFilters =
+    !!search || !!statusFilter || !!sourceFilter || onlyMine || onlyPending || cf.activeCount > 0;
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
@@ -218,6 +287,9 @@ function ExpeditacionContent() {
         <p className="text-gray-500">
           Seguimiento de entregas: OC propias (con seguimiento y recepción) y OC
           abiertas de SAP y Maximo (solo lectura, semáforo por fecha comprometida)
+        </p>
+        <p className="text-sm text-gray-500">
+          Las OC con recepción completa en Maximo cuentan como entregadas, aunque SAP las tenga abiertas
         </p>
       </div>
 
@@ -306,11 +378,19 @@ function ExpeditacionContent() {
           />
           {/* I1a: la lista para cerrarlas en SAP (con los mismos filtros) */}
           <ExportExcelButton
-            path={`/compras/expeditacion/export?${toQuery({ ...baseQuery, ...cf.params, closed_in_maximo: 'true' })}`}
+            path={`/compras/expeditacion/export?${sapListQuery('closed_in_maximo')}`}
             filename={`expeditacion_depurar_sap_${new Date().toISOString().slice(0, 10)}.xlsx`}
             label={`Abiertas en SAP, cerradas en Maximo${stats?.closed_in_maximo !== undefined ? ` (${stats.closed_in_maximo.toLocaleString('es-MX')})` : ''}`}
             title="OC que SAP tiene abiertas pero en Maximo ya están cerradas o canceladas: ya no cuentan como entregas pendientes; descárgalas para cerrarlas en SAP"
             disabled={stats?.closed_in_maximo === 0}
+          />
+          {/* K1: lista aparte, las abiertas en SAP ya recibidas completas en Maximo */}
+          <ExportExcelButton
+            path={`/compras/expeditacion/export?${sapListQuery('received_in_maximo')}`}
+            filename={`expeditacion_recibidas_maximo_${new Date().toISOString().slice(0, 10)}.xlsx`}
+            label={`Abiertas en SAP con recepción completa en Maximo${stats?.received_in_maximo !== undefined ? ` (${stats.received_in_maximo.toLocaleString('es-MX')})` : ''}`}
+            title="SAP las tiene abiertas y en Maximo ya se recibió todo"
+            disabled={stats?.received_in_maximo === 0}
           />
           {canEdit && (
             <button
@@ -329,7 +409,50 @@ function ExpeditacionContent() {
             </button>
           )}
         </div>
-        <ResultChips filteredTotal={meta?.total} loading={listQuery.isLoading} />
+        <div className="flex flex-wrap items-center gap-2">
+          <ResultChips filteredTotal={meta?.total} loading={listQuery.isLoading} />
+          {/* K1: quita entregadas y canceladas (lista, tarjetas y Excel) */}
+          <button
+            type="button"
+            aria-pressed={onlyPending}
+            onClick={() => {
+              setOnlyPending(!onlyPending);
+              setPage(1);
+            }}
+            title="Quita las entregadas y las canceladas de la lista, las tarjetas y el Excel"
+            className={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-full border transition-colors ${
+              onlyPending
+                ? 'bg-[#52AF32] text-white border-[#52AF32]'
+                : 'bg-white text-[#424846] border-gray-300 hover:bg-gray-100'
+            }`}
+          >
+            Solo pendientes
+          </button>
+        </div>
+        {/* K2: integración con SAP (PO5) de la OC de Maximo; clic = filtrar */}
+        {integrationChips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-gray-500">Integración con SAP (PO5):</span>
+            {integrationChips.map(([label, count]) => {
+              const badge = maximoIntegrationBadge(integrationCodeOf(label));
+              const active = activeIntegrations.includes(label);
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => toggleIntegration(label)}
+                  title={`${badge.title}. Clic para filtrar`}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full transition-colors hover:opacity-80 ${badge.className} ${
+                    active ? 'ring-2 ring-[#52AF32] ring-offset-1' : ''
+                  }`}
+                >
+                  {label}
+                  <span className="font-bold">{count.toLocaleString('es-MX')}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
         <ActiveColumnFilters cf={cf} columns={COLUMNS} />
       </div>
 
@@ -356,7 +479,7 @@ function ExpeditacionContent() {
                 <table className="w-full">
                   <thead className="bg-[#424846]">
                     <tr>
-                      <FilterTh column="po_maximo">PO Maximo</FilterTh>
+                      <FilterTh column="po_maximo" title="PO de Maximo; debajo, el estado de su integración con SAP (PO5)">PO Maximo</FilterTh>
                       <FilterTh column="oc_sap" title="OC de SAP (en las propias, la OC de ABENT)">OC SAP</FilterTh>
                       <FilterTh column="origen" align="center">Origen</FilterTh>
                       <FilterTh column="proveedor">Proveedor</FilterTh>
@@ -364,6 +487,7 @@ function ExpeditacionContent() {
                       <FilterTh column="fecha" align="center">Fecha vigente</FilterTh>
                       <FilterTh column="dias" align="center">Días</FilterTh>
                       <FilterTh column="estatus" align="center">Estatus</FilterTh>
+                      <FilterTh column="recepcion" align="center" title="Recepción de la OC en Maximo (RECEIPTS)">Recepción</FilterTh>
                       <FilterTh column="alertas" align="center">Alertas</FilterTh>
                     </tr>
                   </thead>
@@ -377,7 +501,10 @@ function ExpeditacionContent() {
                       >
                         <td className="px-4 py-3 whitespace-nowrap">
                           {item.po_maximo ? (
-                            <span className="font-mono font-medium text-[#8a6a10]">{item.po_maximo}</span>
+                            <>
+                              <span className="font-mono font-medium text-[#8a6a10]">{item.po_maximo}</span>
+                              <IntegrationBadge status={item.integration_status} />
+                            </>
                           ) : (
                             <span className="text-gray-400">—</span>
                           )}
@@ -448,6 +575,9 @@ function ExpeditacionContent() {
                         <td className="px-4 py-3 text-center">
                           <StatusCell item={item} />
                         </td>
+                        <td className="px-4 py-3 text-center">
+                          <ReceiptCell item={item} />
+                        </td>
                         <td className="px-4 py-3 text-center text-sm text-gray-600">
                           {item.purchase_order_id ? (item.tracking?.alert_count ?? 0) : <span className="text-gray-400">—</span>}
                         </td>
@@ -455,7 +585,7 @@ function ExpeditacionContent() {
                     ))}
                     {items.length === 0 && (
                       <tr>
-                        <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                        <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
                           No hay órdenes que coincidan con los filtros
                         </td>
                       </tr>

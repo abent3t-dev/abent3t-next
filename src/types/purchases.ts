@@ -1119,20 +1119,100 @@ export const ERP_CLOSED_BY_LABELS: Record<ErpClosedBy, string> = {
   recepcion_completa: 'Recepción completa en Maximo',
 };
 
-/** I1b: recepción de Maximo (RECEIPTS), cuando CIISA la exponga. */
-export const RECEIPT_STATUS_LABELS: Record<string, string> = {
-  COMPLETE: 'recepción completa',
-  PARTIAL: 'recepción parcial',
-  NONE: 'sin recepción',
+/**
+ * "INPRG en Maximo" (tooltip del estatus). K1: la recepción ya no va aquí;
+ * tiene su columna.
+ */
+export function maximoStatusText(item: { maximo_status: string | null }): string | null {
+  return item.maximo_status ? `${item.maximo_status} en Maximo` : null;
+}
+
+// ── K1/K2 (2026-10-05): recepción (RECEIPTS) e integración con SAP (PO5) de
+// las OC de Maximo. Las mismas etiquetas en Expeditación, Órdenes → Maximo y
+// el detalle de la PO (K7); la API las replica en `expediting.status.ts`.
+
+/** Badge listo para pintar: texto, clases y title (hint). */
+export interface MaximoBadge {
+  label: string;
+  className: string;
+  title: string;
+}
+
+/** K1: recepción de la OC en Maximo (RECEIPTS). */
+export const MAXIMO_RECEIPT_LABELS: Record<string, string> = {
+  COMPLETE: 'Completa',
+  PARTIAL: 'Parcial',
+  NONE: 'Sin recibir',
 };
 
-/** "INPRG en Maximo · recepción completa" (tooltip del estatus). */
-export function maximoStatusText(item: { maximo_status: string | null; receipt_status: string | null }): string | null {
-  if (!item.maximo_status) return null;
-  const receipt = item.receipt_status
-    ? RECEIPT_STATUS_LABELS[item.receipt_status.toUpperCase()] ?? `recepción ${item.receipt_status}`
-    : null;
-  return `${item.maximo_status} en Maximo${receipt ? ` · ${receipt}` : ''}`;
+export const MAXIMO_RECEIPT_CLASSES: Record<string, string> = {
+  COMPLETE: 'bg-green-100 text-green-800',
+  PARTIAL: 'bg-orange-100 text-orange-800',
+  NONE: 'bg-gray-100 text-gray-600',
+};
+
+/** La OC no trae RECEIPTS (null). */
+export const MAXIMO_RECEIPT_NOT_AVAILABLE = 'No disponible';
+
+/** Recepción como badge; null = "No disponible"; un valor desconocido sale tal cual. */
+export function maximoReceiptBadge(status: string | null | undefined): MaximoBadge {
+  if (!status) {
+    return {
+      label: MAXIMO_RECEIPT_NOT_AVAILABLE,
+      className: 'bg-gray-50 text-gray-400',
+      title: 'Maximo no trae la recepción (RECEIPTS) de esta OC',
+    };
+  }
+  const key = status.toUpperCase();
+  return {
+    label: MAXIMO_RECEIPT_LABELS[key] ?? status,
+    className: MAXIMO_RECEIPT_CLASSES[key] ?? 'bg-gray-100 text-gray-700',
+    title: `Recepción en Maximo (RECEIPTS): ${status}`,
+  };
+}
+
+/** K2: estado de integración con SAP (PO.PO5 de Maximo, guardado literal). */
+export const MAXIMO_INTEGRATION_LABELS: Record<string, string> = {
+  PROCESADO: 'Procesado',
+  ERROR: 'Error',
+  ACTUALIZAR: 'Actualizar',
+  AGREGAR: 'Agregar',
+};
+
+/** Hint del title (Jorge, 30-sep: error u otro estado = se migra a mano). */
+export const MAXIMO_INTEGRATION_HINTS: Record<string, string> = {
+  PROCESADO: 'migró sola a SAP',
+  ERROR: 'se captura a mano en SAP',
+  ACTUALIZAR: 'significado preguntado a CIISA',
+  AGREGAR: 'significado preguntado a CIISA',
+};
+
+export const MAXIMO_INTEGRATION_CLASSES: Record<string, string> = {
+  PROCESADO: 'bg-green-100 text-green-800',
+  ERROR: 'bg-red-100 text-red-800',
+  ACTUALIZAR: 'bg-slate-100 text-slate-700',
+  AGREGAR: 'bg-slate-100 text-slate-700',
+};
+
+/** La OC no trae PO5 (null). */
+export const MAXIMO_INTEGRATION_NO_DATA = 'Sin dato';
+
+/** PO5 como badge; null = "Sin dato"; un valor desconocido sale tal cual. */
+export function maximoIntegrationBadge(status: string | null | undefined): MaximoBadge {
+  if (!status) {
+    return {
+      label: MAXIMO_INTEGRATION_NO_DATA,
+      className: 'bg-gray-50 text-gray-400',
+      title: 'Integración con SAP (PO5): Maximo no trae el dato',
+    };
+  }
+  const key = status.toUpperCase();
+  const hint = MAXIMO_INTEGRATION_HINTS[key];
+  return {
+    label: MAXIMO_INTEGRATION_LABELS[key] ?? status,
+    className: MAXIMO_INTEGRATION_CLASSES[key] ?? 'bg-gray-100 text-gray-700',
+    title: `Integración con SAP (PO5): ${status}${hint ? ` — ${hint}` : ''}`,
+  };
 }
 
 export const EXPEDITING_SOURCE_LABELS: Record<ExpeditingSource, string> = {
@@ -1165,9 +1245,11 @@ export interface ExpeditingItem {
   po_maximo?: string | null;
   /** I2: OC de SAP (la propia o la copia de una PO de Maximo). */
   oc_sap?: string | null;
-  /** I1: estatus en Maximo y recepción (RECEIPTS, null hasta que llegue). */
+  /** I1: estatus en Maximo y recepción (RECEIPTS; null = la OC no trae el dato). */
   maximo_status?: string | null;
   receipt_status?: string | null;
+  /** K2 (2026-10-05): PO5 de Maximo, literal (null en ABENT, en la OC de SAP sola o sin dato). */
+  integration_status?: string | null;
   /** I1: cerrada o cancelada en el otro sistema (null = sigue abierta). */
   closed_by?: ErpClosedBy | null;
   supplier: { id: string | null; legal_name: string; email: string | null } | null;
