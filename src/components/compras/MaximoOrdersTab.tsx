@@ -9,13 +9,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { PURCHASE_ADMIN_ROLES } from '@/types/auth';
 import type { PaginatedResponse } from '@/types/pagination';
 import {
-  MAXIMO_INTEGRATION_LABELS,
-  MAXIMO_INTEGRATION_NO_DATA,
   MAXIMO_STATUS_BADGE_CLASSES,
   MaximoPurchaseOrder,
   MaximoSummary,
   buyerLabel,
   maximoIntegrationBadge,
+  maximoIntegrationCodeOf,
   maximoReceiptBadge,
   maximoStatusBadgeClass,
   maximoStatusLabel,
@@ -113,11 +112,6 @@ const NotAvailable = ({ title = AB_FIELD_HINT }: { title?: string }) => (
 
 const SUBTOTAL_MISSING_HINT =
   'Sin subtotal: la OC no trae líneas o alguna no trae LINECOST (no se estima con el total)';
-
-/** K2: código de PO5 a partir de la etiqueta de la faceta (para el color del chip), como en Expeditación. */
-const integrationCodeOf = (label: string): string | null =>
-  Object.keys(MAXIMO_INTEGRATION_LABELS).find((code) => MAXIMO_INTEGRATION_LABELS[code] === label) ??
-  (label === MAXIMO_INTEGRATION_NO_DATA ? null : label);
 
 /** K7: badge de recepción (RECEIPTS) de la OC. */
 function ReceiptBadge({ status }: { status: string | null }) {
@@ -350,7 +344,7 @@ export default function MaximoOrdersTab({
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-gray-500">Integración con SAP (PO5):</span>
             {integrationChips.map(([label, count]) => {
-              const badge = maximoIntegrationBadge(integrationCodeOf(label));
+              const badge = maximoIntegrationBadge(maximoIntegrationCodeOf(label));
               const active = activeIntegrations.includes(label);
               return (
                 <button

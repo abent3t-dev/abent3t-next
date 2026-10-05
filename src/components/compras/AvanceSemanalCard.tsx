@@ -1,8 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { downloadFile } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
+import { api, downloadFile } from '@/lib/api';
+import { NO_DISPONIBLE } from '@/lib/compras-format';
 import { notify } from '@/lib/notifications';
+import type { MontoBase } from '@/types/purchases';
 import ExportExcelButton from './ExportExcelButton';
 import PdfViewerModal from './PdfViewerModal';
 
@@ -18,17 +21,25 @@ import PdfViewerModal from './PdfViewerModal';
  * suma de los dos sistemas (`todas`) ya no se ofrece aquí.
  *
  * K7.10 (2026-10-05): la tarjeta dice la base de los montos adjudicados.
+ * H4: el texto sale de la API (`avance-semanal/reglas`, la constante
+ * AVANCE_MONTO_BASE), no va escrito aquí: cambiar la constante basta, sin
+ * deploy de next. Si la llamada falla, "Base de los montos: No disponible".
  */
 
-/**
- * Base de los montos del PDF. Sale de `AVANCE_MONTO_BASE` del api
- * (purchase-reports/avance-semanal/avance-semanal.reglas.ts, 'sin_iva' a
- * confirmar con Ingrid): la tarjeta solo pide PDF y el JSON de la página
- * (`montos.base`) recalcula toda la semana, así que el texto va fijo. Si la
- * constante cambia a 'con_iva', cambia este texto.
- */
-const MONTOS_BASE_TEXTO =
-  'Montos sin IVA (suma de las líneas de la OC; las OC sin subtotal no se suman ni se estiman); el valor con IVA va en una línea chica.';
+/** GET /compras/reportes/avance-semanal/reglas (sin tocar la BD). */
+interface AvanceReglasVigentes {
+  monto_base: MontoBase;
+  /** "sin IVA" / "con IVA". */
+  monto_base_texto: string;
+  otra_base: MontoBase;
+  otra_base_texto: string;
+  /** Frase lista para la tarjeta: la base y dónde va el otro valor. */
+  monto_base_nota: string;
+  /** Montos de la página de Maximo: sus OC o las OC de SAP migradas. */
+  montos_fuente_maximo: 'maximo' | 'sap_migradas';
+  /** recibida, dias_desde, cerrada, cancelada y corte vigentes. */
+  reglas: Record<string, string>;
+}
 
 type Fuente = 'ambos' | 'maximo' | 'sap';
 
@@ -75,6 +86,16 @@ export default function AvanceSemanalCard({ lunes, elegida }: AvanceSemanalCardP
   const [fuente, setFuente] = useState<Fuente>('ambos');
   const [preview, setPreview] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  // H4: base de los montos según el api (una vez; cambia solo con un deploy del api)
+  const reglasQ = useQuery({
+    queryKey: ['reportes', 'avance-semanal', 'reglas'],
+    queryFn: () => api.get<AvanceReglasVigentes>('/compras/reportes/avance-semanal/reglas'),
+    staleTime: 30 * 60_000,
+    retry: 1,
+  });
+  const montosBase = reglasQ.isError
+    ? `Base de los montos: ${NO_DISPONIBLE}`
+    : (reglasQ.data?.monto_base_nota ?? null);
 
   const fq = fuente === 'ambos' ? '' : `&fuente=${fuente}`;
   const suffix = fuente === 'ambos' ? '' : `_${fuente}`;
@@ -116,7 +137,7 @@ export default function AvanceSemanalCard({ lunes, elegida }: AvanceSemanalCardP
           semana (mismo formato). El acumulado arranca el {Number(desde.slice(8))} de enero
           {ambos ? ': primero todas las semanas de Maximo y luego las de SAP.' : '.'}
         </p>
-        <p className="text-xs text-gray-500 mt-0.5">{MONTOS_BASE_TEXTO}</p>
+        {montosBase && <p className="text-xs text-gray-500 mt-0.5">{montosBase}</p>}
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         <label className="text-sm text-gray-600" htmlFor="avance-fuente">

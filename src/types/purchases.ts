@@ -672,15 +672,25 @@ export interface MaximoSummary {
   purchaseOrders: { total: number; byStatus: MaximoStatusCount[] };
   /** Filas de AB_CONTRATOS por `status` (el del contrato; sin contrato, el de la PR). */
   contracts: {
+    /** Filas PR–contrato (con y sin contrato). */
     total: number;
+    /** Filas PR–contrato CON contrato: un contrato cuenta una vez por PR. */
     withContract: number;
+    /**
+     * H5 (2026-10-05): contratos distintos (por `contractnum`, la llave de la
+     * pestaña Contratos agrupada), con el mismo año. Es el renglón
+     * "Contratos" del tablero.
+     */
+    distinct: number;
     byStatus: MaximoStatusCount[];
   };
   /**
    * K4.4 (2026-10-05): solicitudes (PR) por el estatus DE LA PR, una por PR;
    * con año, por su creación (`pr_issue_date`). null en `status` = sin dato.
+   * H8: `total` null (y `byStatus` vacío) con año cuando ninguna PR trae
+   * estatus todavía (antes del primer full): "No disponible", no 0.
    */
-  requests: { total: number; byStatus: MaximoStatusCount[] };
+  requests: { total: number | null; byStatus: MaximoStatusCount[] };
   lastSync: Record<MaximoSyncTarget, MaximoSummaryLastRun | null>;
 }
 
@@ -1335,6 +1345,18 @@ export function maximoIntegrationBadge(status: string | null | undefined): Maxim
   };
 }
 
+/**
+ * K2: código de PO5 a partir de la etiqueta de la faceta (para el color del
+ * chip). "Sin dato" → null; un valor desconocido sale tal cual. H23
+ * (2026-10-05): una sola copia para Expeditación y Órdenes Maximo.
+ */
+export function maximoIntegrationCodeOf(label: string): string | null {
+  return (
+    Object.keys(MAXIMO_INTEGRATION_LABELS).find((code) => MAXIMO_INTEGRATION_LABELS[code] === label) ??
+    (label === MAXIMO_INTEGRATION_NO_DATA ? null : label)
+  );
+}
+
 export const EXPEDITING_SOURCE_LABELS: Record<ExpeditingSource, string> = {
   abent: 'ABENT',
   sap: 'SAP',
@@ -1664,12 +1686,23 @@ export interface CurrencyAmount {
   total: number;
   count: number;
   /**
-   * K6: solo en montos de OC (no en por recibir, ahorro ni CAPEX/OPEX):
-   * suma sin IVA de las OC que tienen subtotal y cuántas no lo tienen (no
-   * suman; no se estima).
+   * K6: solo en montos de OC (no en por recibir ni ahorro): suma sin IVA de
+   * las OC que tienen subtotal y cuántas no lo tienen (no suman; no se
+   * estima). CAPEX/OPEX trae solo `sin_subtotal` (H7, `ClasCurrencyAmount`).
    */
   subtotal?: number;
   sin_subtotal?: number;
+}
+
+/**
+ * H7 (2026-10-05): CAPEX/OPEX por moneda (siempre sin IVA). `sin_subtotal` =
+ * OC de Maximo de esa moneda sin subtotal (cuentan en `count`, no en
+ * `total`); `monto_disponible` false = ninguna OC de la moneda trae el
+ * monto: se pinta "<moneda> No disponible", no $0.
+ */
+export interface ClasCurrencyAmount extends CurrencyAmount {
+  sin_subtotal: number;
+  monto_disponible: boolean;
 }
 
 /** K6: monto de OC por moneda, con el subtotal sin IVA siempre presente. */
@@ -1805,22 +1838,27 @@ export interface DashboardPendingSource {
 /**
  * K4 (2026-10-05): Maximo, una fila por PR. `total` = PR creadas en el
  * periodo (`pr_issue_date`); `pendientes` = APPR sin OC ni contrato, por
- * fecha de aprobación. null en los del periodo = ninguna PR trae estatus
- * todavía (antes del primer full), nunca 0. Aparte, sin sumarse:
- * pendientes + de_contrato + aprobadas_con_oc = las APPR del periodo.
+ * fecha de aprobación. null = ninguna PR trae estatus todavía (antes del
+ * primer full), nunca 0; H8: también los `*_sin_limite` y, con año, `total`.
+ * Aparte, sin sumarse: pendientes + de_contrato + aprobadas_con_oc = las
+ * APPR del periodo.
  */
-export interface DashboardMaximoPendingSource extends DashboardPendingSource {
+export interface DashboardMaximoPendingSource
+  extends Omit<DashboardPendingSource, 'total' | 'pendientes_sin_limite'> {
+  /** H8: null con año y sin base (la API lo cuenta como 0 en `solicitudes.total`). */
+  total: number | null;
+  pendientes_sin_limite: number | null;
   /** De `total`, las que llegaron a Compras (con primer APPR). */
   llegaron_a_compras: number | null;
   /** I8: APPR de contrato sin OC (la OC se genera en automático). */
   de_contrato: number | null;
-  de_contrato_sin_limite: number;
+  de_contrato_sin_limite: number | null;
   /** APPR que ya tienen OC, con o sin contrato (solo como dato). */
   aprobadas_con_oc: number | null;
-  aprobadas_con_oc_sin_limite: number;
+  aprobadas_con_oc_sin_limite: number | null;
   /** WAPPR (todavía no llegan a Compras), por su emisión. */
   en_aprobacion: number | null;
-  en_aprobacion_sin_limite: number;
+  en_aprobacion_sin_limite: number | null;
 }
 export interface DashboardSummary {
   /** D4: año aplicado (null = todo). */
@@ -1847,7 +1885,10 @@ export interface DashboardSummary {
     por_fuente: {
       sap: DashboardSourceOrders<OrderCurrencyAmount>;
       maximo: DashboardSourceOrders<OrderCurrencyAmount>;
-      /** K6: base desconocida → subtotal 0 y todas en `sin_subtotal`. */
+      /**
+       * K6: base desconocida → subtotal 0 y todas en `sin_subtotal`; H10: con
+       * la base sin IVA también total 0 (el front dice "No disponible", H7).
+       */
       abent: DashboardSourceOrders<OrderCurrencyAmount>;
     };
     /** D1: OC de SAP creadas desde Maximo; `en_maximo` = descontadas del total. */
@@ -1900,13 +1941,17 @@ export interface OrdersKpis {
 }
 /**
  * K6: CAPEX u OPEX. `sin_subtotal` = OC de Maximo clasificadas sin
- * subtotal: cuentan en `documentos`, no en el monto.
+ * subtotal: cuentan en `documentos`, no en el monto. H7: por moneda, con
+ * `monto_disponible` (combinado y Maximo; SAP no cambia).
  */
 export interface OrdersKpiClass {
-  por_moneda: CurrencyAmount[];
+  por_moneda: ClasCurrencyAmount[];
   documentos: number;
   sin_subtotal: number;
-  por_fuente: { sap: OrdersKpiSource; maximo: OrdersKpiSource & { sin_subtotal: number } };
+  por_fuente: {
+    sap: OrdersKpiSource;
+    maximo: { documentos: number; por_moneda: ClasCurrencyAmount[]; sin_subtotal: number };
+  };
 }
 
 /** D6 — equivalencias de usuarios de SAP/Maximo (/compras/erp-aliases). */

@@ -25,8 +25,9 @@ import {
  * K7 (2026-10-05): badges de recepción (RECEIPTS) e integración con SAP
  * (PO5) en la cabecera; "Total (con IVA)" = TOTALCOST, "Subtotal (sin
  * IVA)" = Σ LINECOST ("No disponible" si falta, no se estima) y "OC en SAP"
- * con link a Órdenes SAP; sección "Líneas" (POLINE, sin cantidad pedida:
- * ORDERQTY no llega en AB_COMPRAS).
+ * con link a Órdenes SAP (H1: filtrada por ese número exacto, `doc_num`);
+ * sección "Líneas" (POLINE, sin cantidad pedida: ORDERQTY no llega en
+ * AB_COMPRAS).
  */
 
 interface MaximoPoDetailModalProps {
@@ -204,11 +205,13 @@ export default function MaximoPoDetailModal({
                         Sin OC en SAP
                       </span>
                     ) : (
+                      // H1 (2026-10-05): filtro exacto por número (`doc_num`); con `search`
+                      // también salían la OC cuyo DocEntry es ese número y las subcadenas
                       <Link
-                        href={`/compras/ordenes?tab=sap_po&search=${current.oc_sap}`}
+                        href={`/compras/ordenes?tab=sap_po&doc_num=${current.oc_sap}`}
                         onClick={onClose}
                         className="font-mono text-[#222D59] underline hover:text-[#52AF32]"
-                        title="Ver la OC en Órdenes SAP (la de menor número si hay varias)"
+                        title={`Ver solo la OC ${current.oc_sap} en Órdenes SAP (si la PO se copió en varias OC, es la de menor número)`}
                       >
                         {current.oc_sap}
                       </Link>

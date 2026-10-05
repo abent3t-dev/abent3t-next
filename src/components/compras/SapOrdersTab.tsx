@@ -62,8 +62,12 @@ import type { ColumnConfigs } from '@/lib/column-filters';
  * K6/K7 (2026-10-05): columna "Subtotal" sin IVA (suma de las líneas;
  * "No disponible" si falta alguna, no se estima) con filtro numérico, y
  * "Total" rotulado con IVA (DocTotal). Búsqueda inicial desde la URL
- * (`initialSearch`), para el link "OC en SAP" del detalle de una PO de
- * Maximo.
+ * (`initialSearch`).
+ *
+ * H1 (2026-10-05): el link "OC en SAP" del detalle de una PO de Maximo manda
+ * el número exacto (`initialDocNum` → `doc_num`, chip que se puede quitar);
+ * con la búsqueda libre también salían la OC cuyo DocEntry es ese número y
+ * las que lo traen como subcadena.
  */
 
 const ORIGIN_OPTIONS: Array<{ value: 'sap' | 'maximo' | ''; label: string }> = [
@@ -231,6 +235,7 @@ export default function SapOrdersTab({
   initialStatus = [],
   initialOrigin = '',
   initialSearch = '',
+  initialDocNum = null,
   year = null,
   linkedVendor = null,
   initialFrom = '',
@@ -239,8 +244,10 @@ export default function SapOrdersTab({
   initialStatus?: string[];
   /** D1: filtro inicial de origen (desde el dashboard). */
   initialOrigin?: 'sap' | 'maximo' | '';
-  /** K7: número de la OC prefiltrado desde el detalle de una PO de Maximo. */
+  /** Texto libre inicial (desde la URL). */
   initialSearch?: string;
+  /** H1: número exacto de la OC (DocNum), desde el detalle de una PO de Maximo. */
+  initialDocNum?: number | null;
   /** D4: año (lo controla la página de Órdenes). */
   year?: number | null;
   /** G1: proveedor de la barra del top de Reportes (código de SAP). */
@@ -256,6 +263,7 @@ export default function SapOrdersTab({
   const [from, setFrom] = useState(initialFrom);
   const [to, setTo] = useState(initialTo);
   const [vendor, setVendor] = useState(linkedVendor);
+  const [docNum, setDocNum] = useState(initialDocNum);
   const [page, setPage] = useState(1);
   const [detailDocEntry, setDetailDocEntry] = useState<number | null>(null);
   const cf = useColumnFilters('sapPo', () => setPage(1));
@@ -269,6 +277,8 @@ export default function SapOrdersTab({
     year: year ?? undefined,
     card_code: vendor?.code,
     counted_once: vendor?.countedOnce ? 'true' : undefined,
+    // H1: número exacto (AND con lo demás), no la búsqueda libre
+    doc_num: docNum ?? undefined,
   };
   const filterQs = toQuery({ ...baseQuery, ...cf.params });
   const listQs = toQuery({ page, limit: PAGE_SIZE, ...baseQuery, ...cf.params });
@@ -293,7 +303,8 @@ export default function SapOrdersTab({
 
   const orders = data?.data ?? [];
   const meta = data?.meta;
-  const hasFilters = !!search || statuses.length > 0 || !!from || !!to || !!origin || !!year || !!vendor || cf.activeCount > 0;
+  const hasFilters =
+    !!search || statuses.length > 0 || !!from || !!to || !!origin || !!year || !!vendor || docNum !== null || cf.activeCount > 0;
   const canSeeIntegrations = hasRole(...PURCHASE_ADMIN_ROLES, 'executive');
   const summary = summaryQ.data?.purchaseOrders;
   const chips = SAP_STATUS_OPTIONS.map((opt) => ({
@@ -364,8 +375,19 @@ export default function SapOrdersTab({
           loading={isLoading}
         />
         <LinkedFilterChips
-          filters={
-            vendor
+          filters={[
+            ...(docNum !== null
+              ? [
+                  {
+                    key: 'doc_num',
+                    label: 'OC',
+                    value: String(docNum),
+                    title: 'Número exacto de la OC de SAP (desde el detalle de la PO de Maximo)',
+                    onClear: () => { setDocNum(null); setPage(1); },
+                  },
+                ]
+              : []),
+            ...(vendor
               ? [
                   {
                     key: 'proveedor',
@@ -377,8 +399,8 @@ export default function SapOrdersTab({
                     onClear: () => { setVendor(null); setPage(1); },
                   },
                 ]
-              : []
-          }
+              : []),
+          ]}
         />
         <ActiveColumnFilters cf={cf} columns={COLUMNS} />
         {summaryQ.data && summaryQ.data.migradas.total > 0 && (

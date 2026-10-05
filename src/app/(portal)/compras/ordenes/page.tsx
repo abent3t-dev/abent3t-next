@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { parseDocNumParam } from '@/lib/compras-format';
 import ResultChips from '@/components/compras/ResultChips';
 import StatusMultiSelect from '@/components/compras/StatusMultiSelect';
 import {
@@ -114,6 +115,7 @@ function OrdenesPageInner({
   initialStatus,
   initialYear,
   initialSearch,
+  initialDocNum,
   initialOrigin,
   linked,
 }: {
@@ -121,6 +123,8 @@ function OrdenesPageInner({
   initialStatus: string[];
   initialYear: number | null;
   initialSearch: string;
+  /** K7.4/H1: número exacto de la OC de SAP (link del detalle de la PO de Maximo). */
+  initialDocNum: number | null;
   initialOrigin: 'sap' | 'maximo' | '';
   linked: LinkedVendorParams | null;
 }) {
@@ -244,6 +248,7 @@ function OrdenesPageInner({
           initialStatus={initialTab === 'sap_po' ? initialStatus : []}
           initialOrigin={initialTab === 'sap_po' ? initialOrigin : ''}
           initialSearch={initialTab === 'sap_po' ? initialSearch : ''}
+          initialDocNum={initialTab === 'sap_po' ? initialDocNum : null}
           year={year}
           linkedVendor={
             initialTab === 'sap_po' && linked?.key.startsWith('sap:')
@@ -453,8 +458,10 @@ function OrdenesPageInner({
 /**
  * Pestana/estatus iniciales desde la URL (?tab=sap_po&status=open&year=2025
  * &origin=maximo&search=PO1234); Suspense por useSearchParams. `search` va a
- * Maximo (PONUM, desde la OC de SAP migrada) o a SAP (número de la OC,
- * desde el detalle de la PO de Maximo, K7). G1: desde el
+ * Maximo (PONUM, desde la OC de SAP migrada) o a SAP (texto libre). H1
+ * (2026-10-05): `doc_num` = número exacto de la OC de SAP, desde el detalle
+ * de la PO de Maximo (K7.4); la búsqueda libre también compara contra
+ * DocEntry y subcadenas y abría OC sin relación. G1: desde el
  * top de Reportes llegan `proveedor` (sap:P0000219 / maximo:P0000440),
  * `proveedor_nombre`, `contadas_una_vez`, `from` y `to`.
  */
@@ -468,6 +475,7 @@ function OrdenesFromUrl() {
   const originParam = params.get('origin');
   const initialOrigin = originParam === 'sap' || originParam === 'maximo' ? originParam : '';
   const initialSearch = params.get('search') ?? '';
+  const initialDocNum = parseDocNumParam(params.get('doc_num'));
   const vendorKey = params.get('proveedor') ?? '';
   const isoDay = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '');
   const linked: LinkedVendorParams | null =
@@ -482,11 +490,12 @@ function OrdenesFromUrl() {
       : null;
   return (
     <OrdenesPageInner
-      key={`${initialTab ?? ''}|${initialStatus.join(',')}|${initialYear ?? ''}|${initialOrigin}|${initialSearch}|${vendorKey}|${linked?.from ?? ''}|${linked?.to ?? ''}`}
+      key={`${initialTab ?? ''}|${initialStatus.join(',')}|${initialYear ?? ''}|${initialOrigin}|${initialSearch}|${initialDocNum ?? ''}|${vendorKey}|${linked?.from ?? ''}|${linked?.to ?? ''}`}
       initialTab={initialTab}
       initialStatus={initialStatus}
       initialYear={initialYear}
       initialSearch={initialSearch}
+      initialDocNum={initialDocNum}
       initialOrigin={initialOrigin}
       linked={linked}
     />

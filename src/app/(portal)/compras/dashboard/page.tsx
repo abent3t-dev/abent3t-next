@@ -97,7 +97,8 @@ const Icons = {
   ),
 };
 
-type SourceKpi = { total?: number; count?: number; pendientes?: number | null };
+// H8: `total` de Maximo puede venir null (con año y sin base) → "No disponible"
+type SourceKpi = { total?: number | null; count?: number; pendientes?: number | null };
 
 function KpiCard({
   label,
@@ -355,14 +356,20 @@ export default function ComprasDashboardPage() {
     : [];
   // K4/K7.9: Maximo cuenta PR (llegada a Compras = primer APPR; WAPPR aparte)
   const maximoPr = summary?.solicitudes.por_fuente.maximo;
-  const llegaron = maximoPr
-    ? maximoPr.llegaron_a_compras === null
-      ? ' (llegada a Compras no disponible)'
-      : ` (${maximoPr.llegaron_a_compras.toLocaleString('es-MX')} llegaron a Compras)`
-    : '';
+  // H8: con el total en "No disponible" no se agrega la llegada (tampoco hay base)
+  const llegaron =
+    maximoPr && maximoPr.total !== null
+      ? maximoPr.llegaron_a_compras === null
+        ? ' (llegada a Compras no disponible)'
+        : ` (${maximoPr.llegaron_a_compras.toLocaleString('es-MX')} llegaron a Compras)`
+      : '';
+  // H8: sin ninguna PR con estatus (antes del primer full) Maximo no tiene base: nunca 0
   const sinLimite =
     summary && maximoPr
-      ? `Sin límite de fecha: SAP ${summary.solicitudes.por_fuente.sap.pendientes_sin_limite.toLocaleString('es-MX')} · Maximo ${maximoPr.pendientes_sin_limite.toLocaleString('es-MX')} (y ${maximoPr.en_aprobacion_sin_limite.toLocaleString('es-MX')} en aprobación).`
+      ? `Sin límite de fecha: SAP ${summary.solicitudes.por_fuente.sap.pendientes_sin_limite.toLocaleString('es-MX')} · Maximo ` +
+        (maximoPr.pendientes_sin_limite === null
+          ? `${NO_DISPONIBLE} (ninguna PR trae estatus todavía; antes del primer full).`
+          : `${maximoPr.pendientes_sin_limite.toLocaleString('es-MX')} (y ${kpiNumber(maximoPr.en_aprobacion_sin_limite)} en aprobación).`)
       : '';
   const migradas = summary?.ordenes.migradas;
   // G6: los niveles 1/2/3 y Director General son del Comité (CCC), no de
@@ -633,7 +640,7 @@ export default function ComprasDashboardPage() {
               </span>
             )}
           </div>
-          {maximo.purchaseOrders.total === 0 && maximo.contracts.total === 0 && maximo.requests.total === 0 && !maximo.syncEnabled ? (
+          {maximo.purchaseOrders.total === 0 && maximo.contracts.total === 0 && (maximo.requests.total ?? 0) === 0 && !maximo.syncEnabled ? (
             <p className="text-sm text-gray-500">
               Sincronización pendiente de activación (configuración del servidor). Los datos de Maximo aparecerán aquí en cuanto se habilite.
             </p>
@@ -646,12 +653,26 @@ export default function ComprasDashboardPage() {
               {/* K7.9: una por PR, como el pie; los contratos van aparte (otra fecha) */}
               <div>
                 <p className="text-sm text-gray-500">Solicitudes (PR) de Maximo</p>
-                <p className="text-2xl font-bold text-[#424846]">{maximo.requests.total.toLocaleString('es-MX')}</p>
+                {/* H8: null = con año y ninguna PR con estatus todavía (antes del primer full) */}
+                {maximo.requests.total === null ? (
+                  <p
+                    className="text-2xl font-bold text-gray-500 italic"
+                    title="Ninguna PR trae estatus ni fecha de creación todavía (antes del primer full de Maximo)"
+                  >
+                    {NO_DISPONIBLE}
+                  </p>
+                ) : (
+                  <p className="text-2xl font-bold text-[#424846]">{maximo.requests.total.toLocaleString('es-MX')}</p>
+                )}
+                {/* H5: contratos distintos (la llave de la pestaña Contratos), no filas PR–contrato */}
                 <p
                   className="mt-1 text-xs text-gray-500"
-                  title={year ? 'Contratos por su fecha; las solicitudes, por la fecha de la PR' : undefined}
+                  title={
+                    'Contratos distintos, como la pestaña Contratos (un contrato usado por varias PR cuenta una vez)' +
+                    (year ? '. Contratos por su fecha; las solicitudes, por la fecha de la PR' : '')
+                  }
                 >
-                  Contratos: {maximo.contracts.withContract.toLocaleString('es-MX')}
+                  Contratos: {maximo.contracts.distinct.toLocaleString('es-MX')}
                 </p>
               </div>
               <div>

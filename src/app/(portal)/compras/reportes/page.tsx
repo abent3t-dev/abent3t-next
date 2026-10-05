@@ -9,6 +9,7 @@ import {
   formatAmountLines,
   formatCurrencyAmount,
   formatDays,
+  formatOrderAmount,
   formatOrderAmountLines,
   formatSubtotalLine,
   NO_DISPONIBLE,
@@ -63,6 +64,11 @@ import {
  * (ISSUEDATE) y su pie es por el estatus DE LA PR (`maximo.solicitudes`); los
  * montos de OC dicen su base (`monto_nota`) y traen el subtotal sin IVA como
  * dato secundario (letra chica en la tarjeta, tooltip en series y tops).
+ *
+ * Revisión del bloque K (2026-10-05): H8 las PR de Maximo creadas sin base
+ * (antes del primer full) dicen "No disponible", no 0; H7 con la base sin
+ * IVA, la moneda sin ningún subtotal dice "MXN No disponible", no $0; H4 la
+ * base de los montos del PDF de avance la dice la API.
  */
 
 // ── Tipos de las respuestas del backend ────────────────────────────────────
@@ -89,7 +95,11 @@ interface Resumen {
       creadas: number;
       /** G3: solicitudes sin OC (al día de hoy, últimos 12 meses). */
       pendientes: number;
-      por_fuente: Record<'sap' | 'maximo' | 'abent', { creadas: number; pendientes: number | null }>;
+      /**
+       * H8: `creadas` de Maximo es null sin ninguna PR con estatus (antes del
+       * primer full): "No disponible", no 0 (`creadas` total la cuenta como 0).
+       */
+      por_fuente: Record<'sap' | 'maximo' | 'abent', { creadas: number | null; pendientes: number | null }>;
       pendientes_periodo: { desde: string; hasta: string | null };
     };
     /**
@@ -422,11 +432,16 @@ function KpiCard({
   );
 }
 
+/** H8: un valor null (sin base) se dice "No disponible", nunca 0. */
 function porFuente<T>(
   fuentes: Record<'sap' | 'maximo' | 'abent', T>,
-  valor: (v: T) => number,
+  valor: (v: T) => number | null,
 ): string {
-  return `SAP ${valor(fuentes.sap).toLocaleString('es-MX')} · Maximo ${valor(fuentes.maximo).toLocaleString('es-MX')} · ABENT ${valor(fuentes.abent).toLocaleString('es-MX')}`;
+  const texto = (v: T) => {
+    const n = valor(v);
+    return n === null ? NO_DISPONIBLE : n.toLocaleString('es-MX');
+  };
+  return `SAP ${texto(fuentes.sap)} · Maximo ${texto(fuentes.maximo)} · ABENT ${texto(fuentes.abent)}`;
 }
 
 /**
@@ -477,9 +492,12 @@ function VendorTop({
         const pct = Math.round((row.monto / max) * 100);
         const single: 'sap' | 'maximo' = row.por_fuente.sap.count > 0 ? 'sap' : 'maximo';
         const go = (source: 'sap' | 'maximo') => router.push(ordersHref(row, source, range));
+        // H7: con la base sin IVA, sin ningún subtotal → "MXN No disponible", no $0
+        const fuenteMonto = (s: VendorTopSource) =>
+          formatOrderAmount({ currency: row.currency, total: s.monto, count: s.count, sin_subtotal: s.sin_subtotal }, base);
         const amountTitle = [
           combined
-            ? `SAP: ${formatCurrencyAmount(row.por_fuente.sap.monto, row.currency)} (${row.por_fuente.sap.count} OC) · Maximo: ${formatCurrencyAmount(row.por_fuente.maximo.monto, row.currency)} (${row.por_fuente.maximo.count} OC)`
+            ? `SAP: ${fuenteMonto(row.por_fuente.sap)} (${row.por_fuente.sap.count} OC) · Maximo: ${fuenteMonto(row.por_fuente.maximo)} (${row.por_fuente.maximo.count} OC)`
             : null,
           formatSubtotalLine({ ...row, total: row.monto }, base),
         ]
@@ -501,7 +519,7 @@ function VendorTop({
                       type="button"
                       onClick={() => go('sap')}
                       className="text-[#52AF32] hover:underline mr-2"
-                      title={`SAP: ${formatCurrencyAmount(row.por_fuente.sap.monto, row.currency)} en ${row.por_fuente.sap.count} OC`}
+                      title={`SAP: ${fuenteMonto(row.por_fuente.sap)} en ${row.por_fuente.sap.count} OC`}
                     >
                       SAP {row.por_fuente.sap.count}
                     </button>
@@ -511,7 +529,7 @@ function VendorTop({
                       type="button"
                       onClick={() => go('maximo')}
                       className="text-[#222D59] hover:underline"
-                      title={`Maximo: ${formatCurrencyAmount(row.por_fuente.maximo.monto, row.currency)} en ${row.por_fuente.maximo.count} OC`}
+                      title={`Maximo: ${fuenteMonto(row.por_fuente.maximo)} en ${row.por_fuente.maximo.count} OC`}
                     >
                       Maximo {row.por_fuente.maximo.count}
                     </button>
@@ -528,7 +546,7 @@ function VendorTop({
               <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
             </button>
             <div className="w-28 lg:w-48 lg:whitespace-nowrap text-sm text-right text-gray-700" title={amountTitle || undefined}>
-              {formatCurrencyAmount(row.monto, row.currency)} · {row.count}
+              {formatOrderAmount({ ...row, total: row.monto }, base)} · {row.count}
             </div>
           </div>
         );
@@ -598,7 +616,8 @@ function ErpMonths({ serie, base, nota }: { serie: ErpSerie; base: MontoBase; no
                       className="whitespace-nowrap"
                       title={formatSubtotalLine({ ...c, total: c.monto }, base)}
                     >
-                      {formatCurrencyAmount(c.monto, c.currency)}
+                      {/* H7: con la base sin IVA, un mes sin ningún subtotal → "No disponible", no $0 */}
+                      {formatOrderAmount({ ...c, total: c.monto }, base)}
                     </span>
                   ))}
               </p>

@@ -264,7 +264,8 @@ export default function MaximoRequestsTab({
         </div>
         <ResultChips
           filteredTotal={meta?.total}
-          grandTotal={summary?.total}
+          // H8: null (con año y sin base) = total desconocido: solo el del listado
+          grandTotal={summary?.total ?? undefined}
           statuses={chips}
           activeStatuses={prStatuses}
           onToggleStatus={toggleStatus}

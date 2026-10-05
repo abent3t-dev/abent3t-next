@@ -14,10 +14,9 @@ import {
   EXPEDITING_SOURCE_LABELS,
   ExpeditingItem,
   ExpeditingSource,
-  MAXIMO_INTEGRATION_LABELS,
-  MAXIMO_INTEGRATION_NO_DATA,
   buyerLabel,
   maximoIntegrationBadge,
+  maximoIntegrationCodeOf,
   maximoReceiptBadge,
   maximoStatusText,
 } from '@/types/purchases';
@@ -116,11 +115,6 @@ const COLUMNS: ColumnConfigs = {
 /** K1/K2: la fila tiene una OC de Maximo detrás (la propia o la que originó la de SAP). */
 const hasMaximoPo = (item: ExpeditingItem) =>
   item.source === 'maximo' || (item.source === 'sap' && !!item.maximo_ponum);
-
-/** K2: código de PO5 a partir de la etiqueta de la faceta (para el color del chip). */
-const integrationCodeOf = (label: string): string | null =>
-  Object.keys(MAXIMO_INTEGRATION_LABELS).find((code) => MAXIMO_INTEGRATION_LABELS[code] === label) ??
-  (label === MAXIMO_INTEGRATION_NO_DATA ? null : label);
 
 const formatDate = (date: string | null) =>
   date
@@ -434,7 +428,7 @@ function ExpeditacionContent() {
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-gray-500">Integración con SAP (PO5):</span>
             {integrationChips.map(([label, count]) => {
-              const badge = maximoIntegrationBadge(integrationCodeOf(label));
+              const badge = maximoIntegrationBadge(maximoIntegrationCodeOf(label));
               const active = activeIntegrations.includes(label);
               return (
                 <button

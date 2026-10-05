@@ -2,7 +2,13 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { formatAmountLines, NO_DISPONIBLE } from '@/lib/compras-format';
+import {
+  ClasAmountLine,
+  formatAmountLines,
+  formatClasAmountLines,
+  NO_DISPONIBLE,
+  sinSubtotalPorMoneda,
+} from '@/lib/compras-format';
 import type { OrdersKpiSource, OrdersKpis } from '@/types/purchases';
 
 /**
@@ -14,6 +20,11 @@ import type { OrdersKpiSource, OrdersKpis } from '@/types/purchases';
  * K6/K7 (2026-10-05): CAPEX/OPEX va sin IVA en las dos fuentes; las OC de
  * Maximo clasificadas sin subtotal cuentan en OC pero no en el monto, y se
  * dicen (`sin_subtotal`; la nota de la API va en el tooltip).
+ *
+ * H7 (2026-10-05): la moneda en la que ninguna OC trae subtotal
+ * (`monto_disponible` false, p. ej. CAPEX solo de Maximo antes del primer
+ * full) dice "USD No disponible", nunca "USD $0"; el aviso ámbar dice de qué
+ * moneda son las OC sin subtotal.
  */
 
 const Icons = {
@@ -55,8 +66,10 @@ export default function OrdersKpiCards({ year }: { year: number | null }) {
       ? formatAmountLines(kpis.ahorro.por_moneda)
       : []
     : [];
-  const capexLines = kpis && kpis.clasificacion.capex.documentos > 0 ? formatAmountLines(kpis.clasificacion.capex.por_moneda) : [];
-  const opexLines = kpis && kpis.clasificacion.opex.documentos > 0 ? formatAmountLines(kpis.clasificacion.opex.por_moneda) : [];
+  const capexLines: ClasAmountLine[] =
+    kpis && kpis.clasificacion.capex.documentos > 0 ? formatClasAmountLines(kpis.clasificacion.capex.por_moneda) : [];
+  const opexLines: ClasAmountLine[] =
+    kpis && kpis.clasificacion.opex.documentos > 0 ? formatClasAmountLines(kpis.clasificacion.opex.por_moneda) : [];
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -130,20 +143,29 @@ export default function OrdersKpiCards({ year }: { year: number | null }) {
                     ) : (
                       <ul className="space-y-0.5">
                         {c.lines.map((l) => (
-                          <li key={l} className="text-lg font-bold text-[#424846] tabular-nums leading-tight break-words">{l}</li>
+                          <li
+                            key={l.text}
+                            className={`text-lg tabular-nums leading-tight break-words ${
+                              l.disponible ? 'font-bold text-[#424846]' : 'font-semibold text-gray-500 italic'
+                            }`}
+                            title={l.disponible ? undefined : 'Ninguna OC de esta moneda trae subtotal: no se estima con el total'}
+                          >
+                            {l.text}
+                          </li>
                         ))}
                       </ul>
                     )}
                     <p className="text-xs text-gray-600 mt-1">
                       {c.data.documentos.toLocaleString('es-MX')} OC · SAP {c.data.por_fuente.sap.documentos.toLocaleString('es-MX')} · Maximo {c.data.por_fuente.maximo.documentos.toLocaleString('es-MX')}
                     </p>
-                    {/* K6: OC de Maximo sin subtotal: cuentan en OC, no en el monto */}
+                    {/* K6: OC de Maximo sin subtotal: cuentan en OC, no en el monto (H7: con su moneda) */}
                     {c.data.sin_subtotal > 0 && (
                       <p
                         className="text-xs text-amber-700"
                         title="OC de Maximo clasificadas sin subtotal (sin líneas o con alguna sin LINECOST): cuentan en OC, no en el monto; no se estima con el total"
                       >
                         {c.data.sin_subtotal.toLocaleString('es-MX')} OC de Maximo sin subtotal, fuera del monto
+                        {sinSubtotalPorMoneda(c.data.por_moneda) && ` (${sinSubtotalPorMoneda(c.data.por_moneda)})`}
                       </p>
                     )}
                   </div>
