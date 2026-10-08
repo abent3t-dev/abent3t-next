@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '@/lib/api';
 import { notify } from '@/lib/notifications';
+import { NO_DISPONIBLE } from '@/lib/compras-format';
 import { useAuth } from '@/contexts/AuthContext';
 import { PURCHASE_ADMIN_ROLES } from '@/types/auth';
 import type { PaginatedResponse } from '@/types/pagination';
@@ -12,6 +13,7 @@ import {
   MAXIMO_RUN_STATUS_LABELS,
   SAP_RUN_MODE_LABELS,
   SAP_TARGET_LABELS,
+  SapLastFullRun,
   SapSyncRun,
   SapSyncStatus,
   SapSyncTarget,
@@ -34,6 +36,15 @@ interface SapTriggerResponse {
 
 const RUNS_PAGE_SIZE = 10;
 const REFRESH_MS = 15_000;
+/** L1: un día más margen para los reintentos del full diario. */
+const FULL_STALE_MS = 26 * 60 * 60 * 1000;
+
+/**
+ * L1: el full diario de un target "se atrasó" si su último full exitoso
+ * tiene más de 26 h al momento de la consulta del status, o si nunca hubo.
+ */
+const fullIsStale = (last: SapLastFullRun | null, referenceMs: number) =>
+  !last || referenceMs - new Date(last.started_at).getTime() > FULL_STALE_MS;
 
 const formatDateTime = (date: string | null) =>
   date
@@ -225,7 +236,23 @@ export default function SapIntegrationSection() {
               <p className="text-xs text-gray-500 uppercase">Intervalo</p>
               <p className="text-sm text-gray-900">cada {status.intervalMinutes} min</p>
             </div>
-            <div className="md:col-span-2">
+            {/* L1: full diario de órdenes, solicitudes y proveedores (un api anterior a L1 no lo manda) */}
+            <div>
+              <p className="text-xs text-gray-500 uppercase">Completa diaria</p>
+              <p
+                className="text-sm text-gray-900"
+                title="Sincronización completa de órdenes, solicitudes y proveedores una vez al día: trae los cierres que SAP no marca como cambio"
+              >
+                {!status.fullDaily ? (
+                  <span className="text-gray-500 italic">{NO_DISPONIBLE}</span>
+                ) : status.fullDaily.at ? (
+                  `${status.fullDaily.at} (hora de México)`
+                ) : (
+                  'Apagada'
+                )}
+              </p>
+            </div>
+            <div>
               <p className="text-xs text-gray-500 uppercase">Tamaño de página</p>
               <p className="text-sm text-gray-900">{status.pageSize} documentos</p>
             </div>
@@ -233,6 +260,15 @@ export default function SapIntegrationSection() {
               ['purchase_orders', 'purchase_requests', 'business_partners', 'approval_requests'] as const
             ).map((t) => {
               const lastRun = status.lastRuns[t];
+              // L1: undefined = el api no manda el dato (anterior a L1): no se muestra
+              const lastFull = status.lastFullSuccess?.[t];
+              // L1: se nota si el full diario de un target deja de correr
+              const fullLate =
+                status.enabled &&
+                lastFull !== undefined &&
+                !!status.fullDaily?.at &&
+                status.fullDaily.targets.includes(t) &&
+                fullIsStale(lastFull, statusQuery.dataUpdatedAt);
               return (
                 <div key={t} className="md:col-span-2 border border-gray-200 rounded-lg p-3">
                   <div className="flex items-center justify-between mb-1">
@@ -260,14 +296,31 @@ export default function SapIntegrationSection() {
                       <span>{formatDateTime(lastRun.started_at)}</span>
                       <span
                         className="text-xs text-gray-500"
-                        title="insertados / actualizados / sin cambio / fallidos"
+                        title="insertados / actualizados / re-mapeados (mismo documento en SAP, no es cambio) / sin cambio / fallidos"
                       >
                         +{lastRun.records_inserted} / ~{lastRun.records_updated} /
-                        ={lastRun.records_unchanged} / !{lastRun.records_failed}
+                        ↻{lastRun.records_remapped} / ={lastRun.records_unchanged} /
+                        !{lastRun.records_failed}
                       </span>
                     </div>
                   ) : (
                     <p className="text-sm text-gray-500">Sin corridas registradas</p>
+                  )}
+                  {lastFull !== undefined && (
+                    <p
+                      className={`mt-1 text-xs ${fullLate ? 'text-amber-700 font-medium' : 'text-gray-500'}`}
+                      title={
+                        fullLate
+                          ? 'La sincronización completa diaria no ha terminado bien en más de un día: los cierres que SAP no marca como cambio pueden estar atrasados'
+                          : 'Última sincronización completa que terminó sin errores'
+                      }
+                    >
+                      Última completa exitosa:{' '}
+                      {lastFull
+                        ? `${formatDateTime(lastFull.started_at)} · ${lastFull.triggered_by === 'cron' ? 'Automática' : 'Manual'}`
+                        : 'ninguna'}
+                      {fullLate && ' · atrasada'}
+                    </p>
                   )}
                 </div>
               );
@@ -304,7 +357,7 @@ export default function SapIntegrationSection() {
                     <th className="px-3 py-3 text-left text-xs font-medium text-white uppercase">Inicio</th>
                     <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Duración</th>
                     <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Estado</th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase" title="descargados / insertados / actualizados / sin cambio / fallidos">Registros</th>
+                    <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase" title="descargados / insertados / actualizados / re-mapeados (mismo documento en SAP, no es cambio) / sin cambio / fallidos">Registros</th>
                     <th className="px-3 py-3 text-center text-xs font-medium text-white uppercase">Detalle</th>
                   </tr>
                 </thead>
@@ -391,7 +444,7 @@ function SapRunRow({
           <RunBadge status={run.status} />
         </td>
         <td className="px-3 py-3 text-center text-sm text-gray-600 font-mono whitespace-nowrap">
-          {run.records_fetched} / +{run.records_inserted} / ~{run.records_updated} / ={run.records_unchanged} / !{run.records_failed}
+          {run.records_fetched} / +{run.records_inserted} / ~{run.records_updated} / ↻{run.records_remapped} / ={run.records_unchanged} / !{run.records_failed}
         </td>
         <td className="px-3 py-3 text-center">
           {hasDetail && (
