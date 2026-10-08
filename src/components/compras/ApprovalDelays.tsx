@@ -9,7 +9,7 @@ import type { ApprovalStats, ApprovalTimesReport } from '@/types/purchases';
 /**
  * Quién tiene detenidas las aprobaciones de SAP y desde cuándo (dashboard y
  * reportes). Lo de Maximo va en la cadena de aprobación (MaximoChain.tsx):
- * Maximo no dice a quién le toca cada OC, solo el nivel que espera.
+ * el nivel que espera cada OC con su titular (L3, tabla del cliente).
  *
  * D6 (2026-09-23): los nombres ya llegan resueltos con los alias de SAP/Maximo
  * (Compras → Roles → Usuarios de SAP y Maximo); `usuario` conserva el código.

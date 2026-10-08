@@ -28,11 +28,12 @@ import {
   ApprovalTimesReport,
   CurrencyAmount,
   groupMaximoStatusCounts,
+  MAXIMO_LAST_APPROVAL_LEVEL,
   MAXIMO_STATUS_CHART_COLORS,
   MaximoSummary,
   maximoGroupLabel,
   maximoPrStatusLabel,
-  maximoStatusLabel,
+  maximoStatusListLabel,
   MontoBase,
   OrderCurrencyAmount,
   SAP_STATUS_CHART_COLORS,
@@ -1026,7 +1027,7 @@ export default function ReportesComprasPage() {
                 <span>Contratos: <strong>{formatDays(tiempos.maximo.contratos.promedio_dias)}</strong> ({tiempos.maximo.contratos.total})</span>
               </div>
               <p className="text-xs text-gray-500">
-                Por aprobador: cada aprobación de la cadena (nivel 1, 2, 3, 4 o final), días desde que le llegó la OC ·{' '}
+                Por aprobador: cada aprobación de la cadena (niveles 1 a {MAXIMO_LAST_APPROVAL_LEVEL} o final), días desde que le llegó la OC ·{' '}
                 <Link href="/compras/aprobaciones?tab=historico" className="text-[#52AF32] hover:underline">
                   histórico con periodo
                 </Link>
@@ -1203,7 +1204,8 @@ export default function ReportesComprasPage() {
               {maximo.purchase_orders.por_estatus.map((row) => (
                 <HBar
                   key={row.status}
-                  label={row.status === 'sin_clasificar' ? 'Sin clasificar' : maximoStatusLabel(row.status)}
+                  // L3: APPRn y APPRnREV se llaman igual: la barra lleva el código
+                  label={row.status === 'sin_clasificar' ? 'Sin clasificar' : maximoStatusListLabel(row.status)}
                   value={row.count}
                   max={Math.max(...maximo.purchase_orders.por_estatus.map((r) => r.count), 1)}
                   color={row.status === 'sin_clasificar' ? 'bg-gray-400' : 'bg-[#52AF32]'}
@@ -1222,7 +1224,7 @@ export default function ReportesComprasPage() {
                 maximo.contracts.por_estatus.map((row) => (
                   <HBar
                     key={row.status}
-                    label={row.status === 'sin_clasificar' ? 'Sin clasificar' : maximoStatusLabel(row.status)}
+                    label={row.status === 'sin_clasificar' ? 'Sin clasificar' : maximoStatusListLabel(row.status)}
                     value={row.count}
                     max={Math.max(...maximo.contracts.por_estatus.map((r) => r.count), 1)}
                     color={row.status === 'sin_clasificar' ? 'bg-gray-400' : 'bg-[#222D59]'}

@@ -18,6 +18,7 @@ import {
   maximoReceiptBadge,
   maximoStatusBadgeClass,
   maximoStatusLabel,
+  maximoStatusListLabel,
   maximoStatusTitle,
 } from '@/types/purchases';
 import MaximoPoDetailModal from './MaximoPoDetailModal';
@@ -231,7 +232,8 @@ export default function MaximoOrdersTab({
     .filter((entry): entry is [string, number] => entry[0] !== null)
     .map(([status, count]) => ({
       key: status,
-      label: maximoStatusLabel(status),
+      // L3: APPRn y APPRnREV se llaman igual: el chip lleva el código
+      label: maximoStatusListLabel(status),
       count,
       className: maximoStatusBadgeClass(status),
     }));

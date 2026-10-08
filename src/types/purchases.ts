@@ -694,40 +694,68 @@ export interface MaximoSummary {
   lastSync: Record<MaximoSyncTarget, MaximoSummaryLastRun | null>;
 }
 
+/**
+ * L3 (tabla del cliente, 2026-10-07): titular de cada nivel de autorización
+ * de Maximo (APPRn / APPRnREV = "Autorización n"). Es el TITULAR del nivel,
+ * no necesariamente quien aprobó: quién aprobó sale del usuario del
+ * historial y su nombre, del alias. No es el flujo interno de requisiciones
+ * (`APPROVAL_LEVEL_NAMES`). Misma tabla en el API (`maximo-status.util.ts`).
+ */
+export const MAXIMO_APPROVAL_LEVELS: Readonly<Record<number, string>> = {
+  1: 'David Alejandro Rodríguez Ojeda',
+  2: 'Miguel Ángel Ortiz García',
+  3: 'Gilberto Maltos Vázquez',
+  4: 'Uriel Lases García',
+  5: 'Alejandro Escandón',
+};
+
+/** Niveles de la tabla del cliente, en orden (hoy, del 1 al 5). */
+export const MAXIMO_APPROVAL_LEVEL_NUMBERS = Object.keys(MAXIMO_APPROVAL_LEVELS).map(Number);
+
+/** Último nivel de la tabla del cliente (hoy, 5); después sigue APPR. */
+export const MAXIMO_LAST_APPROVAL_LEVEL = Math.max(...MAXIMO_APPROVAL_LEVEL_NUMBERS);
+
+/** Titular del nivel n; null si el nivel no está en la tabla del cliente. */
+export function maximoLevelHolder(level: number | null): string | null {
+  return level === null ? null : (MAXIMO_APPROVAL_LEVELS[level] ?? null);
+}
+
+const MAXIMO_IN_APPROVAL_BADGE_CLASS = 'bg-yellow-100 text-yellow-800';
+
 // Estatus de Maximo: vocabulario libre de la fuente — se muestran tal cual,
 // solo se colorean los conocidos (clases completas, patron de platforms.ts).
+// Las llaves también son las opciones del filtro de estatus.
 export const MAXIMO_STATUS_BADGE_CLASSES: Record<string, string> = {
   APPR: 'bg-green-100 text-green-800',
   CLOSE: 'bg-gray-200 text-gray-700',
   COMP: 'bg-green-100 text-green-800',
-  WAPPR: 'bg-yellow-100 text-yellow-800',
-  // G7: en aprobación por nivel (estatus propios de A3T)
-  APPR1: 'bg-yellow-100 text-yellow-800',
-  APPR2: 'bg-yellow-100 text-yellow-800',
-  APPR3: 'bg-yellow-100 text-yellow-800',
-  APPR4: 'bg-yellow-100 text-yellow-800',
-  APPR1REV: 'bg-yellow-100 text-yellow-800',
-  APPR2REV: 'bg-yellow-100 text-yellow-800',
-  APPR3REV: 'bg-yellow-100 text-yellow-800',
-  APPR4REV: 'bg-yellow-100 text-yellow-800',
+  WAPPR: MAXIMO_IN_APPROVAL_BADGE_CLASS,
+  // G7/L3: autorización por nivel (estatus propios de A3T): APPR1–APPR5 y
+  // APPR1REV–APPR5REV, uno por nivel de MAXIMO_APPROVAL_LEVELS
+  ...Object.fromEntries(MAXIMO_APPROVAL_LEVEL_NUMBERS.map((n) => [`APPR${n}`, MAXIMO_IN_APPROVAL_BADGE_CLASS])),
+  ...Object.fromEntries(MAXIMO_APPROVAL_LEVEL_NUMBERS.map((n) => [`APPR${n}REV`, MAXIMO_IN_APPROVAL_BADGE_CLASS])),
   PNDREV: 'bg-yellow-100 text-yellow-800',
   REVISD: 'bg-blue-100 text-blue-800',
   INPRG: 'bg-blue-100 text-blue-800',
+  // L3: "En suspenso"
+  HOLD: 'bg-orange-100 text-orange-800',
   CAN: 'bg-red-100 text-red-800',
   CANCEL: 'bg-red-100 text-red-800',
 };
 
 /**
- * Etiquetas en español de los estatus conocidos de Maximo (A2). G7
- * (2026-09-28): provisionales hasta que Alfredo confirme los significados;
- * APPRn / APPRnREV se resuelven en `maximoStatusLabel`.
+ * Etiquetas en español de los estatus conocidos de Maximo (A2), con las
+ * palabras del cliente (L3, tabla del 2026-10-07; en la OC, en femenino:
+ * Cancelada, Cerrada, Revisada). APPRn / APPRnREV ("Autorización n") se
+ * resuelven en `maximoStatusLabel`. Misma tabla en el API.
  */
 export const MAXIMO_STATUS_LABELS: Record<string, string> = {
   APPR: 'Aprobada',
   WAPPR: 'En espera de aprobación',
-  PNDREV: 'Pendiente de revisión',
+  PNDREV: 'Revisión pendiente',
   REVISD: 'Revisada',
-  INPRG: 'En proceso',
+  INPRG: 'En progreso',
+  HOLD: 'En suspenso',
   COMP: 'Completada',
   CLOSE: 'Cerrada',
   CAN: 'Cancelada',
@@ -802,25 +830,38 @@ export function isMaximoInApproval(status: string | null): boolean {
   return status === 'WAPPR' || maximoApprovedLevel(status) !== null;
 }
 
+/** L3: APPRn y APPRnREV = "Autorización n" (tabla del cliente). */
 export function maximoStatusLabel(status: string | null): string {
   if (!status) return MAXIMO_NO_STATUS_LABEL;
   const known = MAXIMO_STATUS_LABELS[status];
   if (known) return known;
-  const revision = MAXIMO_LEVEL_REVISION_STATUS.exec(status);
-  if (revision) return `En aprobación · revisión aprobada en nivel ${revision[1]}`;
-  const level = MAXIMO_LEVEL_STATUS.exec(status);
-  if (level) return `En aprobación · nivel ${level[1]} aprobado`;
-  return status;
+  const level = maximoApprovedLevel(status);
+  return level === null ? status : `Autorización ${level}`;
 }
 
-/** G7: tooltip de un estatus — siempre con el código. */
+/**
+ * L3: etiqueta para chips y barras, donde los estatus salen lado a lado sin
+ * tooltip: APPRn y APPRnREV se llaman igual ("Autorización n"), así que los
+ * de nivel llevan el código ("Autorización 2 (APPR2REV)").
+ */
+export function maximoStatusListLabel(status: string | null): string {
+  const label = maximoStatusLabel(status);
+  return maximoApprovedLevel(status) === null ? label : `${label} (${status})`;
+}
+
+/**
+ * G7: tooltip de un estatus — siempre con el código. L3: APPRn / APPRnREV
+ * con el titular del nivel ("APPR2 · Autorización 2 · Miguel Ángel Ortiz
+ * García"); INPRG, con quién la pone.
+ */
 export function maximoStatusTitle(status: string | null): string | undefined {
   if (!status) return undefined;
-  if (status === 'INPRG') {
-    return 'INPRG · la ponen los compradores después de la aprobación; significado exacto por confirmar con Alfredo';
-  }
   const label = maximoStatusLabel(status);
-  return label === status ? status : `${status} · ${label}`;
+  if (label === status) return status;
+  const titular = maximoLevelHolder(maximoApprovedLevel(status));
+  if (titular) return `${status} · ${label} · ${titular}`;
+  if (status === 'INPRG') return `${status} · ${label} · la ponen los compradores después de la aprobación`;
+  return `${status} · ${label}`;
 }
 
 /** Clave sintética del grupo "En aprobación" en los pies (G7). */
@@ -864,6 +905,8 @@ export const MAXIMO_STATUS_CHART_COLORS: Record<string, string> = {
   PNDREV: '#DFA922',
   REVISD: '#3b82f6',
   INPRG: '#222D59',
+  // L3: "En suspenso"
+  HOLD: '#ea580c',
   CLOSE: '#9ca3af',
   CAN: '#ef4444',
   CANCEL: '#ef4444',
@@ -905,7 +948,8 @@ export function statusChartColors(
 export function maximoStatusBadgeClass(status: string | null): string {
   return (
     (status && MAXIMO_STATUS_BADGE_CLASSES[status]) ||
-    'bg-gray-100 text-gray-800'
+    // L3: un nivel fuera de la tabla (APPR6…) también va como en aprobación
+    (isMaximoInApproval(status) ? MAXIMO_IN_APPROVAL_BADGE_CLASS : 'bg-gray-100 text-gray-800')
   );
 }
 
@@ -1648,18 +1692,36 @@ export interface SapSyncRun {
   records_fetched: number;
   records_inserted: number;
   records_updated: number;
+  /** L1: mismo documento en SAP re-mapeado por un mapper nuevo (no es cambio real). */
+  records_remapped: number;
   records_unchanged: number;
   records_failed: number;
   error_summary: string | null;
   mapper_version: string;
 }
 
+/** L1: último full con status success de un target (manual o del cron). */
+export interface SapLastFullRun {
+  id: string;
+  triggered_by: SapSyncRun['triggered_by'];
+  started_at: string;
+  finished_at: string | null;
+}
+
 export interface SapSyncStatus {
   enabled: boolean;
   intervalMinutes: number;
   pageSize: number;
+  /**
+   * L1: full diario de OC, solicitudes y proveedores (SAP no mueve UpdateDate
+   * cuando otro documento cierra la OC o la solicitud). `at` = HH:MM en
+   * `timeZone`; null = apagado. Opcional: un api anterior a L1 no lo manda.
+   */
+  fullDaily?: { at: string | null; timeZone: string; targets: SapSyncTarget[] };
   running: SapSyncTarget[];
   lastRuns: Record<SapSyncTarget, SapSyncRun | null>;
+  /** L1: último full EXITOSO por target (null = nunca); opcional, como fullDaily. */
+  lastFullSuccess?: Record<SapSyncTarget, SapLastFullRun | null>;
   counts: Record<SapSyncTarget, number>;
 }
 
@@ -2113,6 +2175,7 @@ export interface MaximoPendingOrder {
   estatus: string | null;
   estatus_etiqueta: string;
   nivel: number | null;
+  /** L3: el nivel que espera con su titular ("Nivel 2 · Miguel Ángel Ortiz García") o "Aprobación final". */
   nivel_etiqueta: string;
   proveedor: string | null;
   proveedor_codigo: string | null;

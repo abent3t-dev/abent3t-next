@@ -15,6 +15,7 @@ import {
   MaximoSummary,
   maximoStatusBadgeClass,
   maximoStatusLabel,
+  maximoStatusListLabel,
   maximoStatusTitle,
 } from '@/types/purchases';
 import MaximoContractDetailModal from './MaximoContractDetailModal';
@@ -181,7 +182,8 @@ function MaximoContractRowsView({
     .filter((entry): entry is [string, number] => entry[0] !== null)
     .map(([status, count]) => ({
       key: status,
-      label: maximoStatusLabel(status),
+      // L3: APPRn y APPRnREV se llaman igual: el chip lleva el código
+      label: maximoStatusListLabel(status),
       count,
       className: maximoStatusBadgeClass(status),
     }));

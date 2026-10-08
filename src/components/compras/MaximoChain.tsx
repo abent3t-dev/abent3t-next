@@ -17,14 +17,19 @@ import MaximoPoDetailModal from './MaximoPoDetailModal';
  * G6 (reunión con Ingrid 2026-09-28) — Cadena de aprobación de Maximo, que
  * ya viene en el historial POSTATUS: comprador → nivel 1 → nivel 2 → … →
  * aprobación final (según el monto). Las OC en aprobación (WAPPR / APPRn /
- * APPRnREV) esperan al siguiente nivel desde su último cambio. Maximo no dice
- * a qué persona exacta le toca (eso sería el workflow): se muestran los
- * aprobadores HABITUALES de ese paso. Los niveles 1/2/3 y Director General de
- * ABENT son del Comité (CCC), no de esta cadena.
+ * APPRnREV) esperan al siguiente nivel desde su último cambio. L3
+ * (2026-10-07): el nivel dice a quién le toca, su TITULAR según la tabla del
+ * cliente ("Nivel 2 · Miguel Ángel Ortiz García", lo arma el API); los
+ * aprobadores HABITUALES dicen quién lo aprueba de verdad en el historial.
+ * Los niveles 1/2/3 y Director General de ABENT son del Comité (CCC), no de
+ * esta cadena.
  */
 
 const dayCount = (days: number | null) =>
   days === null ? 'sin fecha' : `${days} ${days === 1 ? 'día' : 'días'}`;
+
+// L3: la etiqueta trae el nombre del titular; solo la primera letra va en minúscula
+const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
 
 const formatMoney = (amount: number | null, currency: string | null) => {
   if (amount === null) return '—';
@@ -72,7 +77,7 @@ export function MaximoChainSummary({ cadena, linkToTab = true }: { cadena: Caden
       <p className="text-sm text-gray-700">
         <strong>Maximo: {cadena.total.toLocaleString('es-MX')} en aprobación</strong>
         {' · '}
-        {cadena.por_nivel.map((n) => `${n.pendientes} en ${n.etiqueta.toLowerCase()}`).join(' · ')}
+        {cadena.por_nivel.map((n) => `${n.pendientes} en ${lowerFirst(n.etiqueta)}`).join(', ')}
         {linkToTab && (
           <>
             {' · '}
@@ -123,8 +128,8 @@ export default function MaximoChainTab({ initialApprover = null }: { initialAppr
     <div className="space-y-4">
       <div className="bg-white p-4 rounded-lg shadow space-y-3">
         <p className="text-sm text-gray-600">
-          Cadena de aprobación de <strong>Maximo</strong> (solo lectura: se aprueba en Maximo). Nivel que espera cada OC y
-          quién suele aprobar ese paso.
+          Cadena de aprobación de <strong>Maximo</strong> (solo lectura: se aprueba en Maximo). Nivel que espera cada OC con
+          su titular y quién suele aprobar ese paso.
         </p>
         {cadenaQ.isError ? (
           <p className="text-sm text-red-600">No se pudo cargar la cadena de aprobación de Maximo.</p>
@@ -141,7 +146,7 @@ export default function MaximoChainTab({ initialApprover = null }: { initialAppr
                     key: 'aprobador',
                     label: 'Aprobador',
                     value: `${approverName} (${approver}) · órdenes del paso que suele aprobar`,
-                    title: 'Maximo no dice a quién le toca cada OC: se muestran las del nivel que este usuario suele aprobar',
+                    title: 'Se muestran las órdenes del paso que este usuario suele aprobar en el historial (puede no ser el titular del nivel)',
                     onClear: () => setApprover(null),
                   },
                 ]
