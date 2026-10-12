@@ -18,6 +18,7 @@ import {
 import ContractStatusBadge from './ContractStatusBadge';
 import ContractFileUploader from './ContractFileUploader';
 import PdfViewerModal from './PdfViewerModal';
+import SupplierCombobox, { type SupplierOption } from './SupplierCombobox';
 import { usePurchaseUsers } from '@/hooks/usePurchaseUsers';
 
 /**
@@ -36,12 +37,6 @@ interface ContractModalProps {
   onClose: () => void;
   contract: Contract | null; // null = alta
   canEdit: boolean;
-}
-
-interface Supplier {
-  id: string;
-  legal_name: string;
-  tax_id: string;
 }
 
 const EMPTY_FORM = {
@@ -172,16 +167,12 @@ function ContractModalBody({
   const detail = detailQuery.data;
   const documents = detail?.documents ?? [];
 
-  // Catalogos: solo cuando se puede editar (los GET de suppliers/usuarios
-  // estan restringidos a PURCHASE_TEAM / admins en el backend)
-  const { data: suppliersData } = useQuery({
-    queryKey: ['suppliers-for-contracts'],
-    queryFn: () => api.get<{ data: Supplier[] }>('/suppliers?limit=100'),
-    enabled: canEdit,
-  });
+  // Proveedor elegido (para mostrarlo en el buscador); el id va en formData.
+  // El catálogo se busca en el servidor (SupplierCombobox): ya no se carga
+  // completo, porque los primeros 100 no alcanzaban (Diana, 2026-10-12).
+  const [supplier, setSupplier] = useState<SupplierOption | null>(contract?.supplier ?? null);
   // T7: /compras/usuarios (antes /auth/users daba 403 a PURCHASE_TEAM)
   const { data: buyersData } = usePurchaseUsers('comprador', canEdit);
-  const suppliers = suppliersData?.data ?? [];
   const buyers = buyersData ?? [];
 
   // I6: con carpeta el número se arma solo; sin ella, se captura a mano
@@ -629,24 +620,15 @@ function ContractModalBody({
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Proveedor *</label>
-                <select
-                  value={formData.supplier_id}
-                  onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
-                  className={`${inputClass} bg-white`}
-                  required
-                >
-                  <option value="">Seleccionar proveedor...</option>
-                  {/* El catalogo solo trae 100 proveedores: si el actual no viene, se muestra igual */}
-                  {contract?.supplier && !suppliers.some((s) => s.id === contract.supplier_id) && (
-                    <option value={contract.supplier_id}>
-                      {contract.supplier.legal_name} ({contract.supplier.tax_id})
-                    </option>
-                  )}
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>{s.legal_name} ({s.tax_id})</option>
-                  ))}
-                </select>
+                <label htmlFor="contrato-proveedor" className="block text-sm font-medium text-gray-700 mb-1">Proveedor *</label>
+                <SupplierCombobox
+                  id="contrato-proveedor"
+                  value={supplier}
+                  onChange={(s) => {
+                    setSupplier(s);
+                    setFormData({ ...formData, supplier_id: s?.id ?? '' });
+                  }}
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
