@@ -30,6 +30,9 @@ import { useComitePendientes } from '@/hooks/useComitePendientes';
  * H3 (2026-09-29): editor de la cadena (PURCHASE_ADMINS) y aviso en la app
  * de lo que espera mi firma ("Mis pendientes (N)" y el menú) mientras el
  * correo sigue en simulación.
+ *
+ * M3 (2026-10-14): la cadena también se ve (y los admins la editan) dentro
+ * de cada comité, en "Aprobadores"; aquí se llama igual.
  */
 
 const PAGE_SIZE = 15;
@@ -154,7 +157,7 @@ export default function ComitePage() {
               onClick={() => setShowChain(true)}
               className="px-3 py-1.5 text-sm font-medium rounded-lg border border-amber-300 bg-white text-amber-900 hover:bg-amber-100"
             >
-              Revisar la cadena
+              Revisar los aprobadores
             </button>
           )}
         </div>
@@ -171,14 +174,14 @@ export default function ComitePage() {
           >
             <span>
               <span className="block text-base font-semibold text-[#424846]">
-                Cadena de aprobación del comité
+                Aprobadores del comité
               </span>
               <span className="block text-sm text-gray-500">
-                Quién firma cada nivel, en qué orden, y si ya está confirmado
+                La cadena de aprobación: quién firma cada nivel, en qué orden y si ya está confirmado
               </span>
             </span>
             <span className="text-sm font-medium text-[#52AF32]">
-              {showChain ? 'Ocultar' : 'Editar cadena'}
+              {showChain ? 'Ocultar' : 'Editar aprobadores'}
             </span>
           </button>
           {showChain && (

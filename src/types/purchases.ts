@@ -1220,6 +1220,11 @@ export interface CommitteeLevelInfo {
   role: string;
   has_specific_user: boolean;
   confirmed: boolean;
+  /**
+   * M3 (2026-10-14): la persona que firma el nivel (null = cualquiera con el
+   * rol). Opcional: un api anterior no lo trae.
+   */
+  profile?: { id: string; full_name: string | null; email: string } | null;
 }
 
 export interface CommitteeDetail extends PurchaseCommittee {
@@ -1242,7 +1247,7 @@ export interface CommitteeApprovalLevel {
 
 export const COMMITTEE_STATUS_LABELS: Record<CommitteeStatus, string> = {
   borrador: 'Borrador',
-  en_aprobacion: 'En aprobacion',
+  en_aprobacion: 'En aprobación',
   aprobado: 'Aprobado',
   rechazado: 'Rechazado',
   cancelado: 'Cancelado',

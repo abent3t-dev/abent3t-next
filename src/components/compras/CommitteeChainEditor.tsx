@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useId, useState } from 'react';
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { notify } from '@/lib/notifications';
 import { ROLE_LABELS, type UserRole } from '@/types/auth';
@@ -19,6 +19,12 @@ import ProfileCombobox, { type ProfileOption } from './ProfileCombobox';
  * aprobación no se reordena ni se desactiva el nivel que tiene uno esperando,
  * la cadena conserva al menos un nivel activo y quien firma por persona
  * necesita un rol de aprobador de compras.
+ *
+ * M3 (2026-10-14, Ingrid y Omar): también se abre desde el comité ("Editar
+ * aprobadores"); cada cambio refresca el detalle de los comités abiertos. La
+ * búsqueda es por nombre o correo y, si no encuentra a nadie, dice que esa
+ * persona no tiene cuenta en la plataforma (p. ej. un externo) y que la pida
+ * a TI, en vez de solo "Sin coincidencias".
  */
 
 const LEVEL_ROLES: UserRole[] = [
@@ -32,6 +38,23 @@ const LEVEL_ROLES: UserRole[] = [
 ];
 
 const LEVELS_KEY = ['committee-levels'];
+
+/**
+ * M3: la cadena se ve dentro de cada comité y decide el turno: refrescar los
+ * niveles, el detalle de los comités y la lista (nivel vigente, "Revisar" y
+ * "Mis pendientes").
+ */
+const refreshChain = (qc: QueryClient) => {
+  void qc.invalidateQueries({ queryKey: LEVELS_KEY });
+  void qc.invalidateQueries({ queryKey: ['committee-detail'] });
+  void qc.invalidateQueries({ queryKey: ['committees'] });
+};
+
+/** M3: la búsqueda no encontró a nadie con ese nombre o correo. */
+const noAccountText = (term: string) =>
+  term.includes('@')
+    ? `${term} no tiene cuenta en la plataforma; pídela a TI.`
+    : `Nadie con "${term}" tiene cuenta en la plataforma. Busca también por correo; si no tiene cuenta (p. ej. alguien externo), pídela a TI.`;
 
 const errorText = (err: unknown) =>
   err instanceof Error ? err.message : 'No se pudo guardar';
@@ -59,12 +82,15 @@ function LevelRow({
   total,
   onMove,
   busy,
+  idPrefix,
 }: {
   level: CommitteeApprovalLevel;
   index: number;
   total: number;
   onMove: (from: number, to: number) => void;
   busy: boolean;
+  /** M3: único por editor (puede haber uno en la página y otro en el comité) */
+  idPrefix: string;
 }) {
   const qc = useQueryClient();
   // La fila se re-monta cuando cambia el nivel guardado (ver `key` abajo)
@@ -79,7 +105,7 @@ function LevelRow({
     mutationFn: (body: Record<string, unknown>) =>
       api.put<CommitteeApprovalLevel>(`/compras/comite/niveles/${level.id}`, body),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: LEVELS_KEY });
+      refreshChain(qc);
       notify.success(`Nivel ${level.orden} guardado`);
     },
     onError: (err) => notify.error(errorText(err)),
@@ -92,7 +118,8 @@ function LevelRow({
       notes: draft.notes.trim() || undefined,
     });
 
-  const inputId = `nivel-${level.id}-persona`;
+  const inputId = `${idPrefix}-nivel-${level.id}-persona`;
+  const roleId = `${idPrefix}-nivel-${level.id}-rol`;
   const warning = draft.profile && !canSign(draft.profile);
 
   return (
@@ -144,6 +171,7 @@ function LevelRow({
               id={inputId}
               value={draft.profile}
               onChange={(profile) => setDraft({ ...draft, profile })}
+              emptyText={noAccountText}
             />
             <p className="text-xs text-gray-500 mt-1">
               {draft.profile
@@ -158,11 +186,11 @@ function LevelRow({
             )}
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor={`nivel-${level.id}-rol`}>
+            <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor={roleId}>
               Rol del nivel
             </label>
             <select
-              id={`nivel-${level.id}-rol`}
+              id={roleId}
               value={draft.role}
               onChange={(e) => setDraft({ ...draft, role: e.target.value as UserRole })}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-900 bg-white"
@@ -222,6 +250,8 @@ function LevelRow({
 
 export default function CommitteeChainEditor() {
   const qc = useQueryClient();
+  // M3: ids únicos por editor (el de la página y el del comité pueden convivir)
+  const uid = useId();
   const levelsQuery = useQuery({
     queryKey: LEVELS_KEY,
     queryFn: () => api.get<CommitteeApprovalLevel[]>('/compras/comite/niveles'),
@@ -232,7 +262,7 @@ export default function CommitteeChainEditor() {
     mutationFn: (ids: string[]) =>
       api.put<CommitteeApprovalLevel[]>('/compras/comite/niveles/orden', { ids }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: LEVELS_KEY });
+      refreshChain(qc);
       notify.success('Orden de la cadena guardado');
     },
     onError: (err) => notify.error(errorText(err)),
@@ -247,7 +277,7 @@ export default function CommitteeChainEditor() {
         profile_id: newProfile?.id ?? null,
       }),
     onSuccess: (level) => {
-      void qc.invalidateQueries({ queryKey: LEVELS_KEY });
+      refreshChain(qc);
       setNewProfile(null);
       notify.success(`Nivel ${level.orden} agregado al final de la cadena`);
     },
@@ -296,6 +326,7 @@ export default function CommitteeChainEditor() {
               total={levels.length}
               onMove={move}
               busy={reorder.isPending}
+              idPrefix={uid}
             />
           ))}
         </ol>
@@ -305,17 +336,22 @@ export default function CommitteeChainEditor() {
         <p className="text-sm font-medium text-[#424846] mb-2">Agregar un nivel al final</p>
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-[14rem] flex-1">
-            <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="nuevo-nivel-persona">
+            <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor={`${uid}-nuevo-nivel-persona`}>
               Persona (opcional)
             </label>
-            <ProfileCombobox id="nuevo-nivel-persona" value={newProfile} onChange={setNewProfile} />
+            <ProfileCombobox
+              id={`${uid}-nuevo-nivel-persona`}
+              value={newProfile}
+              onChange={setNewProfile}
+              emptyText={noAccountText}
+            />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor="nuevo-nivel-rol">
+            <label className="block text-xs font-medium text-gray-600 mb-1" htmlFor={`${uid}-nuevo-nivel-rol`}>
               Rol
             </label>
             <select
-              id="nuevo-nivel-rol"
+              id={`${uid}-nuevo-nivel-rol`}
               value={newRole}
               onChange={(e) => setNewRole(e.target.value as UserRole)}
               className="px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-900 bg-white"

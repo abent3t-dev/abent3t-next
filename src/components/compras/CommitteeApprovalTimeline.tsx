@@ -11,6 +11,9 @@ import { CommitteeApproval, CommitteeDetail } from "@/types/purchases";
  *
  * H3 (2026-09-29): debajo, el histórico de las versiones anteriores (quién
  * firmó y el comentario del rechazo), que antes dejaba de verse al reenviar.
+ *
+ * M3 (2026-10-14): cada nivel dice quién firma (la persona, o "cualquiera con
+ * el rol") y si Compras ya lo confirmó.
  */
 
 const formatDateTime = (date: string | null) =>
@@ -68,25 +71,47 @@ export default function CommitteeApprovalTimeline({
               <div className="flex-1 pb-1">
                 <p className="text-sm text-gray-900">
                   <span className="font-medium">Nivel {level.orden}</span> ·{" "}
-                  {roleLabel(level.role)}
-                  {level.has_specific_user && (
-                    <span className="text-xs text-gray-400">
-                      {" "}
-                      (usuario especifico)
+                  {level.profile ? (
+                    <span className="font-medium">
+                      {level.profile.full_name ?? level.profile.email}
                     </span>
+                  ) : level.profile === null ? (
+                    <span>Cualquiera con el rol {roleLabel(level.role)}</span>
+                  ) : (
+                    // api anterior a M3: sin la persona
+                    <>
+                      {roleLabel(level.role)}
+                      {level.has_specific_user && (
+                        <span className="text-xs text-gray-400">
+                          {" "}
+                          (usuario específico)
+                        </span>
+                      )}
+                    </>
                   )}
-                  {!level.confirmed && (
-                    <span
-                      className="ml-1 text-xs text-amber-600"
-                      title="Mapeo pendiente de confirmar con Ingrid"
-                    >
-                      *
-                    </span>
-                  )}
+                  <span
+                    className={`ml-2 inline-flex px-1.5 py-0.5 text-[11px] font-medium rounded ${
+                      level.confirmed
+                        ? "bg-green-50 text-green-700"
+                        : "bg-amber-50 text-amber-700"
+                    }`}
+                    title={
+                      level.confirmed
+                        ? "Compras confirmó quién firma este nivel"
+                        : "Asignación propuesta: falta que Compras la confirme (el flujo opera igual)"
+                    }
+                  >
+                    {level.confirmed ? "Confirmado" : "Sin confirmar"}
+                  </span>
                 </p>
+                {level.profile && (
+                  <p className="text-xs text-gray-500">
+                    {roleLabel(level.role)} · {level.profile.email}
+                  </p>
+                )}
                 {approval ? (
                   <p className="text-xs text-gray-500">
-                    {approval.action === "aprobado" ? "Aprobo" : "Rechazo"}{" "}
+                    {approval.action === "aprobado" ? "Aprobó" : "Rechazó"}{" "}
                     <span className="font-medium">
                       {approval.approver?.full_name ?? "—"}
                     </span>

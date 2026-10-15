@@ -33,6 +33,13 @@ interface ProfileComboboxProps {
   onChange: (profile: ProfileOption | null) => void;
   /** id del input, para asociarlo con su `<label htmlFor>`. */
   id?: string;
+  /**
+   * M3 (2026-10-14): texto cuando la búsqueda no encuentra a nadie, o cuando
+   * se busca un correo completo y ninguna cuenta lo tiene exacto (p. ej. la
+   * cadena del comité: "no tiene cuenta en la plataforma; pídela a TI").
+   * Sin él, "Sin coincidencias".
+   */
+  emptyText?: (term: string) => string;
 }
 
 interface Option {
@@ -47,7 +54,7 @@ const NONE_KEY = 'sin-ligar';
 
 const profileLabel = (p: ProfileOption) => `${p.full_name ?? p.email} · ${p.email}`;
 
-export default function ProfileCombobox({ value, onChange, id }: ProfileComboboxProps) {
+export default function ProfileCombobox({ value, onChange, id, emptyText }: ProfileComboboxProps) {
   const baseId = useId();
   const inputId = id ?? `${baseId}-input`;
   const listboxId = `${baseId}-listbox`;
@@ -86,13 +93,22 @@ export default function ProfileCombobox({ value, onChange, id }: ProfileCombobox
   const activeIndex = options.findIndex((o) => o.key === activeKey);
   const pending = typed !== term || profilesQ.isFetching;
 
+  // M3: buscando un correo completo, la búsqueda por palabras también trae
+  // correos parecidos ("felix@x.com" → "felix.perez@x.com"): si ninguno es
+  // ese correo exacto, se avisa igual que cuando no hay nadie
+  const exactEmailMissing =
+    term.includes('@') && !matches.some((m) => m.email.toLowerCase() === term.toLowerCase());
   const statusText = profilesQ.isError
     ? 'No se pudieron cargar los perfiles.'
     : pending
       ? 'Buscando…'
       : matches.length === 0
-        ? 'Sin coincidencias'
-        : '';
+        ? term && emptyText
+          ? emptyText(term)
+          : 'Sin coincidencias'
+        : emptyText && exactEmailMissing
+          ? emptyText(term)
+          : '';
 
   const close = () => {
     setOpen(false);
