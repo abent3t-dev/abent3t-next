@@ -22,6 +22,7 @@ import PurchaseOrderModal from '@/components/compras/PurchaseOrderModal';
 import MaximoOrdersTab from '@/components/compras/MaximoOrdersTab';
 import SapOrdersTab from '@/components/compras/SapOrdersTab';
 import OrdersKpiCards from '@/components/compras/OrdersKpiCards';
+import OrdersBuyerCharts from '@/components/compras/OrdersBuyerCharts';
 import YearChips from '@/components/compras/YearChips';
 import { useAuth } from '@/contexts/AuthContext';
 import { PURCHASE_TEAM_ROLES } from '@/types/auth';
@@ -208,6 +209,9 @@ function OrdenesPageInner({
 
       {/* D5: ahorro acumulado y CAPEX/OPEX (SAP + Maximo, por moneda) */}
       <OrdersKpiCards year={year} />
+
+      {/* M1/M2 (2026-10-14, Ingrid): ahorro y tiempo de gestión por comprador */}
+      <OrdersBuyerCharts year={year} />
 
       {/* Tabs por fuente (T6) + año (D4) */}
       <div className="flex flex-wrap items-center justify-between gap-2 bg-white rounded-xl p-2 shadow">

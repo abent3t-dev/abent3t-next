@@ -46,11 +46,20 @@ function sourceLine(label: string, s: OrdersKpiSource) {
   return `${label}: ${formatAmountLines(s.por_moneda).join(' · ')} (${s.documentos.toLocaleString('es-MX')} OC)`;
 }
 
-export default function OrdersKpiCards({ year }: { year: number | null }) {
-  const q = useQuery({
+/**
+ * D5: GET /compras/dashboard/ordenes-kpis. M1/M2 (2026-10-14): las tarjetas y
+ * las gráficas por comprador (OrdersBuyerCharts) usan la misma llave y la
+ * misma consulta: React Query hace una sola petición.
+ */
+export function useOrdersKpis(year: number | null) {
+  return useQuery({
     queryKey: ['compras', 'dashboard', 'ordenes-kpis', year],
     queryFn: () => api.get<OrdersKpis>(`/compras/dashboard/ordenes-kpis${year ? `?year=${year}` : ''}`),
   });
+}
+
+export default function OrdersKpiCards({ year }: { year: number | null }) {
+  const q = useOrdersKpis(year);
   const kpis = q.data;
 
   if (q.isError) {

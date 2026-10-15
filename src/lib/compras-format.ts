@@ -42,21 +42,28 @@ export function formatCurrencyNoDisponible(currency: string | null): string {
   return `${currencyLabel(currency)} ${NO_DISPONIBLE}`;
 }
 
-export function formatCurrencyAmount(amount: number | null, currency: string | null): string {
-  if (amount === null || amount === undefined) return NO_DISPONIBLE;
+/**
+ * El número de un monto sin el código de la moneda al frente: "$1,234"
+ * (símbolo corto); sin moneda conocida, solo el número. M1 (2026-10-14):
+ * para renglones que ya dicen la moneda una vez ("USD: Jorge $1,234 · Ana $500").
+ */
+export function formatCurrencyNumber(amount: number, currency: string | null): string {
   const known = isKnownCurrency(currency);
-  let number: string;
   try {
-    number = new Intl.NumberFormat(
+    return new Intl.NumberFormat(
       'es-MX',
       known
         ? { style: 'currency', currency, currencyDisplay: 'narrowSymbol', maximumFractionDigits: 0 }
         : { maximumFractionDigits: 0 },
     ).format(amount);
   } catch {
-    number = amount.toLocaleString('es-MX', { maximumFractionDigits: 0 });
+    return amount.toLocaleString('es-MX', { maximumFractionDigits: 0 });
   }
-  return `${currencyLabel(currency)} ${number}`;
+}
+
+export function formatCurrencyAmount(amount: number | null, currency: string | null): string {
+  if (amount === null || amount === undefined) return NO_DISPONIBLE;
+  return `${currencyLabel(currency)} ${formatCurrencyNumber(amount, currency)}`;
 }
 
 /** Un renglón por moneda → ["MXN $1,234", "USD $56"]. */

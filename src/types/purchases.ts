@@ -1990,6 +1990,8 @@ export interface OrdersKpis {
     documentos: number;
     por_moneda: CurrencyAmount[];
     por_fuente: { sap: OrdersKpiSource; maximo: OrdersKpiSource };
+    /** M1 (2026-10-14): por moneda, la suma de las barras = `por_moneda`. */
+    por_comprador: AhorroPorComprador[];
     nota: string;
   };
   /** K6 (2026-10-05): montos sin IVA en las dos fuentes. */
@@ -1999,7 +2001,58 @@ export interface OrdersKpis {
     opex: OrdersKpiClass;
     nota: string;
   };
+  /** M2 (2026-10-14): días de gestión (G2) por comprador, por sistema. */
+  gestion_por_comprador: {
+    /** Con menos OC en el periodo, el comprador va al final y sin destacar. */
+    min_oc: number;
+    sap: GestionPorCompradorSistema;
+    maximo: GestionPorCompradorSistema & {
+      definicion_secundaria: string;
+      /** El dato secundario del tablero (`dias_gestion.maximo_desde_aprobacion`). */
+      total_desde_aprobacion: GestionStats;
+    };
+  };
   generated_at: string;
+}
+/**
+ * M1 (2026-10-14, Ingrid): ahorro de un comprador (regla E4/F1: Maximo y la
+ * OC de SAP que nació allá = PURCHASEAGENT o quien creó la OC; SAP = quien la
+ * capturó). `comprador` null = "Sin comprador identificado"; `tipo`
+ * 'capturo' = comprador inferido en `documentos_capturo` de sus OC.
+ */
+export interface AhorroPorComprador {
+  comprador: string | null;
+  tipo: BuyerKind;
+  /** OC con ahorro. */
+  documentos: number;
+  documentos_capturo: number;
+  /** Por moneda, sin convertir. */
+  por_moneda: CurrencyAmount[];
+}
+/**
+ * M2 (2026-10-14): G2 de un comprador con la cuenta del tablero (promedio,
+ * mediana y N). Maximo trae el dato secundario desde la aprobación.
+ */
+export interface GestionPorComprador {
+  comprador: string | null;
+  tipo: BuyerKind;
+  /** De las N, con comprador inferido. */
+  documentos_capturo: number;
+  promedio_dias: number | null;
+  mediana_dias: number | null;
+  /** N: OC que entran al promedio. */
+  total: number;
+  descartadas: number;
+  /** Solo Maximo: OC sin solicitud. */
+  sin_solicitud?: number;
+  /** Solo Maximo. */
+  desde_aprobacion?: { promedio_dias: number | null; mediana_dias: number | null; total: number };
+}
+export interface GestionPorCompradorSistema {
+  definicion: string;
+  /** El mismo G2 del tablero (`summary.dias_gestion`), sin la definición. */
+  total: GestionStats;
+  compradores: GestionPorComprador[];
 }
 /**
  * K6: CAPEX u OPEX. `sin_subtotal` = OC de Maximo clasificadas sin
