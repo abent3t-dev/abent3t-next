@@ -9,6 +9,7 @@ import {
   AmountLine,
   formatAmountLines,
   formatDays,
+  formatMonthYear,
   formatOrderAmountLines,
   NO_DISPONIBLE,
   subtotalNota,
@@ -281,8 +282,6 @@ function GestionCard({ rows }: { rows: GestionRow[] }) {
   );
 }
 
-const monthYear = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleDateString('es-MX', { month: 'short', year: 'numeric' }) : null;
 const dateTime = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
 
@@ -388,7 +387,8 @@ export default function ComprasDashboardPage() {
           <p className="text-gray-500">SAP Business One + Maximo{SHOW_INTERNAL_REQUISITIONS ? ' + registros propios de ABENT' : ''}</p>
           {summary && (
             <p className="mt-1 text-xs text-gray-600">
-              Datos desde {monthYear(summary.datos.sap_desde) ?? '—'} (SAP) y {monthYear(summary.datos.maximo_desde) ?? '—'} (Maximo) ·
+              Datos desde {formatMonthYear(summary.datos.sap_desde, { utc: true }) ?? '—'} (SAP) y{' '}
+              {formatMonthYear(summary.datos.maximo_desde) ?? '—'} (Maximo) ·
               sincronización cada hora · última: SAP {dateTime(summary.datos.ultima_sync.sap) ?? 'sin corridas'}, Maximo{' '}
               {dateTime(summary.datos.ultima_sync.maximo) ?? 'sin corridas'}
             </p>
