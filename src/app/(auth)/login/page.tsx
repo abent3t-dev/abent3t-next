@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import OidcErrorBanner from '@/components/auth/OidcErrorBanner';
 
 export default function LoginPage() {
   const { signInWithMicrosoft, signInWithEmail, loading, authConfig } =
@@ -54,6 +55,11 @@ export default function LoginPage() {
             ⚠️ Entorno de desarrollo: login con email/password habilitado.
           </div>
         )}
+
+        {/* Motivo de un inicio con Microsoft que no procedió (/login?error=…) */}
+        <Suspense fallback={null}>
+          <OidcErrorBanner allowedDomain={authConfig?.allowed_email_domain} />
+        </Suspense>
 
         {!showForm && (oidcEnabled || onlyMicrosoft || both) ? (
           <>
