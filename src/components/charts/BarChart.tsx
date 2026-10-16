@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
   Cell,
   LabelList,
+  Legend,
 } from 'recharts';
 import type { TooltipContentProps } from 'recharts';
 
@@ -37,6 +38,27 @@ interface BarChartProps<T extends object> {
   yAxisWidth?: number;
   /** Caracteres del nombre antes de recortarlo con "..." (20 si no se dice). */
   maxLabelLength?: number;
+  /**
+   * N1 (2026-10-16): barras verticales AGRUPADAS, una por serie (p. ej.
+   * "Monto adjudicado" y "Ahorro" por persona), con leyenda. Sin `series` la
+   * gráfica es la de una sola serie de siempre (`dataKey`). `colors` por
+   * barra (índice de `data`) y `label` (texto arriba de la barra) son por
+   * serie. Solo en vertical. `axis: 'right'` pone la serie en un segundo eje
+   * (a la derecha, con su color): para montos de escalas muy distintas, como
+   * el ahorro junto al monto adjudicado.
+   */
+  series?: Array<{
+    dataKey: string;
+    name: string;
+    color: string;
+    colors?: string[];
+    label?: (item: T) => string;
+    axis?: 'left' | 'right';
+  }>;
+  /** Vertical: ángulo de los nombres del eje X (-45 si no se dice). */
+  xLabelAngle?: number;
+  /** Vertical: alto del eje X (80 si no se dice), para nombres largos. */
+  xAxisHeight?: number;
 }
 
 /** Posición del elemento en `data` (para el tooltip y la etiqueta propios). */
@@ -80,6 +102,9 @@ export function BarChart<T extends object>({
   barLabel,
   yAxisWidth,
   maxLabelLength = 20,
+  series,
+  xLabelAngle = -45,
+  xAxisHeight = 80,
 }: BarChartProps<T>) {
   const chartId = useId();
   const chartData = data.map((item, index) => {
@@ -179,6 +204,78 @@ export function BarChart<T extends object>({
     );
   }
 
+  if (series) {
+    const right = series.find((x) => x.axis === 'right');
+    const order = series.map((x) => x.dataKey);
+    return (
+      <ResponsiveContainer width="100%" height={height}>
+        <RechartsBarChart data={chartData} margin={{ bottom: 10, left: 10, right: 10, top: 24 }} barGap={2}>
+          <CartesianGrid yAxisId="left" strokeDasharray="3 3" stroke="#f0f0f0" opacity={0.5} />
+          <XAxis
+            dataKey={xAxisKey}
+            angle={xLabelAngle}
+            textAnchor={xLabelAngle === 0 ? 'middle' : 'end'}
+            height={xAxisHeight}
+            interval={0}
+            tick={{ fill: '#374151', fontSize: 11, fontWeight: 500 }}
+            axisLine={{ stroke: '#e5e7eb' }}
+          />
+          <YAxis
+            yAxisId="left"
+            tickFormatter={formatValue}
+            tick={{ fill: right ? (series.find((x) => x.axis !== 'right')?.color ?? '#6b7280') : '#6b7280', fontSize: 12 }}
+            axisLine={{ stroke: '#e5e7eb' }}
+          />
+          {right && (
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              tickFormatter={formatValue}
+              tick={{ fill: right.color, fontSize: 12 }}
+              axisLine={{ stroke: '#e5e7eb' }}
+            />
+          )}
+          <Tooltip content={tooltipContent} cursor={{ fill: 'rgba(82, 175, 50, 0.05)' }} />
+          <Legend
+            verticalAlign="top"
+            height={28}
+            iconType="square"
+            wrapperStyle={{ fontSize: 12 }}
+            // en el orden de las series (por defecto las ordena alfabéticamente)
+            itemSorter={(item) => order.indexOf(String(item.dataKey))}
+          />
+          {series.map((s) => (
+            <Bar
+              key={s.dataKey}
+              yAxisId={s.axis === 'right' ? 'right' : 'left'}
+              dataKey={s.dataKey}
+              name={s.axis === 'right' ? `${s.name} (eje derecho)` : s.name}
+              fill={s.color}
+              radius={[6, 6, 0, 0]}
+              animationDuration={800}
+              animationBegin={0}
+            >
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${s.dataKey}-${index}`} fill={s.colors?.[index] ?? s.color} />
+              ))}
+              {s.label && (
+                <LabelList
+                  dataKey={(entry: unknown) => {
+                    const item = original(entry);
+                    return item && s.label ? s.label(item) : '';
+                  }}
+                  position="top"
+                  fill="#4b5563"
+                  fontSize={11}
+                />
+              )}
+            </Bar>
+          ))}
+        </RechartsBarChart>
+      </ResponsiveContainer>
+    );
+  }
+
   return (
     <ResponsiveContainer width="100%" height={height}>
       <RechartsBarChart data={chartData} margin={{ bottom: 60, left: 10, right: 10, top: barLabel ? 24 : 10 }}>
@@ -191,9 +288,9 @@ export function BarChart<T extends object>({
         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" opacity={0.5} />
         <XAxis
           dataKey={xAxisKey}
-          angle={-45}
+          angle={xLabelAngle}
           textAnchor="end"
-          height={80}
+          height={xAxisHeight}
           interval={0}
           tick={{ fill: '#374151', fontSize: 11, fontWeight: 500 }}
           axisLine={{ stroke: '#e5e7eb' }}

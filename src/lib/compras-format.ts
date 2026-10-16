@@ -155,6 +155,22 @@ export function formatAmounts(list: CurrencyAmount[] | undefined | null): string
   return formatAmountLines(list).join(' · ');
 }
 
+/**
+ * N3 (2026-10-16): mes y año de una fecha ISO ("sep 2026"), como el "Datos
+ * desde" del tablero; null → null. `utc` para las fechas de SAP, que son
+ * días sin hora (00:00 UTC): en la hora de México el día 1 caería en el mes
+ * anterior.
+ */
+export function formatMonthYear(iso: string | null | undefined, opts: { utc?: boolean } = {}): string | null {
+  return iso
+    ? new Date(iso).toLocaleDateString('es-MX', {
+        month: 'short',
+        year: 'numeric',
+        ...(opts.utc ? { timeZone: 'UTC' } : {}),
+      })
+    : null;
+}
+
 export function formatDays(days: number | null | undefined): string {
   if (days === null || days === undefined) return NO_DISPONIBLE;
   return `${days} ${days === 1 ? 'día' : 'días'}`;

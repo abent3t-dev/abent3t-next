@@ -1998,7 +1998,26 @@ export interface OrdersKpis {
     /** M1 (2026-10-14): por moneda, la suma de las barras = `por_moneda`. */
     por_comprador: AhorroPorComprador[];
     nota: string;
+    /** N3 (2026-10-16): primera OC con ahorro capturado de cada sistema (sin año). */
+    desde?: { sap: string | null; maximo: string | null };
   };
+  /**
+   * N1 (2026-10-16): monto adjudicado sin IVA (la base de la tarjeta de
+   * Órdenes del tablero). Opcional: un api anterior no lo trae.
+   */
+  adjudicado?: {
+    disponible: boolean;
+    documentos: number;
+    por_moneda: AdjudicadoAmount[];
+    por_fuente: {
+      sap: { documentos: number; por_moneda: AdjudicadoAmount[] };
+      maximo: { documentos: number; por_moneda: AdjudicadoAmount[] };
+    };
+    monto_base: 'sin_iva';
+    nota: string;
+  };
+  /** N1: por persona, adjudicado y ahorro (de mayor a menor adjudicado en MXN). */
+  compradores?: CompradorAdjudicado[];
   /** K6 (2026-10-05): montos sin IVA en las dos fuentes. */
   clasificacion: {
     disponible: boolean;
@@ -2015,6 +2034,12 @@ export interface OrdersKpis {
       definicion_secundaria: string;
       /** El dato secundario del tablero (`dias_gestion.maximo_desde_aprobacion`). */
       total_desde_aprobacion: GestionStats;
+    };
+    /** N2 (2026-10-16): SAP + Maximo por persona. Opcional: un api anterior no lo trae. */
+    ambos?: {
+      definicion: string;
+      total: GestionAmbosStats;
+      compradores: GestionAmbos[];
     };
   };
   generated_at: string;
@@ -2052,6 +2077,40 @@ export interface GestionPorComprador {
   sin_solicitud?: number;
   /** Solo Maximo. */
   desde_aprobacion?: { promedio_dias: number | null; mediana_dias: number | null; total: number };
+}
+/** N1: monto adjudicado de una moneda, sin IVA; las OC sin subtotal no suman. */
+export interface AdjudicadoAmount {
+  currency: string | null;
+  total: number;
+  count: number;
+  sin_subtotal: number;
+}
+/**
+ * N1 (2026-10-16): por persona, el monto adjudicado (sin IVA) y el ahorro
+ * capturado; la persona se junta entre SAP y Maximo por su perfil.
+ */
+export interface CompradorAdjudicado {
+  comprador: string | null;
+  tipo: BuyerKind;
+  /** OC adjudicadas del periodo. */
+  documentos: number;
+  documentos_capturo: number;
+  adjudicado: AdjudicadoAmount[];
+  ahorro: { documentos: number; por_moneda: CurrencyAmount[] };
+}
+/** N2: promedio y mediana de los días de cada OC de los dos sistemas. */
+export interface GestionAmbosStats {
+  promedio_dias: number | null;
+  mediana_dias: number | null;
+  /** N = OC de SAP + OC de Maximo. */
+  total: number;
+  sap: number;
+  maximo: number;
+}
+export interface GestionAmbos extends GestionAmbosStats {
+  comprador: string | null;
+  tipo: BuyerKind;
+  documentos_capturo: number;
 }
 export interface GestionPorCompradorSistema {
   definicion: string;
