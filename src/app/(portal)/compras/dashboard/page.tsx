@@ -291,6 +291,9 @@ export default function ComprasDashboardPage() {
   const [year, setYear] = useState<number | null>(null);
   const yearQs = year ? `?year=${year}` : '';
   const yearParam = year ? `&year=${year}` : '';
+  // N3: Órdenes abre en el año en curso; desde el tablero en "Todos" el
+  // enlace lo pide explícito para que las cifras coincidan
+  const ordenesYearParam = year ? `&year=${year}` : '&year=todos';
 
   const summaryQ = useQuery({
     queryKey: ['compras', 'dashboard', 'summary', year],
@@ -322,11 +325,11 @@ export default function ComprasDashboardPage() {
   const cadenaQ = useCadenaMaximo();
 
   const goSapOrders = (status: string | null) =>
-    router.push(`/compras/ordenes?tab=sap_po${status ? `&status=${status}` : ''}${yearParam}`);
+    router.push(`/compras/ordenes?tab=sap_po${status ? `&status=${status}` : ''}${ordenesYearParam}`);
   // G7: el segmento "En aprobación" lleva todos sus estatus reales
   const goMaximoOrders = (status: string | null, codes?: string[]) => {
     const list = codes && codes.length > 0 ? codes.join(',') : status;
-    router.push(`/compras/ordenes?tab=maximo_po${list ? `&status=${list}` : ''}${yearParam}`);
+    router.push(`/compras/ordenes?tab=maximo_po${list ? `&status=${list}` : ''}${ordenesYearParam}`);
   };
   const goSapRequests = (status: string | null) =>
     router.push(`/compras/solicitudes?tab=sap_pr${status ? `&status=${status}` : ''}${yearParam}`);
@@ -580,7 +583,7 @@ export default function ComprasDashboardPage() {
               </p>
               {sap.migradas.total > 0 && (
                 <p className="mt-1 text-xs text-gray-500">
-                  <button type="button" onClick={() => router.push(`/compras/ordenes?tab=sap_po&origin=maximo${yearParam}`)} className="text-[#52AF32] hover:underline">
+                  <button type="button" onClick={() => router.push(`/compras/ordenes?tab=sap_po&origin=maximo${ordenesYearParam}`)} className="text-[#52AF32] hover:underline">
                     {sap.migradas.total.toLocaleString('es-MX')} creadas desde Maximo
                   </button>
                 </p>

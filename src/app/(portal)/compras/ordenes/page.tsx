@@ -1,10 +1,10 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { parseDocNumParam } from '@/lib/compras-format';
+import { formatMonthYear, parseDocNumParam } from '@/lib/compras-format';
 import ResultChips from '@/components/compras/ResultChips';
 import StatusMultiSelect from '@/components/compras/StatusMultiSelect';
 import {
@@ -89,6 +89,9 @@ const formatCurrency = (amount: number) =>
 
 const formatDate = (date: string) =>
   new Date(date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+/** N3: fecha y hora de la última sincronización, como en el tablero. */
+const dateTime = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
 
 const getStatusBadgeClass = (status: POStatus) => {
   const colorMap: Record<string, string> = {
@@ -101,6 +104,11 @@ const getStatusBadgeClass = (status: POStatus) => {
   };
   return colorMap[PO_STATUS_COLORS[status]] || 'bg-gray-100 text-gray-800';
 };
+
+/** N3: el año en curso en la hora de México (el de la operación de Compras). */
+function currentYearMx(): number {
+  return Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Mexico_City', year: 'numeric' }).format(new Date()));
+}
 
 /** G1: proveedor y periodo que llegan desde el top de Reportes. */
 interface LinkedVendorParams {
@@ -144,7 +152,14 @@ function OrdenesPageInner({
     queryFn: () => api.get<DashboardSummary>('/compras/dashboard/summary'),
     staleTime: 5 * 60_000,
   });
-  const years = yearsQ.data?.datos.anios ?? [];
+  // N3: el año en curso siempre está en los chips (aunque aún no tenga datos)
+  const dataYears = yearsQ.data?.datos.anios;
+  const years = useMemo(() => {
+    const list = dataYears ?? [];
+    const actual = currentYearMx();
+    return list.includes(actual) ? list : [actual, ...list];
+  }, [dataYears]);
+  const datos = yearsQ.data?.datos;
   const [search, setSearch] = useState('');
   const [statuses, setStatuses] = useState<string[]>(
     initialTab === 'abent' ? initialStatus : [],
@@ -190,6 +205,15 @@ function OrdenesPageInner({
         <div>
           <h1 className="text-2xl font-bold text-[#424846]">Órdenes de Compra (PO)</h1>
           <p className="text-gray-500">Gestiona las órdenes de compra emitidas</p>
+          {/* N3: desde cuándo hay datos, como en el tablero ("esa parte es bien importante") */}
+          {datos && (
+            <p className="mt-1 text-xs text-gray-600">
+              Datos desde {formatMonthYear(datos.sap_desde, { utc: true }) ?? '—'} (SAP) y{' '}
+              {formatMonthYear(datos.maximo_desde) ?? '—'}{' '}
+              (Maximo) · sincronización cada hora · última: SAP {dateTime(datos.ultima_sync.sap) ?? 'sin corridas'}, Maximo{' '}
+              {dateTime(datos.ultima_sync.maximo) ?? 'sin corridas'}
+            </p>
+          )}
         </div>
         {activeTab === 'abent' && canEdit && (
           <button
@@ -474,13 +498,27 @@ function OrdenesFromUrl() {
   const tabParam = params.get('tab');
   const initialTab = TAB_IDS.includes(tabParam as OrdersTab) ? (tabParam as OrdersTab) : null;
   const initialStatus = (params.get('status') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-  const yearParam = Number(params.get('year'));
-  const initialYear = Number.isInteger(yearParam) && yearParam > 2000 ? yearParam : null;
   const originParam = params.get('origin');
   const initialOrigin = originParam === 'sap' || originParam === 'maximo' ? originParam : '';
   const initialSearch = params.get('search') ?? '';
   const initialDocNum = parseDocNumParam(params.get('doc_num'));
   const vendorKey = params.get('proveedor') ?? '';
+  // N3 (2026-10-16, Ingrid: "esta página sería siempre el año en el que se
+  // esté"): sin `?year=` abre en el año en curso (hora de México). `?year=`
+  // manda; `?year=todos` = Todos (los enlaces del tablero sin año). Los
+  // enlaces a un documento o a un proveedor (búsqueda, OC de SAP, proveedor
+  // con periodo) abren en Todos, para no esconder lo que buscan.
+  const yearRaw = params.get('year');
+  const yearParam = Number(yearRaw);
+  const deepLink = !!initialSearch || initialDocNum !== null || !!vendorKey;
+  const initialYear =
+    yearRaw === 'todos'
+      ? null
+      : Number.isInteger(yearParam) && yearParam > 2000
+        ? yearParam
+        : deepLink
+          ? null
+          : currentYearMx();
   const isoDay = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '');
   const linked: LinkedVendorParams | null =
     /^(sap|maximo):.+/.test(vendorKey)
