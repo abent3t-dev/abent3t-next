@@ -4,7 +4,7 @@ import { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { HOME_ROUTES, type UserModule, type UserRole } from '@/types/auth';
+import { HOME_ROUTES, getDisplayRole, type UserModule, type UserRole } from '@/types/auth';
 
 interface ModuleCard {
   module: UserModule | 'admin';
@@ -96,6 +96,26 @@ function buildModuleCards(
       icon: (
         <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m-6 4h6m-6 4h4m-4 4h6a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+        </svg>
+      ),
+    });
+  }
+
+  // FP&A: entra al inicio de su rol del módulo (área → /fpa; planeación y
+  // CFO → /fpa/consolidado). super_admin sin rol fpa entra a /fpa (no se usa
+  // homeForModule, que lo mandaría a /admin).
+  if (hasModule('fpa')) {
+    const fpaRole = getDisplayRole(assignments.filter((a) => a.module === 'fpa').map((a) => a.role));
+    cards.push({
+      module: 'fpa',
+      title: 'FP&A',
+      description: 'Presupuesto por área, consolidación y control presupuestal',
+      href: (fpaRole && HOME_ROUTES[fpaRole]) || '/fpa',
+      accentClass: 'border-[#424846]/30 hover:border-[#424846]',
+      iconBgClass: 'bg-[#424846]',
+      icon: (
+        <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
         </svg>
       ),
     });

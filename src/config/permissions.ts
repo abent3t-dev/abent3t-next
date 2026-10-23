@@ -55,6 +55,12 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
   { path: '/compras/proveedores', roles: ROLE_PRIORITY },
   { path: '/compras/reportes', roles: ROLE_PRIORITY },
 
+  // FP&A (presupuesto y control presupuestal). super_admin explícito: RoleGate
+  // no lo deja pasar solo. Áreas antes que /fpa: gana la primera que coincide.
+  // Qué áreas ve y captura cada quien lo decide el API (fpa_assignments).
+  { path: '/fpa/areas', roles: ['super_admin', 'fpa_planeacion'] },
+  { path: '/fpa', roles: ['super_admin', 'fpa_area', 'fpa_planeacion', 'fpa_cfo'] },
+
   // Reportes
   { path: '/reportes', roles: ['super_admin', 'admin_rh', 'executive'] },
 

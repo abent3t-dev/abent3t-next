@@ -20,10 +20,14 @@ export type UserRole =
   | 'contabilidad'          // Equipo de contabilidad (Irene, Henry)
   | 'fiscal'                // Especialista fiscal (Francisco)
   | 'director_financiero'   // Director financiero
-  | 'accionista';           // Accionista (solo lectura)
+  | 'accionista'            // Accionista (solo lectura)
+  // Roles de FP&A
+  | 'fpa_area'              // Responsable de área: captura o aprueba en sus áreas
+  | 'fpa_planeacion'        // Planeación: ve todo y administra áreas y responsables
+  | 'fpa_cfo';              // CFO: ve todo y firma el paso final
 
 /** Módulos del sistema: agrupan los roles por área funcional. */
-export type UserModule = 'core' | 'capacitacion' | 'compras' | 'contabilidad';
+export type UserModule = 'core' | 'capacitacion' | 'compras' | 'contabilidad' | 'fpa';
 
 /** Asignación de un rol específico a un módulo (de la tabla user_roles). */
 export interface UserRoleAssignment {
@@ -81,6 +85,7 @@ export const MODULE_ROLES: Record<UserModule, UserRole[]> = {
     'solicitante',
   ],
   contabilidad: ['contabilidad', 'fiscal', 'director_financiero', 'accionista'],
+  fpa: ['fpa_area', 'fpa_planeacion', 'fpa_cfo'],
 };
 
 /** Etiquetas legibles de los módulos. */
@@ -89,10 +94,11 @@ export const MODULE_LABELS: Record<UserModule, string> = {
   capacitacion: 'Capacitación',
   compras: 'Compras',
   contabilidad: 'Contabilidad',
+  fpa: 'FP&A',
 };
 
 /** Lista ordenada de módulos para iterar en UI. */
-export const ALL_MODULES: UserModule[] = ['core', 'capacitacion', 'compras', 'contabilidad'];
+export const ALL_MODULES: UserModule[] = ['core', 'capacitacion', 'compras', 'contabilidad', 'fpa'];
 
 /**
  * Prioridad para elegir el rol "principal" cuando un usuario tiene varios.
@@ -119,6 +125,11 @@ export const ROLE_PRIORITY: UserRole[] = [
   'executive',
   'colaborador',
   'collaborator',
+  // FP&A al final, igual que en el backend (user-roles.helper.ts): quien
+  // también tiene un rol de Capacitación conserva ese rol principal
+  'fpa_planeacion',
+  'fpa_cfo',
+  'fpa_area',
 ];
 
 /**
@@ -185,6 +196,17 @@ const ACCOUNTING_EDITORS: UserRole[] = ['super_admin', 'contabilidad', 'fiscal']
 // Todos los roles de contabilidad
 const ALL_ACCOUNTING_ROLES: UserRole[] = ['super_admin', ...ACCOUNTING_TEAM, 'director_financiero', 'accionista'];
 
+// ==========================================
+// GRUPOS DE ROLES - FP&A
+// ==========================================
+
+// Entrada al módulo. super_admin va explícito: RoleGate y el Sidebar no lo
+// dejan pasar solo. Qué área ve y captura cada quien lo decide el API.
+const FPA_ROLES: UserRole[] = ['super_admin', 'fpa_area', 'fpa_planeacion', 'fpa_cfo'];
+
+// Administran áreas y responsables
+const FPA_ADMINS: UserRole[] = ['super_admin', 'fpa_planeacion'];
+
 /** Navegacion principal del sidebar */
 export const SIDEBAR_NAV: NavItem[] = [
   // Administracion del Sistema (Solo Super Admin)
@@ -248,6 +270,20 @@ export const SIDEBAR_NAV: NavItem[] = [
       { label: 'Correo', href: '/compras/correo', icon: 'mail', roles: [...PURCHASE_ADMINS, 'admin_rh'] },
       // Fase INT-5: estado y corridas del sync Maximo (pagina tecnica)
       { label: 'Integraciones', href: '/compras/integraciones', icon: 'database', roles: [...PURCHASE_ADMINS, 'executive'] },
+    ],
+  },
+  // ==========================================
+  // MODULO DE FP&A (presupuesto y control presupuestal)
+  // ==========================================
+  {
+    label: 'FP&A',
+    href: '/fpa',
+    icon: 'presentation-chart',
+    roles: FPA_ROLES,
+    children: [
+      { label: 'Presupuestos', href: '/fpa', icon: 'wallet', roles: FPA_ROLES },
+      { label: 'Consolidado', href: '/fpa/consolidado', icon: 'bar-chart', roles: FPA_ROLES },
+      { label: 'Áreas', href: '/fpa/areas', icon: 'building', roles: FPA_ADMINS },
     ],
   },
   // ==========================================
@@ -334,6 +370,10 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   fiscal: 'Fiscal',
   director_financiero: 'Director Financiero',
   accionista: 'Accionista',
+  // Roles de FP&A
+  fpa_area: 'Responsable de área (FP&A)',
+  fpa_planeacion: 'Planeación (FP&A)',
+  fpa_cfo: 'CFO (FP&A)',
 };
 
 /** Pagina de inicio por rol */
@@ -359,6 +399,10 @@ export const HOME_ROUTES: Record<UserRole, string> = {
   fiscal: '/contabilidad/dashboard',
   director_financiero: '/contabilidad/dashboard',
   accionista: '/contabilidad/tenencia',
+  // Roles de FP&A
+  fpa_area: '/fpa',
+  fpa_planeacion: '/fpa/consolidado',
+  fpa_cfo: '/fpa/consolidado',
 };
 
 /** Roles que pueden gestionar usuarios */
