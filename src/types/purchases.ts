@@ -2042,8 +2042,25 @@ export interface OrdersKpis {
       compradores: GestionAmbos[];
     };
   };
+  /**
+   * O3 (2026-10-26): desde cuándo vale el comprador de las gráficas y, con
+   * "Todos" o un año anterior, el aviso. Opcional: un api anterior no lo trae.
+   */
+  comprador?: {
+    desde_anio: number;
+    aviso: string | null;
+    /** Los marcados como compradores en SAP (constante del api). */
+    compradores_sap?: string[];
+  };
   generated_at: string;
 }
+/**
+ * O3 (2026-10-26): a qué grupo va cada renglón de las gráficas por persona:
+ * una persona compradora, "Sin comprador identificado" o "OC de contrato"
+ * (los dos últimos en gris y al final). Opcional: un api anterior no lo trae
+ * (entonces `comprador` null = sin comprador).
+ */
+export type GrupoComprador = 'persona' | 'sin_comprador' | 'contrato';
 /**
  * M1 (2026-10-14, Ingrid): ahorro de un comprador (regla E4/F1: Maximo y la
  * OC de SAP que nació allá = PURCHASEAGENT o quien creó la OC; SAP = quien la
@@ -2052,6 +2069,7 @@ export interface OrdersKpis {
  */
 export interface AhorroPorComprador {
   comprador: string | null;
+  grupo?: GrupoComprador;
   tipo: BuyerKind;
   /** OC con ahorro. */
   documentos: number;
@@ -2065,6 +2083,7 @@ export interface AhorroPorComprador {
  */
 export interface GestionPorComprador {
   comprador: string | null;
+  grupo?: GrupoComprador;
   tipo: BuyerKind;
   /** De las N, con comprador inferido. */
   documentos_capturo: number;
@@ -2091,6 +2110,7 @@ export interface AdjudicadoAmount {
  */
 export interface CompradorAdjudicado {
   comprador: string | null;
+  grupo?: GrupoComprador;
   tipo: BuyerKind;
   /** OC adjudicadas del periodo. */
   documentos: number;
@@ -2109,6 +2129,7 @@ export interface GestionAmbosStats {
 }
 export interface GestionAmbos extends GestionAmbosStats {
   comprador: string | null;
+  grupo?: GrupoComprador;
   tipo: BuyerKind;
   documentos_capturo: number;
 }

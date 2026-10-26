@@ -17,6 +17,7 @@ import type {
   CompradorAdjudicado,
   GestionAmbosStats,
   GestionStats,
+  GrupoComprador,
   OrdersKpis,
 } from '@/types/purchases';
 
@@ -40,16 +41,37 @@ import type {
  * Comprador = regla E4/F1; la persona se junta entre SAP y Maximo por su
  * perfil de la plataforma (Compras → Roles). Usa la misma consulta que las
  * tarjetas (useOrdersKpis): una sola petición.
+ *
+ * O3 (2026-10-26, Ingrid: "solo debería salir Ana, Jorge, Diana y yo"):
+ * solo personas compradoras, y al final, en gris, "Sin comprador
+ * identificado" y "OC de contrato" (`grupo`). En Maximo el comprador es el de
+ * la solicitud de cotización (RQ) o el agente de compras; en SAP, quien
+ * capturó la OC si está marcado como comprador. Con "Todos" o un año
+ * anterior a 2026, el aviso de la API (`comprador.aviso`).
  */
 
 const AZUL = '#222D59';
 const DORADO = '#DFA922';
-/** Barras atenuadas: "Sin comprador identificado". */
+/** Barras atenuadas: "Sin comprador identificado" y "OC de contrato". */
 const GRIS = '#B8BDC2';
 const GRIS_CLARO = '#D9DCDF';
 
 const SIN_COMPRADOR = 'Sin comprador identificado';
-const nombre = (comprador: string | null) => comprador ?? SIN_COMPRADOR;
+const OC_CONTRATO = 'OC de contrato';
+
+type ConGrupo = { comprador: string | null; grupo?: GrupoComprador };
+/** O3: el grupo de un renglón (un api anterior no lo trae: null = sin comprador). */
+const grupoDe = (c: ConGrupo): GrupoComprador => c.grupo ?? (c.comprador === null ? 'sin_comprador' : 'persona');
+const nombre = (c: ConGrupo) =>
+  grupoDe(c) === 'contrato' ? OC_CONTRATO : grupoDe(c) === 'sin_comprador' ? SIN_COMPRADOR : (c.comprador ?? SIN_COMPRADOR);
+/** O3: los dos grupos van en gris y al final. */
+const enGris = (c: ConGrupo) => grupoDe(c) !== 'persona';
+/** O3: por qué está en su grupo (tooltip). */
+const GRUPO_NOTA: Partial<Record<GrupoComprador, string>> = {
+  sin_comprador:
+    'Sin comprador: en Maximo, OC sin solicitud de cotización (RQ) ni agente de compras; en SAP, capturada por quien no es comprador',
+  contrato: 'OC de contrato (CONTRACTREFNUM): no pasan por RQ y no se atribuyen a quien las capturó',
+};
 const oc = (n: number) => `${n.toLocaleString('es-MX')} OC`;
 const pct = (parte: number, total: number) => {
   const valor = (parte / total) * 100;
@@ -60,11 +82,20 @@ const pct = (parte: number, total: number) => {
 const compacto = new Intl.NumberFormat('es-MX', { notation: 'compact', maximumFractionDigits: 1 });
 const ejeMxn = (v: number) => `${v < 0 ? '-' : ''}$${compacto.format(Math.abs(v))}`;
 
-const REGLA_COMPRADOR =
-  'Comprador: en Maximo (y en la OC de SAP que nació allá) el agente de compras (PURCHASEAGENT) o, si no lo trae, quien creó la OC; ' +
-  'en SAP, quien capturó la OC (SAP no registra comprador). Esos dos últimos son comprador inferido ("Capturó"). ' +
-  'La misma persona se junta entre SAP y Maximo por su perfil de la plataforma: en Compras → Roles → "Usuarios de SAP y Maximo", ' +
-  'liga cada usuario de Maximo al perfil de la persona (o nómbralo igual que en SAP).';
+/** La regla del comprador; los marcados de SAP vienen del api (`comprador.compradores_sap`). */
+function reglaComprador(kpis: OrdersKpis | undefined): string {
+  const marcados = kpis?.comprador?.compradores_sap ?? [];
+  const nombres = marcados.map((n) => n.split(' ')[0]);
+  const lista =
+    nombres.length > 1 ? ` (${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]})` : nombres.length === 1 ? ` (${nombres[0]})` : '';
+  return (
+    'Comprador: en Maximo (y en la OC de SAP que nació allá), quien llevó la solicitud de cotización (RQ) o, si no hay RQ, el agente de compras (PURCHASEAGENT); ' +
+    `quien capturó la OC ya no cuenta como comprador. En SAP (no tiene RQ), quien capturó la OC, si está marcado como comprador${lista}: ` +
+    'es comprador inferido ("Capturó"). Sin eso, la OC va a "Sin comprador identificado"; las OC de contrato van aparte, en "OC de contrato". ' +
+    'La misma persona se junta entre SAP y Maximo por su perfil de la plataforma: en Compras → Roles → "Usuarios de SAP y Maximo", ' +
+    'liga cada usuario de Maximo al perfil de la persona (o nómbralo igual que en SAP).'
+  );
+}
 
 /** Tooltip: el comprador inferido ("Capturó"), también cuando es solo en parte de sus OC. */
 function inferido(tipo: BuyerKind, capturo: number, total: number): string | null {
@@ -125,7 +156,7 @@ function otrasMonedas(compradores: CompradorAdjudicado[]): string[] {
           : null,
         ah ? `${formatCurrencyNumber(ah.total, moneda)} ahorro` : null,
       ].filter(Boolean);
-      return [`${nombre(c.comprador)} ${textos.join(' / ')}`];
+      return [`${nombre(c)} ${textos.join(' / ')}`];
     });
     return `${currencyLabel(moneda)}: ${partes.join(' · ')}`;
   });
@@ -134,7 +165,7 @@ function otrasMonedas(compradores: CompradorAdjudicado[]): string[] {
 function TooltipAdjudicado({ x }: { x: AdjBar }) {
   const adj = mxn(x.c.adjudicado);
   const ah = mxn(x.c.ahorro.por_moneda);
-  const nota = inferido(x.c.tipo, x.c.documentos_capturo, x.c.documentos);
+  const nota = inferido(x.c.tipo, x.c.documentos_capturo, x.c.documentos) ?? GRUPO_NOTA[grupoDe(x.c)] ?? null;
   const otras = [
     ...x.c.adjudicado.filter((m) => m.currency !== 'MXN').map((m) => `${adjudicadoText(m)} adjudicado (${oc(m.count)})`),
     ...x.c.ahorro.por_moneda
@@ -183,7 +214,7 @@ function AdjudicadoAhorroCard({ kpis, year }: { kpis: OrdersKpis | undefined; ye
     const adj = mxn(c.adjudicado);
     const ah = mxn(c.ahorro.por_moneda);
     if (!adj && !ah) return [];
-    return [{ nombre: nombre(c.comprador), adjudicado: adj?.total ?? 0, ahorro: ah?.total ?? 0, c }];
+    return [{ nombre: nombre(c), adjudicado: adj?.total ?? 0, ahorro: ah?.total ?? 0, c }];
   });
   const otras = otrasMonedas(compradores);
   const totalAdj = kpis?.adjudicado ? mxn(kpis.adjudicado.por_moneda) : undefined;
@@ -192,8 +223,8 @@ function AdjudicadoAhorroCard({ kpis, year }: { kpis: OrdersKpis | undefined; ye
   const hint = [
     'Por persona: el monto adjudicado (OC no canceladas del periodo, sin IVA: la suma de sus líneas; las OC sin subtotal se cuentan aparte, nunca como 0) y, al lado, el ahorro capturado (SAP: U_Imp_ahorro; Maximo: AB_AHORRO), en su propio eje (el derecho) porque es mucho menor. Arriba del ahorro, el % sobre lo adjudicado.',
     'En MXN, de mayor a menor adjudicado; las otras monedas van aparte, sin convertir. Las OC migradas de Maximo a SAP cuentan una vez.',
-    'La suma de las barras es el total de Órdenes sin IVA del tablero (adjudicado) y la tarjeta Ahorro acumulado (ahorro).',
-    REGLA_COMPRADOR,
+    'La suma de las barras (con "Sin comprador identificado" y "OC de contrato", en gris al final) es el total de Órdenes sin IVA del tablero (adjudicado) y la tarjeta Ahorro acumulado (ahorro).',
+    reglaComprador(kpis),
   ].join('\n');
   // con muchas personas, la gráfica se desplaza en lugar de apretar las barras
   const anchoMinimo = Math.max(0, barras.length * 96);
@@ -237,13 +268,13 @@ function AdjudicadoAhorroCard({ kpis, year }: { kpis: OrdersKpis | undefined; ye
                         dataKey: 'adjudicado',
                         name: 'Monto adjudicado',
                         color: AZUL,
-                        colors: barras.map((x) => (x.c.comprador === null ? GRIS : AZUL)),
+                        colors: barras.map((x) => (enGris(x.c) ? GRIS : AZUL)),
                       },
                       {
                         dataKey: 'ahorro',
                         name: 'Ahorro',
                         color: DORADO,
-                        colors: barras.map((x) => (x.c.comprador === null ? GRIS_CLARO : DORADO)),
+                        colors: barras.map((x) => (enGris(x.c) ? GRIS_CLARO : DORADO)),
                         label: (x) => (x.ahorro > 0 && x.adjudicado > 0 ? pct(x.ahorro, x.adjudicado) : ''),
                         // el ahorro es mucho menor que lo adjudicado: con un solo
                         // eje su barra no se ve; el % va arriba de la barra
@@ -297,6 +328,7 @@ const SISTEMAS: Array<{ id: Sistema; label: string }> = [
 
 type Fila = {
   comprador: string | null;
+  grupo?: GrupoComprador;
   tipo: BuyerKind;
   documentos_capturo: number;
   total: number;
@@ -330,8 +362,8 @@ function GestionCard({ kpis, year }: { kpis: OrdersKpis | undefined; year: numbe
         `Maximo: ${g.maximo.definicion}.`,
         g.ambos ? `${g.ambos.definicion}.` : null,
         `Maximo, dato secundario (en el renglón): ${g.maximo.definicion_secundaria}.`,
-        `En gris, al final: menos de ${g.min_oc} OC en el periodo o sin comprador identificado. Con año, cuentan las OC creadas ese año.`,
-        REGLA_COMPRADOR,
+        `En gris, al final: menos de ${g.min_oc} OC en el periodo, sin comprador identificado y OC de contrato. Con año, cuentan las OC creadas ese año.`,
+        reglaComprador(kpis),
       ]
         .filter(Boolean)
         .join('\n')
@@ -400,12 +432,13 @@ function GestionCard({ kpis, year }: { kpis: OrdersKpis | undefined; year: numbe
               </thead>
               <tbody>
                 {datos.filas.map((f, i) => {
-                  const atenuada = f.comprador === null || f.total < g.min_oc;
+                  const atenuada = enGris(f) || f.total < g.min_oc;
                   const nota = inferido(f.tipo, f.documentos_capturo, f.total);
                   const apr = f.desde_aprobacion;
                   const titulo = [
                     nota,
-                    atenuada && f.comprador !== null ? `Menos de ${g.min_oc} OC en el periodo: sin destacar` : null,
+                    GRUPO_NOTA[grupoDe(f)] ?? null,
+                    atenuada && !enGris(f) ? `Menos de ${g.min_oc} OC en el periodo: sin destacar` : null,
                     apr && apr.total > 0
                       ? `Desde la aprobación: ${formatDays(apr.promedio_dias)} (mediana ${formatDays(apr.mediana_dias)}, ${oc(apr.total)})`
                       : null,
@@ -416,12 +449,12 @@ function GestionCard({ kpis, year }: { kpis: OrdersKpis | undefined; year: numbe
                   return (
                     <tr
                       // dos perfiles homónimos serían dos filas con el mismo nombre
-                      key={`${f.comprador ?? '—'}-${i}`}
+                      key={`${grupoDe(f)}-${f.comprador ?? '—'}-${i}`}
                       className={`border-b border-gray-100 ${atenuada ? 'text-gray-400' : 'text-gray-800'}`}
                       title={titulo || undefined}
                     >
                       <td className="py-1.5 pr-3">
-                        <span className={atenuada ? '' : 'font-medium'}>{nombre(f.comprador)}</span>
+                        <span className={atenuada ? '' : 'font-medium'}>{nombre(f)}</span>
                         {nota && <span className="ml-1 text-xs text-gray-400" aria-label={nota}>*</span>}
                       </td>
                       <td className="py-1.5 px-3 text-right tabular-nums">
@@ -461,8 +494,8 @@ function GestionCard({ kpis, year }: { kpis: OrdersKpis | undefined; year: numbe
             </table>
           </div>
           <p className="mt-2 text-xs text-gray-500">
-            En gris, al final: menos de {g.min_oc} OC en el periodo o sin comprador identificado. * Comprador inferido
-            (capturó o creó la OC). {efectivo !== 'ambos' && 'El total es el de los días de gestión del tablero. '}
+            En gris, al final: menos de {g.min_oc} OC en el periodo, sin comprador identificado y OC de contrato. *
+            Comprador inferido (capturó la OC en SAP). {efectivo !== 'ambos' && 'El total es el de los días de gestión del tablero. '}
             Para que cada quien salga en una sola fila, liga su usuario de Maximo a su perfil en Compras → Roles →
             &quot;Usuarios de SAP y Maximo&quot;.
           </p>
@@ -484,8 +517,18 @@ export default function OrdersBuyerCharts({ year }: { year: number | null }) {
   // Un API anterior al bloque N no trae los datos por persona: sin gráficas
   // (las tarjetas y la página siguen)
   if (q.data && (!q.data.compradores || !q.data.gestion_por_comprador)) return null;
+  // O3: con "Todos" o un año anterior a 2026, el comprador casi no existe
+  const aviso = q.data?.comprador?.aviso ?? null;
   return (
     <div className="space-y-4">
+      {aviso && (
+        <p
+          role="note"
+          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800"
+        >
+          {aviso}
+        </p>
+      )}
       <AdjudicadoAhorroCard kpis={q.data} year={year} />
       <GestionCard kpis={q.data} year={year} />
     </div>
