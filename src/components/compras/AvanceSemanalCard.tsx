@@ -82,7 +82,20 @@ interface AvanceSemanalCardProps {
   elegida: boolean;
 }
 
-export default function AvanceSemanalCard({ lunes, elegida }: AvanceSemanalCardProps) {
+/**
+ * O1 (2026-10-26): con corte el viernes, en sábado y domingo la semana en
+ * curso ya cerró y es "la última completa" (Reportes manda la anterior). Hora
+ * local del navegador.
+ */
+function ultimaCompleta(lunesPagina: string, corte: string | undefined): string {
+  const hoy = new Date();
+  const dia = hoy.getDay();
+  if (corte !== 'viernes' || (dia !== 6 && dia !== 0)) return lunesPagina;
+  const lunes = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - ((dia + 6) % 7));
+  return `${lunes.getFullYear()}-${String(lunes.getMonth() + 1).padStart(2, '0')}-${String(lunes.getDate()).padStart(2, '0')}`;
+}
+
+export default function AvanceSemanalCard({ lunes: lunesPagina, elegida }: AvanceSemanalCardProps) {
   const [fuente, setFuente] = useState<Fuente>('ambos');
   const [preview, setPreview] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -93,6 +106,8 @@ export default function AvanceSemanalCard({ lunes, elegida }: AvanceSemanalCardP
     staleTime: 30 * 60_000,
     retry: 1,
   });
+  // la semana elegida manda; si no, la última completa con el corte del api
+  const lunes = elegida ? lunesPagina : ultimaCompleta(lunesPagina, reglasQ.data?.reglas?.corte);
   const montosBase = reglasQ.isError
     ? `Base de los montos: ${NO_DISPONIBLE}`
     : (reglasQ.data?.monto_base_nota ?? null);
