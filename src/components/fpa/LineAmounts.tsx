@@ -5,10 +5,16 @@ import { formatNumber, formatWithCurrency } from '@/lib/fpa-format';
 import FpaAmount, { noDisponibleTitle } from './FpaAmount';
 
 /**
- * FP&A (A3) — lo guardado de una línea, mes por mes: lo que se capturó
- * (veces, precio del mes, monto o viajes) y lo que calculó el API, con
- * centavos, en la moneda de la línea y en pesos. Solo lectura.
+ * FP&A (A3) — una línea mes por mes: lo que se capturó (veces, precio del
+ * mes, monto o viajes) y lo que calculó el API, con centavos, en la moneda de
+ * la línea y en pesos. Solo lectura. Sirve para lo guardado y para la vista
+ * previa del modal (B1), que trae lo mismo sin guardar.
  */
+
+export type LineAmountsData = Pick<
+  FpaLine,
+  'calc_method' | 'currency' | 'months_input' | 'months' | 'total_currency' | 'total_mxn' | 'unavailable_reason'
+>;
 
 const quantityText = (value: string) =>
   Number.isFinite(Number(value))
@@ -25,7 +31,7 @@ interface CapturedRow {
   get: (m: FpaMonthInput) => string | null;
 }
 
-function capturedRows(line: FpaLine): CapturedRow[] {
+function capturedRows(line: LineAmountsData): CapturedRow[] {
   if (line.calc_method === 'precio_veces') {
     const rows: CapturedRow[] = [
       { label: 'Veces', get: (m) => (m.quantity ? quantityText(m.quantity) : null) },
@@ -53,7 +59,7 @@ const TH = 'px-2 py-1.5 text-right font-medium text-gray-500 whitespace-nowrap';
 const ROW_TH = 'px-2 py-1.5 text-left font-medium text-gray-600 whitespace-nowrap bg-white sticky left-0';
 const TD = 'px-2 py-1.5 text-right tabular-nums whitespace-nowrap';
 
-export default function LineAmounts({ line }: { line: FpaLine }) {
+export default function LineAmounts({ line }: { line: LineAmountsData }) {
   const inputs = new Map(line.months_input.map((m) => [m.month, m]));
   const amounts = new Map(line.months.map((m) => [m.month, m]));
   const rows = capturedRows(line);

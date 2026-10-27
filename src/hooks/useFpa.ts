@@ -33,6 +33,8 @@ export const fpaKeys = {
   areas: ['fpa', 'areas'] as const,
   directory: (term: string) => ['fpa', 'directorio', term] as const,
   supplier: (id: string | null | undefined) => ['fpa', 'proveedor', id] as const,
+  /** Vista previa del cálculo de una línea (B1): la llave es lo capturado. */
+  calc: (budgetId: string, input: string | null) => ['fpa', 'calcular', budgetId, input] as const,
 };
 
 /** Lo que cambia mientras las áreas capturan: se vuelve a pedir a los 30 s. */

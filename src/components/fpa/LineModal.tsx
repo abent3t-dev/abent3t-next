@@ -1,11 +1,12 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api, ApiError } from '@/lib/api';
 import { notify } from '@/lib/notifications';
 import SupplierCombobox, { type SupplierOption } from '@/components/compras/SupplierCombobox';
 import { fpaKeys } from '@/hooks/useFpa';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import {
   CALC_METHOD_LABELS,
   MONTH_LABELS,
@@ -14,6 +15,8 @@ import {
   TRIP_TYPE_LABELS,
   type CalcMethod,
   type FpaBudgetDetail,
+  type FpaCalcInput,
+  type FpaCalcResult,
   type FpaCatalog,
   type FpaLine,
   type FpaLineInput,
@@ -37,7 +40,8 @@ import {
   trimDecimal,
 } from '@/lib/fpa-format';
 import FpaModal from './FpaModal';
-import LineAmounts from './LineAmounts';
+import LineAmounts, { type LineAmountsData } from './LineAmounts';
+import TripBreakdownTable from './TripBreakdownTable';
 
 /**
  * FP&A (A3) — alta, edición y consulta de una línea del presupuesto.
@@ -48,8 +52,10 @@ import LineAmounts from './LineAmounts';
  * - Proveedor del catálogo (SupplierCombobox) u OTROS; la base exige
  *   proveedor en todo gasto que no es viaje. Los viajes van en pesos, con
  *   precio acordado y sin proveedor.
- * - El front no calcula montos: el total que se muestra es el que guardó el
- *   API. "Repartir un total" solo llena las casillas de monto por mes.
+ * - El front no calcula montos. Mientras se captura, el API calcula la vista
+ *   previa con los parámetros de la versión (POST /fpa/calcular, B1): los
+ *   meses, el total y, en un viaje, su desglose; al guardar vuelve a
+ *   calcular. "Repartir un total" solo llena las casillas de monto por mes.
  * - Valida lo mínimo (obligatorios y números como los acepta la base); el
  *   resto lo valida el API y aquí se muestra su mensaje.
  */
@@ -117,8 +123,8 @@ const priceText = (value: string) =>
     ? Number(value).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
     : value;
 
-/** Total guardado de la línea (lo calculó el API) y, si no se pudo, por qué. */
-function SavedTotal({ line }: { line: FpaLine }) {
+/** Total de la línea (lo calculó el API) y, si no se pudo, por qué. */
+function LineTotal({ line }: { line: LineAmountsData }) {
   return (
     <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
       <p className="text-sm text-gray-600">
@@ -177,7 +183,10 @@ function LineReadOnlyModal({ line, budget, onClose }: { line: FpaLine; budget: F
           <h3 className="text-sm font-semibold text-[#424846]">Meses</h3>
           <LineAmounts line={line} />
         </div>
-        <SavedTotal line={line} />
+        <LineTotal line={line} />
+        {line.trip_breakdown && (
+          <TripBreakdownTable breakdown={line.trip_breakdown} totalMxn={line.total_mxn} versionCode={budget.version.code} />
+        )}
       </div>
       <div className="flex justify-end px-6 py-4 border-t border-gray-200 bg-gray-50">
         <button
@@ -296,36 +305,22 @@ type SupplierChoice =
 
 const isOtrosName = (name: string | null | undefined) => (name ?? '').trim().toUpperCase() === 'OTROS';
 
+/** Lo que usa el cálculo: lo mismo que va a POST /fpa/calcular, sin el presupuesto. */
+type CalcFields = Omit<FpaCalcInput, 'budget_id'>;
+
+type CalcBuild = { ok: true; fields: CalcFields } | { ok: false; error: string };
 type BuildResult = { ok: true; payload: FpaLineInput } | { ok: false; error: string };
 
-/** Valida lo mínimo y arma el cuerpo de POST/PUT con solo los meses con dato. */
-function buildPayload(form: FormState, supplier: SupplierChoice, allowsNegative: boolean): BuildResult {
-  const fail = (error: string): BuildResult => ({ ok: false, error });
+/**
+ * Valida y arma la parte del cálculo (forma, moneda, índice, precio, viaje y
+ * los meses con dato). La usan el guardado y la vista previa.
+ */
+function buildCalcFields(form: FormState, allowsNegative: boolean): CalcBuild {
+  const fail = (error: string): CalcBuild => ({ ok: false, error });
 
-  if (!form.department_id) return fail('Elige el departamento.');
-  if (!form.classification_id) {
-    return fail(form.category_id ? 'Elige la clasificación.' : 'Elige la categoría y la clasificación.');
-  }
-  const concept = form.concept.trim();
-  if (!concept) return fail('Escribe el concepto.');
   if (!form.calc_method) return fail('Elige la forma de cálculo.');
   if (!form.currency) return fail('Elige la moneda.');
   if (!form.price_index) return fail('Elige el índice.');
-
-  let supplierId: string | null = null;
-  let supplierName: string | null = null;
-  if (form.calc_method !== 'viaje') {
-    if (supplier.kind === 'catalog') {
-      supplierId = supplier.id;
-      supplierName = supplier.name;
-    } else if (supplier.kind === 'otros') {
-      supplierName = 'OTROS';
-    } else if (supplier.kind === 'text') {
-      supplierName = supplier.name;
-    } else {
-      return fail('Elige el proveedor del catálogo o marca OTROS.');
-    }
-  }
 
   const months: FpaMonthInput[] = [];
   let unitPrice: string | null = null;
@@ -391,14 +386,7 @@ function buildPayload(form: FormState, supplier: SupplierChoice, allowsNegative:
   const isTrip = form.calc_method === 'viaje';
   return {
     ok: true,
-    payload: {
-      department_id: form.department_id,
-      classification_id: form.classification_id,
-      concept,
-      justification: form.justification.trim() || null,
-      supplier_id: supplierId,
-      supplier_name: supplierName,
-      priority: form.priority || null,
+    fields: {
       calc_method: form.calc_method,
       // Viaje: siempre en pesos y con precio acordado (las tarifas ya son de la versión)
       currency: isTrip ? 'MXN' : form.currency,
@@ -408,6 +396,170 @@ function buildPayload(form: FormState, supplier: SupplierChoice, allowsNegative:
       months,
     },
   };
+}
+
+/** Valida lo mínimo y arma el cuerpo de POST/PUT con solo los meses con dato. */
+function buildPayload(form: FormState, supplier: SupplierChoice, allowsNegative: boolean): BuildResult {
+  const fail = (error: string): BuildResult => ({ ok: false, error });
+
+  if (!form.department_id) return fail('Elige el departamento.');
+  if (!form.classification_id) {
+    return fail(form.category_id ? 'Elige la clasificación.' : 'Elige la categoría y la clasificación.');
+  }
+  const concept = form.concept.trim();
+  if (!concept) return fail('Escribe el concepto.');
+
+  const calc = buildCalcFields(form, allowsNegative);
+  if (!calc.ok) return fail(calc.error);
+
+  let supplierId: string | null = null;
+  let supplierName: string | null = null;
+  if (form.calc_method !== 'viaje') {
+    if (supplier.kind === 'catalog') {
+      supplierId = supplier.id;
+      supplierName = supplier.name;
+    } else if (supplier.kind === 'otros') {
+      supplierName = 'OTROS';
+    } else if (supplier.kind === 'text') {
+      supplierName = supplier.name;
+    } else {
+      return fail('Elige el proveedor del catálogo o marca OTROS.');
+    }
+  }
+
+  return {
+    ok: true,
+    payload: {
+      department_id: form.department_id,
+      classification_id: form.classification_id,
+      concept,
+      justification: form.justification.trim() || null,
+      supplier_id: supplierId,
+      supplier_name: supplierName,
+      priority: form.priority || null,
+      ...calc.fields,
+    },
+  };
+}
+
+/** "Elige la moneda." → "elige la moneda." (para "Para ver el cálculo: …"). */
+const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
+
+/**
+ * Lo que regresa la vista previa: el cálculo del API junto con la entrada con
+ * la que se pidió. Mientras llega el siguiente (keepPreviousData) se enseña el
+ * anterior completo, sin mezclarlo con lo que ya cambió en el formulario.
+ */
+interface CalcPreview {
+  input: CalcFields;
+  result: FpaCalcResult;
+}
+
+const isThrottled = (error: Error | null) => error instanceof ApiError && error.status === 429;
+
+/**
+ * Vista previa del cálculo (B1): lo que calcula el API con lo capturado, sin
+ * guardar. Mientras faltan datos dice cuál; si el alta lo rechazaría, dice
+ * por qué y no enseña montos.
+ */
+function LiveCalc({
+  build,
+  preview: data,
+  error,
+  loading,
+  updating,
+  versionCode,
+  saveLabel,
+}: {
+  build: CalcBuild;
+  preview: CalcPreview | undefined;
+  error: Error | null;
+  loading: boolean;
+  /** Hay cambios que aún no se calculan (tecleando o en camino). */
+  updating: boolean;
+  versionCode: string;
+  saveLabel: string;
+}) {
+  const header = (
+    <div className="flex flex-wrap items-baseline justify-between gap-2">
+      <h3 className="text-sm font-semibold text-[#424846]">
+        Cálculo{updating && <span className="ml-2 text-xs font-normal text-gray-400">calculando…</span>}
+      </h3>
+      <p className="text-xs text-gray-500">
+        Con los parámetros de la versión {versionCode}. Se guarda al dar «{saveLabel}».
+      </p>
+    </div>
+  );
+
+  if (!build.ok) {
+    return (
+      <div className="space-y-1">
+        {header}
+        <p className="text-sm text-gray-500">Para ver el cálculo: {lowerFirst(build.error)}</p>
+      </div>
+    );
+  }
+  if (error && !data) {
+    return (
+      <div className="space-y-1">
+        {header}
+        <p className="text-sm text-amber-700">
+          {isThrottled(error)
+            ? 'Hay muchos cálculos seguidos; espera un momento y vuelve a cambiar un dato.'
+            : `No se pudo calcular: ${error.message}`}
+        </p>
+      </div>
+    );
+  }
+  if (!data) {
+    return (
+      <div className="space-y-1">
+        {header}
+        {loading && (
+          <div role="status" className="w-6 h-6 border-4 border-[#52AF32] border-t-transparent rounded-full animate-spin">
+            <span className="sr-only">Calculando…</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+  const { input, result } = data;
+  if (result.errors.length > 0) {
+    return (
+      <div className={`space-y-1 transition-opacity ${updating ? 'opacity-60' : ''}`}>
+        {header}
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <p className="font-medium">Así no se puede guardar:</p>
+          <ul className="list-disc pl-5">
+            {result.errors.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+  }
+  const preview: LineAmountsData = {
+    calc_method: input.calc_method,
+    currency: input.currency,
+    months_input: input.months,
+    months: result.months,
+    total_currency: result.total_currency,
+    total_mxn: result.total_mxn,
+    unavailable_reason: result.unavailable_reason,
+  };
+  return (
+    <div className={`space-y-3 transition-opacity ${updating ? 'opacity-60' : ''}`}>
+      {header}
+      <LineAmounts line={preview} />
+      <div aria-live="polite">
+        <LineTotal line={preview} />
+      </div>
+      {result.trip_breakdown && (
+        <TripBreakdownTable breakdown={result.trip_breakdown} totalMxn={result.total_mxn} versionCode={versionCode} />
+      )}
+    </div>
+  );
 }
 
 // disabled: opacidad, porque globals.css fija el fondo y el color de los
@@ -551,6 +703,26 @@ function LineFormModal({ onClose, budget, line, catalog }: LineModalProps & { ca
   const rate = version.exchange_rates.find((r) => r.currency === form.currency) ?? null;
   const inflation = formatInflation(version.inflation_pct);
   const isTrip = form.calc_method === 'viaje';
+
+  // ── Vista previa del cálculo (B1): se pide al API al dejar de teclear ──
+  const calcBuild = buildCalcFields(form, allowsNegative);
+  const calcInput = calcBuild.ok ? JSON.stringify(calcBuild.fields) : null;
+  const debouncedInput = useDebouncedValue(calcInput, 350);
+  const calcQ = useQuery({
+    queryKey: fpaKeys.calc(budget.id, debouncedInput),
+    queryFn: async (): Promise<CalcPreview> => {
+      const input = JSON.parse(debouncedInput as string) as CalcFields;
+      const result = await api.post<FpaCalcResult>('/fpa/calcular', { budget_id: budget.id, ...input });
+      return { input, result };
+    },
+    enabled: debouncedInput !== null,
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+    // Solo se reintenta si el límite de peticiones respondió 429
+    retry: (count, error) => isThrottled(error) && count < 2,
+    retryDelay: 2_000,
+  });
+  const calcUpdating = calcInput !== null && (calcInput !== debouncedInput || calcQ.isFetching);
 
   // ── Cambios ──
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
@@ -1143,21 +1315,16 @@ function LineFormModal({ onClose, budget, line, catalog }: LineModalProps & { ca
             )}
           </div>
 
-          {/* Lo guardado: lo calculó el API (se recalcula al guardar) */}
-          {line ? (
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h3 className="text-sm font-semibold text-[#424846]">Lo guardado</h3>
-                <p className="text-xs text-gray-500">Lo calcula el sistema; se recalcula al guardar los cambios</p>
-              </div>
-              <LineAmounts line={line} />
-              <SavedTotal line={line} />
-            </div>
-          ) : (
-            <p className="text-xs text-gray-500">
-              El sistema calcula los montos de cada mes y el total al guardar, con el tipo de cambio y la inflación de la versión.
-            </p>
-          )}
+          {/* Vista previa: la calcula el API con lo capturado (se recalcula al guardar) */}
+          <LiveCalc
+            build={calcBuild}
+            preview={calcQ.data}
+            error={calcQ.error}
+            loading={calcQ.isLoading}
+            updating={calcUpdating}
+            versionCode={version.code}
+            saveLabel={isEditing ? 'Guardar cambios' : 'Agregar línea'}
+          />
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">

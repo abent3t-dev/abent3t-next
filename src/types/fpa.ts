@@ -154,6 +154,42 @@ export interface FpaMonthAmount {
   amount_mxn: Money;
 }
 
+export type TravelerType = 'colaborador' | 'director';
+
+/** Lo que cuesta UN viaje para un tipo de viajero, con las tarifas de la versión. */
+export interface FpaTripTravelerCost {
+  traveler_type: TravelerType;
+  count: number;
+  flight_per_person: string;
+  hotel_per_night: string;
+  meals_per_day: string;
+  /** vuelo × personas */
+  flight: string;
+  /** noches × hotel × personas */
+  hotel: string;
+  /** días × alimentos × personas */
+  meals: string;
+}
+
+/**
+ * Desglose de UN viaje en pesos (B1, reunión del 26-oct). La suma de sus
+ * partes es `per_trip`; el total de la línea es `per_trip` × `trips`. Lo
+ * calcula el API.
+ */
+export interface FpaTripBreakdown {
+  trip_type: TripType;
+  nights: number;
+  /** noches + 1 */
+  days: number;
+  /** Solo los tipos de viajero que van (colaborador y luego director). */
+  travelers: FpaTripTravelerCost[];
+  /** Una vez por viaje, sin personas: tarifa de director si va al menos uno. */
+  transport: { traveler_type: TravelerType; per_day: string; amount: string };
+  per_trip: string;
+  /** Viajes del año (suma de los 12 meses). */
+  trips: number;
+}
+
 export interface FpaLine {
   id: string;
   /** Folio visible de la línea (L-000123). */
@@ -181,11 +217,37 @@ export interface FpaLine {
   total_mxn: Money;
   /** Por qué la línea sale "No disponible" (null si se pudo calcular). */
   unavailable_reason: string | null;
+  /** Viaje: desglose de un viaje (null en las otras formas o "No disponible"). */
+  trip_breakdown: FpaTripBreakdown | null;
   contract_label: string | null;
   project_tag: string | null;
   outside_ebitda: boolean | null;
   spend_type: SpendType | null;
   source_ref: string | null;
+}
+
+/** POST /fpa/calcular (B1): lo que usa el cálculo, sin guardar la línea. */
+export interface FpaCalcInput {
+  budget_id: string;
+  calc_method: CalcMethod;
+  currency: string;
+  price_index: PriceIndex;
+  unit_price?: string | null;
+  trip?: FpaTripInput | null;
+  months: FpaMonthInput[];
+}
+
+/**
+ * Respuesta de POST /fpa/calcular. `errors` trae lo que el alta rechazaría del
+ * cálculo (p. ej. "Un viaje va en pesos"); si hay, no se enseñan los montos.
+ */
+export interface FpaCalcResult {
+  months: FpaMonthAmount[];
+  total_currency: Money;
+  total_mxn: Money;
+  unavailable_reason: string | null;
+  trip_breakdown: FpaTripBreakdown | null;
+  errors: string[];
 }
 
 export interface FpaCategoryTotal {
@@ -295,6 +357,11 @@ export const VERSION_KIND_LABELS: Record<VersionKind, string> = {
 export const TRIP_TYPE_LABELS: Record<TripType, string> = {
   nacional: 'Nacional',
   internacional: 'Internacional',
+};
+
+export const TRAVELER_TYPE_LABELS: Record<TravelerType, { one: string; many: string }> = {
+  colaborador: { one: 'colaborador', many: 'colaboradores' },
+  director: { one: 'director', many: 'directores' },
 };
 
 export const DUTY_LABELS: Record<FpaDuty, string> = {
