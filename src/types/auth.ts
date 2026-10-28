@@ -285,6 +285,8 @@ export const SIDEBAR_NAV: NavItem[] = [
     roles: FPA_ROLES,
     children: [
       { label: 'Presupuestos', href: '/fpa', icon: 'wallet', roles: FPA_ROLES },
+      // B3: lo que espera mi firma y lo que me regresaron (con contador)
+      { label: 'Pendientes', href: '/fpa/pendientes', icon: 'check-circle', roles: FPA_ROLES },
       { label: 'Consolidado', href: '/fpa/consolidado', icon: 'bar-chart', roles: FPA_ROLES },
       { label: 'Versiones', href: '/fpa/versiones', icon: 'calendar', roles: FPA_SEE_ALL },
       { label: 'Áreas', href: '/fpa/areas', icon: 'building', roles: FPA_ADMINS },

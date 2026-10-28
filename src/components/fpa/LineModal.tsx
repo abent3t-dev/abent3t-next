@@ -794,6 +794,8 @@ function LineFormModal({ onClose, budget, line, catalog }: LineModalProps & { ca
     void qc.invalidateQueries({ queryKey: fpaKeys.budgetAll });
     void qc.invalidateQueries({ queryKey: fpaKeys.budgetsAll });
     void qc.invalidateQueries({ queryKey: fpaKeys.consolidatedAll });
+    // B3: las líneas deciden si se puede enviar (sin líneas o con una "No disponible", no)
+    void qc.invalidateQueries({ queryKey: fpaKeys.flowAll });
   };
 
   const saveMutation = useMutation({

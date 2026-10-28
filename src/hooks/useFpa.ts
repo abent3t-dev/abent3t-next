@@ -1,10 +1,15 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSocket } from '@/contexts/SocketContext';
 import type {
   FpaAreaRow,
   FpaBudgetDetail,
+  FpaBudgetFlow,
+  FpaPendingItem,
   FpaBudgetSummary,
   FpaCatalog,
   FpaConsolidated,
@@ -41,6 +46,10 @@ export const fpaKeys = {
   versionAll: ['fpa', 'version'] as const,
   version: (id: string | null) => ['fpa', 'version', id] as const,
   signers: ['fpa', 'firmantes'] as const,
+  /** B3: flujo de aprobación de un presupuesto y bandeja de pendientes. */
+  flowAll: ['fpa', 'flujo'] as const,
+  flow: (id: string | undefined) => ['fpa', 'flujo', id] as const,
+  pending: ['fpa', 'pendientes'] as const,
 };
 
 /** Lo que cambia mientras las áreas capturan: se vuelve a pedir a los 30 s. */
@@ -137,6 +146,50 @@ export function useFpaSigners(enabled = true) {
     queryKey: fpaKeys.signers,
     queryFn: () => api.get<FpaSigners>('/fpa/firmantes'),
     enabled,
+    retry: retryServerErrors,
+  });
+}
+
+/** B3: flujo de un presupuesto (turno, qué puede hacer la persona y las rondas con qué cambió). */
+export function useFpaFlow(id: string | undefined) {
+  return useQuery({
+    queryKey: fpaKeys.flow(id),
+    queryFn: () => api.get<FpaBudgetFlow>(`/fpa/presupuestos/${encodeURIComponent(id ?? '')}/flujo`),
+    enabled: !!id,
+    staleTime: LIVE_STALE_MS,
+    retry: retryServerErrors,
+  });
+}
+
+/**
+ * B3: lo que espera a la persona (firmas y devueltos), para la bandeja y el
+ * contador del menú. Mientras el correo de prod siga en simulación es el
+ * aviso principal: se refresca cada minuto y con el aviso en pantalla
+ * (fpa:pending, por user:{id}), que también refresca los presupuestos.
+ */
+export function useFpaPendientes() {
+  const { user, hasRole } = useAuth();
+  const qc = useQueryClient();
+  const { on, off } = useSocket();
+  const enabled = !!user && hasRole('super_admin', 'fpa_area', 'fpa_planeacion', 'fpa_cfo');
+
+  useEffect(() => {
+    if (!enabled) return;
+    const refresh = () => {
+      void qc.invalidateQueries({ queryKey: fpaKeys.pending });
+      void qc.invalidateQueries({ queryKey: fpaKeys.flowAll });
+      void qc.invalidateQueries({ queryKey: fpaKeys.budgetAll });
+      void qc.invalidateQueries({ queryKey: fpaKeys.budgetsAll });
+    };
+    on('fpa:pending', refresh);
+    return () => off('fpa:pending', refresh);
+  }, [enabled, on, off, qc]);
+
+  return useQuery({
+    queryKey: fpaKeys.pending,
+    queryFn: () => api.get<FpaPendingItem[]>('/fpa/pendientes'),
+    enabled,
+    refetchInterval: 60_000,
     retry: retryServerErrors,
   });
 }

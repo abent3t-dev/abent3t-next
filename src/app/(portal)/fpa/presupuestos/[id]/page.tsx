@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { useFpaBudget, useFpaCatalog } from '@/hooks/useFpa';
 import BudgetLinesTable, { groupLines, type AmountMode } from '@/components/fpa/BudgetLinesTable';
 import LineModal from '@/components/fpa/LineModal';
+import { BudgetFlowCard, BudgetFlowHistory } from '@/components/fpa/BudgetFlow';
 import FpaAmount from '@/components/fpa/FpaAmount';
 import { BudgetStatusBadge, VersionStatusBadge } from '@/components/fpa/StatusBadges';
 import { VersionFacts } from '@/components/fpa/VersionPicker';
@@ -18,6 +19,8 @@ import type { FpaLine } from '@/types/fpa';
  * cambio, inflación y total en pesos), selector pesos / moneda original y las
  * líneas agrupadas por categoría. Con can_edit: "Agregar línea" y clic en una
  * fila para editarla; sin él, la fila abre la línea en solo lectura.
+ * B3: arriba, el flujo de aprobación (turno y pasos de quien mira); abajo,
+ * su historial por ronda.
  */
 
 const errorText = (error: unknown, fallback: string) =>
@@ -136,6 +139,9 @@ export default function FpaPresupuestoPage() {
         <VersionFacts version={version} />
       </div>
 
+      {/* Flujo de aprobación (B3) */}
+      <BudgetFlowCard budgetId={detail.id} />
+
       {/* Herramientas */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm" role="group" aria-label="Moneda de los montos">
@@ -199,6 +205,8 @@ export default function FpaPresupuestoPage() {
           </>
         )}
       </div>
+
+      <BudgetFlowHistory budgetId={detail.id} />
 
       <LineModal
         isOpen={modal.open}

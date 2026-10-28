@@ -151,6 +151,9 @@ function PresupuestosContent() {
                       </td>
                       <td className="px-4 py-3 text-center">
                         <BudgetStatusBadge status={budget.status} />
+                        {budget.current_round > 0 && (
+                          <span className="block mt-0.5 text-xs text-gray-500">Ronda {budget.current_round}</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-gray-700 tabular-nums">
                         {budget.line_count.toLocaleString('es-MX')}

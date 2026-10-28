@@ -533,3 +533,116 @@ export const GROUP_BY_LABELS: Record<FpaGroupBy, string> = {
   categoria: 'Por categoría',
   area_categoria: 'Área › categoría',
 };
+
+// ── Flujo de aprobación (B3) ────────────────────────────────────────────────
+
+export type FlowStep = 'area' | 'planeacion' | 'cfo';
+export type FlowAction = 'enviado' | 'aprobado' | 'rechazado' | 'retirado' | 'reabierto';
+export type FlowActingAs = 'titular' | 'suplente' | 'rol' | 'super_admin';
+
+/** Lo que puede hacer la persona; code dice si el "no" es por el estado (para nadie) o porque le toca a otra. */
+export interface FpaFlowCheck extends FpaCheck {
+  code: 'estado' | 'persona' | null;
+}
+
+export interface FpaFlowEvent {
+  id: string;
+  round: number;
+  action: FlowAction;
+  step: FlowStep | null;
+  from_status: BudgetStatus;
+  to_status: BudgetStatus;
+  comment: string | null;
+  actor: FpaPerson;
+  actor_role: string | null;
+  acting_as: FlowActingAs;
+  created_at: string;
+}
+
+export interface FpaLineBrief {
+  folio: string;
+  concept: string;
+  total_mxn: Money;
+}
+
+/** Qué cambió de la foto de la ronda anterior a la de esta (por llave de línea). */
+export interface FpaRoundChanges {
+  total_before: Money;
+  total_after: Money;
+  /** Después − antes. */
+  delta: Money;
+  added: FpaLineBrief[];
+  removed: FpaLineBrief[];
+  changed: Array<FpaLineBrief & { total_before: Money; fields: string[] }>;
+}
+
+export interface FpaFlowRound {
+  round: number;
+  sent: { at: string; by: FpaPerson; acting_as: FlowActingAs; total_mxn: Money; comment: string | null } | null;
+  /** En orden: envío, firmas, rechazo, retiro o reapertura. */
+  events: FpaFlowEvent[];
+  changes: FpaRoundChanges | null;
+}
+
+/** GET /fpa/presupuestos/:id/flujo (y la respuesta de cada paso). */
+export interface FpaBudgetFlow {
+  budget: {
+    id: string;
+    status: BudgetStatus;
+    current_round: number;
+    area: { id: string; name: string };
+    version: { id: string; code: string; name: string; status: VersionStatus };
+  };
+  turn: {
+    step: FlowStep | null;
+    label: string;
+    rule: 'registrados' | 'rol' | null;
+    /** Quienes pueden actuar ahora (en captura, quienes capturan). */
+    who: Array<FpaPerson & { is_alternate: boolean }>;
+    /** Hay un paso pendiente y ninguno de los responsables lo puede firmar en esta ronda. */
+    blocked: boolean;
+  };
+  actions: Record<'submit' | 'approve' | 'reject' | 'withdraw' | 'reopen', FpaFlowCheck>;
+  /** De la más reciente a la primera. */
+  rounds: FpaFlowRound[];
+}
+
+/** POST /fpa/presupuestos/:id/{enviar|aprobar|rechazar|retirar|reabrir}: lo que había en pantalla. */
+export interface FpaFlowActionInput {
+  expected_status: BudgetStatus;
+  expected_round: number;
+  comment?: string | null;
+}
+
+/** GET /fpa/pendientes */
+export interface FpaPendingItem {
+  budget_id: string;
+  version: { id: string; code: string; name: string };
+  area: { id: string; name: string };
+  status: BudgetStatus;
+  current_round: number;
+  /** firma: el paso que te toca firmar; devuelto: te lo regresaron para corregir y reenviar. */
+  kind: 'firma' | 'devuelto';
+  step: FlowStep | null;
+  /** Desde cuándo está así. */
+  since: string;
+  /** Días hábiles completos que lleva esperando. */
+  business_days: number;
+  total_mxn: Money;
+  sender: FpaPerson | null;
+  last: { action: FlowAction; step: FlowStep | null; actor: FpaPerson; comment: string | null } | null;
+}
+
+/** "el paso del área", "el paso de planeación", "el paso del CFO". */
+export const FLOW_STEP_OF: Record<FlowStep, string> = {
+  area: 'del área',
+  planeacion: 'de planeación',
+  cfo: 'del CFO',
+};
+
+export const FLOW_ACTING_AS_LABELS: Record<FlowActingAs, string | null> = {
+  titular: null,
+  suplente: 'como suplente',
+  rol: null,
+  super_admin: 'como soporte',
+};
