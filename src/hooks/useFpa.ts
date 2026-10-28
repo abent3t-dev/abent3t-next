@@ -170,20 +170,24 @@ export function useFpaFlow(id: string | undefined) {
 export function useFpaPendientes() {
   const { user, hasRole } = useAuth();
   const qc = useQueryClient();
-  const { on, off } = useSocket();
+  // El socket es estado del contexto: al cargar la página llega después que el
+  // usuario, así que la suscripción espera a que exista (y se repite si se recrea)
+  const { socket } = useSocket();
   const enabled = !!user && hasRole('super_admin', 'fpa_area', 'fpa_planeacion', 'fpa_cfo');
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !socket) return;
     const refresh = () => {
       void qc.invalidateQueries({ queryKey: fpaKeys.pending });
       void qc.invalidateQueries({ queryKey: fpaKeys.flowAll });
       void qc.invalidateQueries({ queryKey: fpaKeys.budgetAll });
       void qc.invalidateQueries({ queryKey: fpaKeys.budgetsAll });
     };
-    on('fpa:pending', refresh);
-    return () => off('fpa:pending', refresh);
-  }, [enabled, on, off, qc]);
+    socket.on('fpa:pending', refresh);
+    return () => {
+      socket.off('fpa:pending', refresh);
+    };
+  }, [enabled, socket, qc]);
 
   return useQuery({
     queryKey: fpaKeys.pending,

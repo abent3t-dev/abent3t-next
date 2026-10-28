@@ -17,6 +17,13 @@ const errorText = (error: unknown, fallback: string) =>
   error instanceof Error && error.message ? error.message : fallback;
 
 function What({ item }: { item: FpaPendingItem }) {
+  if (item.kind === 'bloqueado') {
+    return (
+      <span className="inline-flex px-2.5 py-1 text-xs font-medium rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">
+        Sin quien firme: paso {item.step ? FLOW_STEP_OF[item.step] : ''}
+      </span>
+    );
+  }
   if (item.kind === 'devuelto') {
     return (
       <span className="inline-flex px-2.5 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 whitespace-nowrap">
@@ -51,7 +58,8 @@ export default function FpaPendientesPage() {
       <div>
         <h1 className="text-2xl font-bold text-[#424846]">Mis pendientes</h1>
         <p className="text-gray-500">
-          Presupuestos que esperan tu firma y los que te regresaron para corregir
+          Presupuestos que esperan tu firma y los que te regresaron para corregir. Planeación ve también los que nadie
+          de los responsables puede firmar.
         </p>
       </div>
 
@@ -103,7 +111,12 @@ export default function FpaPendientesPage() {
                       <FpaAmount value={item.total_mxn} cents />
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 max-w-md">
-                      {item.kind === 'devuelto' && item.last ? (
+                      {item.kind === 'bloqueado' ? (
+                        <p className="text-amber-800">
+                          Nadie de los responsables puede firmar este paso en esta ronda (nadie firma lo que envió ni dos
+                          pasos de la misma ronda). Soporte lo puede firmar, o se registra otro firmante en Áreas.
+                        </p>
+                      ) : item.kind === 'devuelto' && item.last ? (
                         <>
                           <p>
                             Lo regresó <strong>{item.last.actor.full_name}</strong>
@@ -121,6 +134,7 @@ export default function FpaPendientesPage() {
                     <td className="px-4 py-3 text-center">
                       <Link
                         href={`/fpa/presupuestos/${item.budget_id}`}
+                        aria-label={`Abrir el presupuesto de ${item.area.name} (${item.version.code})`}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-[#52AF32] text-white hover:bg-[#52AF32]/90 transition-colors"
                       >
                         Abrir

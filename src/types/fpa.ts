@@ -543,6 +543,8 @@ export type FlowActingAs = 'titular' | 'suplente' | 'rol' | 'super_admin';
 /** Lo que puede hacer la persona; code dice si el "no" es por el estado (para nadie) o porque le toca a otra. */
 export interface FpaFlowCheck extends FpaCheck {
   code: 'estado' | 'persona' | null;
+  /** Con qué derecho actuaría (la pantalla avisa cuando es como soporte). */
+  acting_as: FlowActingAs | null;
 }
 
 export interface FpaFlowEvent {
@@ -621,8 +623,12 @@ export interface FpaPendingItem {
   area: { id: string; name: string };
   status: BudgetStatus;
   current_round: number;
-  /** firma: el paso que te toca firmar; devuelto: te lo regresaron para corregir y reenviar. */
-  kind: 'firma' | 'devuelto';
+  /**
+   * firma: el paso que te toca firmar; devuelto: te lo regresaron para
+   * corregir y reenviar; bloqueado: nadie de los responsables puede firmar el
+   * paso en esta ronda (lo ven planeación y soporte).
+   */
+  kind: 'firma' | 'devuelto' | 'bloqueado';
   step: FlowStep | null;
   /** Desde cuándo está así. */
   since: string;

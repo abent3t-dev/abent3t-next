@@ -157,11 +157,13 @@ function FlowActionModal({
   const refresh = useRefreshFlow();
   const [comment, setComment] = useState('');
   const budgetId = flow.budget.id;
+  // Lo que había en pantalla al abrir el modal: si mientras tanto cambió, el API responde 409
+  const [seen] = useState(() => ({ status: flow.budget.status, round: flow.budget.current_round }));
   const mutation = useMutation({
     mutationFn: (text: string | null) =>
       api.post<FpaBudgetFlow>(`/fpa/presupuestos/${budgetId}/${spec.path}`, {
-        expected_status: flow.budget.status,
-        expected_round: flow.budget.current_round,
+        expected_status: seen.status,
+        expected_round: seen.round,
         comment: text,
       } satisfies FpaFlowActionInput),
     onSuccess: (saved) => {
@@ -188,7 +190,12 @@ function FlowActionModal({
     mutation.mutate(text || null);
   };
   return (
-    <FpaModal title={spec.title} subtitle={`${flow.budget.version.code} · ronda ${Math.max(flow.budget.current_round, 1)}`} size="md" onClose={onClose}>
+    <FpaModal
+      title={spec.title}
+      subtitle={`${flow.budget.version.code} · ronda ${spec.key === 'submit' ? seen.round + 1 : seen.round}`}
+      size="md"
+      onClose={onClose}
+    >
       <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
         <div className="px-6 py-5 space-y-3">
           <p className="text-sm text-gray-700">{spec.message}</p>
@@ -202,6 +209,7 @@ function FlowActionModal({
               onChange={(e) => setComment(e.target.value)}
               rows={3}
               maxLength={1000}
+              aria-required={spec.comment === 'required'}
               className={INPUT}
             />
           </div>
@@ -225,6 +233,7 @@ function names(who: FpaBudgetFlow['turn']['who']): string {
 
 /** Tarjeta del flujo: estado, ronda, de quién es el turno y los pasos de quien mira. */
 export function BudgetFlowCard({ budgetId }: { budgetId: string }) {
+  const uid = useId();
   const flowQ = useFpaFlow(budgetId);
   const [open, setOpen] = useState<ActionSpec | null>(null);
   const flow = flowQ.data;
@@ -267,31 +276,41 @@ export function BudgetFlowCard({ budgetId }: { budgetId: string }) {
         </div>
         {visible.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            {visible.map((s) => (
-              <button
-                key={s.key}
-                type="button"
-                onClick={() => setOpen(s)}
-                disabled={!flow.actions[s.key].ok}
-                className={BTN[s.tone]}
-              >
-                {s.label}
-              </button>
-            ))}
+            {visible.map((s) => {
+              const check = flow.actions[s.key];
+              return (
+                <button
+                  key={s.key}
+                  type="button"
+                  onClick={() => setOpen(s)}
+                  disabled={!check.ok}
+                  aria-describedby={check.ok ? undefined : `${uid}-${s.key}`}
+                  title={check.acting_as === 'super_admin' ? 'Como soporte (super_admin): queda dicho en el historial' : undefined}
+                  className={BTN[s.tone]}
+                >
+                  {s.label}
+                  {check.acting_as === 'super_admin' && ' (soporte)'}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
       {visible.map((s) => (
-        <Reason key={s.key} check={flow.actions[s.key]} />
+        <Reason key={s.key} id={`${uid}-${s.key}`} check={flow.actions[s.key]} />
       ))}
       {open && <FlowActionModal flow={flow} spec={open} onClose={() => setOpen(null)} />}
     </div>
   );
 }
 
-function Reason({ check }: { check: FpaFlowCheck }) {
+function Reason({ id, check }: { id: string; check: FpaFlowCheck }) {
   if (check.ok || !check.reason) return null;
-  return <p className="text-xs text-amber-800">{check.reason}</p>;
+  return (
+    <p id={id} className="text-xs text-amber-800">
+      {check.reason}
+    </p>
+  );
 }
 
 // ── Línea de tiempo ─────────────────────────────────────────────────────────
@@ -410,7 +429,13 @@ export function BudgetFlowHistory({ budgetId }: { budgetId: string }) {
   return (
     <div className="bg-white rounded-lg shadow p-4 space-y-3">
       <h2 className="text-base font-semibold text-[#424846]">Historial del flujo</h2>
-      {rounds.length === 0 ? (
+      {flowQ.isLoading ? (
+        <p className="text-sm text-gray-500">Cargando…</p>
+      ) : flowQ.isError ? (
+        <p className="text-sm text-red-600">
+          No se pudo cargar el historial: {flowQ.error instanceof Error ? flowQ.error.message : 'intenta de nuevo'}
+        </p>
+      ) : rounds.length === 0 ? (
         <p className="text-sm text-gray-500">Todavía no se ha enviado.</p>
       ) : (
         <ol className="space-y-5">
