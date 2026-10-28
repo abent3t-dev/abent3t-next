@@ -59,6 +59,8 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
   // no lo deja pasar solo. Áreas antes que /fpa: gana la primera que coincide.
   // Qué áreas ve y captura cada quien lo decide el API (fpa_assignments).
   { path: '/fpa/areas', roles: ['super_admin', 'fpa_planeacion'] },
+  // B2: versiones y parámetros; el CFO los ve sin cambiarlos (lo decide el API)
+  { path: '/fpa/versiones', roles: ['super_admin', 'fpa_planeacion', 'fpa_cfo'] },
   { path: '/fpa', roles: ['super_admin', 'fpa_area', 'fpa_planeacion', 'fpa_cfo'] },
 
   // Reportes

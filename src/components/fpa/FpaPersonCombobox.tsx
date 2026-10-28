@@ -5,7 +5,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { fpaKeys } from '@/hooks/useFpa';
-import type { FpaPerson } from '@/types/fpa';
+import type { FpaPerson, FpaRole } from '@/types/fpa';
 
 /**
  * FP&A (A3) — selector con búsqueda de una persona del directorio de FP&A
@@ -20,11 +20,13 @@ interface FpaPersonComboboxProps {
   value: FpaPerson | null;
   onChange: (person: FpaPerson | null) => void;
   id?: string;
+  /** Solo personas con este rol de FP&A (B2: firmantes de planeación y del CFO). */
+  role?: FpaRole;
 }
 
 const DEBOUNCE_MS = 300;
 
-export default function FpaPersonCombobox({ value, onChange, id }: FpaPersonComboboxProps) {
+export default function FpaPersonCombobox({ value, onChange, id, role }: FpaPersonComboboxProps) {
   const baseId = useId();
   const inputId = id ?? `${baseId}-input`;
   const listboxId = `${baseId}-listbox`;
@@ -40,10 +42,11 @@ export default function FpaPersonCombobox({ value, onChange, id }: FpaPersonComb
   const term = useDebouncedValue(typed, DEBOUNCE_MS);
 
   const peopleQ = useQuery({
-    queryKey: fpaKeys.directory(term),
+    queryKey: [...fpaKeys.directory(term), role ?? 'todos'],
     queryFn: () => {
       const qs = new URLSearchParams();
       if (term) qs.set('search', term);
+      if (role) qs.set('rol', role);
       const suffix = qs.toString();
       return api.get<FpaPerson[]>(`/fpa/usuarios/directorio${suffix ? `?${suffix}` : ''}`);
     },

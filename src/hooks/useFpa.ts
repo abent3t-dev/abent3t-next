@@ -10,7 +10,9 @@ import type {
   FpaConsolidated,
   FpaContext,
   FpaGroupBy,
+  FpaSigners,
   FpaVersion,
+  FpaVersionDetail,
 } from '@/types/fpa';
 
 /**
@@ -35,6 +37,10 @@ export const fpaKeys = {
   supplier: (id: string | null | undefined) => ['fpa', 'proveedor', id] as const,
   /** Vista previa del cálculo de una línea (B1): la llave es lo capturado. */
   calc: (budgetId: string, input: string | null) => ['fpa', 'calcular', budgetId, input] as const,
+  /** B2: detalle de una versión y firmantes generales. */
+  versionAll: ['fpa', 'version'] as const,
+  version: (id: string | null) => ['fpa', 'version', id] as const,
+  signers: ['fpa', 'firmantes'] as const,
 };
 
 /** Lo que cambia mientras las áreas capturan: se vuelve a pedir a los 30 s. */
@@ -109,6 +115,27 @@ export function useFpaAreas(enabled = true) {
   return useQuery({
     queryKey: fpaKeys.areas,
     queryFn: () => api.get<FpaAreaRow[]>('/fpa/areas'),
+    enabled,
+    retry: retryServerErrors,
+  });
+}
+
+/** B2: detalle de una versión con sus parámetros, visto bueno e historial. */
+export function useFpaVersion(id: string | null) {
+  return useQuery({
+    queryKey: fpaKeys.version(id),
+    queryFn: () => api.get<FpaVersionDetail>(`/fpa/versiones/${encodeURIComponent(id ?? '')}`),
+    enabled: !!id,
+    staleTime: LIVE_STALE_MS,
+    retry: retryServerErrors,
+  });
+}
+
+/** B2: firmantes de planeación y del CFO (planeación y super_admin). */
+export function useFpaSigners(enabled = true) {
+  return useQuery({
+    queryKey: fpaKeys.signers,
+    queryFn: () => api.get<FpaSigners>('/fpa/firmantes'),
     enabled,
     retry: retryServerErrors,
   });

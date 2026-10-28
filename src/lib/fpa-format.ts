@@ -57,11 +57,11 @@ export function formatWithCurrency(value: Money, currency: string): string {
   return currency === 'MXN' ? formatPesos(value, true) : `${currency} ${formatNumber(value, true)}`;
 }
 
-/** Tipo de cambio "20.000000" → "20.00" (hasta 4 decimales si los trae). */
+/** Tipo de cambio "20.000000" → "20.00"; con los 6 decimales que guarda la base si los trae. */
 export function formatRate(rate: string): string {
   const n = Number(rate);
   if (!Number.isFinite(n)) return rate;
-  return n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+  return n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 }
 
 /** "USD 20.00 · EUR 22.00"; null si la versión no tiene otras monedas. */
@@ -77,6 +77,20 @@ export function formatInflation(pct: string | null): string | null {
   const n = Number(pct);
   if (!Number.isFinite(n)) return `${pct}%`;
   return `${n.toLocaleString('es-MX', { maximumFractionDigits: 3 })}%`;
+}
+
+/** "2026-10-28T16:02:00Z" → "28 oct 2026, 10:02" (hora de México). */
+export function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString('es-MX', {
+    timeZone: 'America/Mexico_City',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 /** Versión por omisión: la primera en captura; si no hay, la primera. */

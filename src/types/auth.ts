@@ -207,6 +207,9 @@ const FPA_ROLES: UserRole[] = ['super_admin', 'fpa_area', 'fpa_planeacion', 'fpa
 // Administran áreas y responsables
 const FPA_ADMINS: UserRole[] = ['super_admin', 'fpa_planeacion'];
 
+// Ven todas las áreas y las versiones con sus parámetros (B2); cambiarlas es de planeación
+const FPA_SEE_ALL: UserRole[] = ['super_admin', 'fpa_planeacion', 'fpa_cfo'];
+
 /** Navegacion principal del sidebar */
 export const SIDEBAR_NAV: NavItem[] = [
   // Administracion del Sistema (Solo Super Admin)
@@ -283,6 +286,7 @@ export const SIDEBAR_NAV: NavItem[] = [
     children: [
       { label: 'Presupuestos', href: '/fpa', icon: 'wallet', roles: FPA_ROLES },
       { label: 'Consolidado', href: '/fpa/consolidado', icon: 'bar-chart', roles: FPA_ROLES },
+      { label: 'Versiones', href: '/fpa/versiones', icon: 'calendar', roles: FPA_SEE_ALL },
       { label: 'Áreas', href: '/fpa/areas', icon: 'building', roles: FPA_ADMINS },
     ],
   },

@@ -66,6 +66,10 @@ export interface FpaVersion {
   inflation_pct: string | null;
   cutoff_month: number | null;
   exchange_rates: FpaExchangeRate[];
+  /** B2: de dónde salen los parámetros ("Proyecciones Santander, sep-2026"). */
+  params_source: string | null;
+  /** B2: visto bueno de planeación a los parámetros; null = sin visto bueno. */
+  params_approved: { by: FpaPerson; at: string } | null;
 }
 
 /** GET /fpa/catalogo — categorías con sus clasificaciones y departamentos. */
@@ -299,6 +303,150 @@ export interface FpaAreaRow {
   approver: FpaPerson | null;
 }
 
+// ---------------------------------------------------------------------------
+// B2 (28-oct): versiones y sus parámetros, con el visto bueno de planeación
+// ---------------------------------------------------------------------------
+
+export type TravelerTypeKey = 'colaborador' | 'director';
+
+export interface FpaTravelRateParams {
+  trip_type: TripType;
+  traveler_type: TravelerTypeKey;
+  /** Montos con 2 decimales ("4000.00"). */
+  flight_per_person: string;
+  hotel_per_night: string;
+  transport_per_day: string;
+  meals_per_day: string;
+}
+
+/** Los parámetros de una versión tal como los guarda el API (foto canónica). */
+export interface FpaVersionParams {
+  inflation_pct: string | null;
+  cutoff_month: number | null;
+  source: string | null;
+  exchange_rates: FpaExchangeRate[];
+  travel_rates: FpaTravelRateParams[];
+  /** Hash de estos parámetros: se manda al guardar y al dar el visto bueno. */
+  hash: string;
+}
+
+export interface FpaCheck {
+  ok: boolean;
+  /** Por qué no (null si se puede). */
+  reason: string | null;
+}
+
+export type FpaVersionAction =
+  | 'creada'
+  | 'parametros'
+  | 'visto_bueno'
+  | 'abierta'
+  | 'regresada'
+  | 'cerrada'
+  | 'reabierta';
+
+export interface FpaParamChange {
+  campo: string;
+  etiqueta: string;
+  antes: string | null;
+  despues: string | null;
+}
+
+export interface FpaVersionEvent {
+  id: string;
+  action: FpaVersionAction;
+  from_status: VersionStatus | null;
+  to_status: VersionStatus | null;
+  /** parametros: {cambios, visto_bueno_retirado}; visto_bueno: {parametros, hash}; creada: {copia_de}; abierta: {presupuestos_creados}. */
+  detail: {
+    cambios?: FpaParamChange[];
+    visto_bueno_retirado?: { por: string; el: string } | null;
+    copia_de?: { id: string; code: string };
+    presupuestos_creados?: number;
+  } | null;
+  comment: string | null;
+  actor: FpaPerson | null;
+  acting_as: 'titular' | 'suplente' | 'rol' | 'super_admin';
+  created_at: string;
+}
+
+/** GET /fpa/versiones/:id (planeación y CFO). */
+export interface FpaVersionDetail {
+  version: {
+    id: string;
+    code: string;
+    name: string;
+    fiscal_year: number;
+    kind: VersionKind;
+    status: VersionStatus;
+    notes: string | null;
+    base_version: { id: string; code: string } | null;
+    created_at: string;
+  };
+  params: FpaVersionParams;
+  params_updated: { by: FpaPerson | null; at: string } | null;
+  params_approved: { by: FpaPerson | null; at: string } | null;
+  /** Parámetros que faltan para el visto bueno y para abrir; vacío = completos. */
+  gaps: string[];
+  usage: {
+    budgets: number;
+    budgets_sent: number;
+    budgets_in_flow: number;
+    lines: number;
+    currencies: string[];
+  };
+  signers: {
+    titular: FpaPerson | null;
+    suplentes: FpaPerson[];
+    /** registrados: solo ellos dan el visto bueno; rol: cualquiera de planeación. */
+    rule: 'registrados' | 'rol';
+  };
+  actions: {
+    edit_params: FpaCheck;
+    edit_info: FpaCheck;
+    approve: FpaCheck;
+    open: FpaCheck;
+    give_back: FpaCheck;
+    close: FpaCheck;
+    reopen: FpaCheck;
+  };
+  /** Del más reciente al más viejo. */
+  events: FpaVersionEvent[];
+}
+
+/** POST /fpa/versiones */
+export interface FpaCreateVersionInput {
+  code: string;
+  name: string;
+  fiscal_year: number;
+  kind: VersionKind;
+  cutoff_month?: number | null;
+  copy_params_from?: string | null;
+}
+
+/** PUT /fpa/versiones/:id/parametros — el juego completo. */
+export interface FpaVersionParamsInput {
+  inflation_pct: string | null;
+  cutoff_month?: number | null;
+  params_source: string | null;
+  exchange_rates: FpaExchangeRate[];
+  travel_rates: FpaTravelRateParams[];
+  expected_hash?: string;
+}
+
+export interface FpaSignerGroup {
+  titular: FpaPerson | null;
+  suplentes: FpaPerson[];
+}
+
+/** GET y POST /fpa/firmantes */
+export interface FpaSigners {
+  planeacion: FpaSignerGroup;
+  cfo: FpaSignerGroup;
+  /** Quién puede cambiar a cada firmante: el de planeación, solo soporte (super_admin). */
+  can_assign: { planeacion: boolean; cfo: boolean };
+}
+
 /** POST /fpa/responsables — nombra al titular (revoca al anterior). */
 export interface FpaAssignInput {
   area_id: string;
@@ -357,6 +505,16 @@ export const VERSION_KIND_LABELS: Record<VersionKind, string> = {
 export const TRIP_TYPE_LABELS: Record<TripType, string> = {
   nacional: 'Nacional',
   internacional: 'Internacional',
+};
+
+export const VERSION_ACTION_LABELS: Record<FpaVersionAction, string> = {
+  creada: 'Creó la versión',
+  parametros: 'Cambió los parámetros',
+  visto_bueno: 'Dio el visto bueno a los parámetros',
+  abierta: 'Abrió la versión a captura',
+  regresada: 'Regresó la versión a preparación',
+  cerrada: 'Cerró la versión',
+  reabierta: 'Reabrió la versión',
 };
 
 export const TRAVELER_TYPE_LABELS: Record<TravelerType, { one: string; many: string }> = {

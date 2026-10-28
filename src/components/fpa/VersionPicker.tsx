@@ -6,16 +6,17 @@ import {
   VERSION_STATUS_LABELS,
   type FpaVersion,
 } from '@/types/fpa';
-import { NO_DISPONIBLE, formatExchangeRates, formatInflation } from '@/lib/fpa-format';
+import { NO_DISPONIBLE, formatDateTime, formatExchangeRates, formatInflation } from '@/lib/fpa-format';
 import { VersionStatusBadge } from './StatusBadges';
 
 /**
  * FP&A (A3) — chips de versión (B-26, F2-26, B-27…) y, debajo, los datos de
  * la elegida: nombre, ejercicio, tipo, estado, tipos de cambio e inflación.
- * Los parámetros los fija FP&A; para las áreas son de solo lectura.
+ * Los parámetros los fija FP&A; para las áreas son de solo lectura. B2: con su
+ * fuente y el visto bueno de planeación.
  */
 
-/** Tipos de cambio, inflación y mes de corte de una versión (una línea de texto). */
+/** Tipos de cambio, inflación, mes de corte, fuente y visto bueno de una versión. */
 export function VersionFacts({ version }: { version: FpaVersion }) {
   const rates = formatExchangeRates(version.exchange_rates);
   const inflation = formatInflation(version.inflation_pct);
@@ -42,6 +43,27 @@ export function VersionFacts({ version }: { version: FpaVersion }) {
       {version.cutoff_month !== null && version.cutoff_month >= 1 && version.cutoff_month <= 12 && (
         <span>
           Mes de corte: <strong className="font-semibold text-[#424846]">{MONTH_LABELS[version.cutoff_month - 1]}</strong>
+        </span>
+      )}
+      {version.params_source && (
+        <span>
+          Fuente: <span className="text-[#424846]">{version.params_source}</span>
+        </span>
+      )}
+      {/* Una versión de comparación no lleva visto bueno */}
+      {version.kind !== 'comparacion' && (
+        <span>
+          Visto bueno:{' '}
+          {version.params_approved ? (
+            <span title={formatDateTime(version.params_approved.at)}>
+              <strong className="font-semibold text-[#3d8425]">{version.params_approved.by.full_name}</strong>
+              <span className="text-gray-500"> · {formatDateTime(version.params_approved.at)}</span>
+            </span>
+          ) : (
+            <span className="font-medium text-amber-700" title="Planeación todavía no da el visto bueno a estos parámetros">
+              pendiente
+            </span>
+          )}
         </span>
       )}
     </div>
