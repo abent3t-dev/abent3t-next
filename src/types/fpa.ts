@@ -78,7 +78,13 @@ export interface FpaCatalog {
     id: string;
     name: string;
     sort_order: number;
-    classifications: { id: string; name: string; allows_negative: boolean }[];
+    classifications: {
+      id: string;
+      name: string;
+      allows_negative: boolean;
+      /** C1: departamentos a los que el COA se la da; vacío = la ven todas las áreas. */
+      department_ids?: string[];
+    }[];
   }[];
   departments: {
     id: string;

@@ -668,12 +668,36 @@ function LineFormModal({ onClose, budget, line, catalog }: LineModalProps & { ca
           : { kind: 'none' };
 
   // ── Catálogo ──
-  const categories = [...catalog.categories].sort((a, b) => a.sort_order - b.sort_order);
+  // C1: el área ve las clasificaciones que el COA da a sus departamentos (las
+  // que no tienen departamento, como Viajes › Viajes, las ven todas). Si el
+  // área no tiene ninguna del COA, se enseña todo el catálogo. La de la línea
+  // que se edita siempre se queda, aunque sea de otro departamento.
+  const areaDepartmentIds = new Set(
+    catalog.departments.filter((d) => d.area_id === budget.area.id).map((d) => d.id),
+  );
+  const ofArea = (ids: string[] | undefined) => (ids ?? []).some((id) => areaDepartmentIds.has(id));
+  const areaHasCoa = catalog.categories.some((c) => c.classifications.some((k) => ofArea(k.department_ids)));
+  const categories = [...catalog.categories]
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((c) =>
+      areaHasCoa
+        ? {
+            ...c,
+            classifications: c.classifications.filter(
+              (k) => !k.department_ids?.length || ofArea(k.department_ids) || k.id === line?.classification.id,
+            ),
+          }
+        : c,
+    )
+    .filter((c) => c.classifications.length > 0);
+  // Una clasificación dada de baja (o la "Por clasificar" de una carga) se
+  // enseña para no perder el dato, pero hay que elegir otra para guardar
+  const missingLabel = (name: string) =>
+    name === 'Por clasificar' ? 'Por clasificar (elige una del catálogo)' : `${name} (ya no está en el catálogo)`;
   if (line && !categories.some((c) => c.id === line.category.id)) {
-    // Categoría dada de baja en el catálogo: se muestra para no perder el dato
     categories.push({
       id: line.category.id,
-      name: `${line.category.name} (ya no está en el catálogo)`,
+      name: missingLabel(line.category.name),
       sort_order: Number.MAX_SAFE_INTEGER,
       classifications: [{ id: line.classification.id, name: line.classification.name, allows_negative: false }],
     });
@@ -683,7 +707,7 @@ function LineFormModal({ onClose, budget, line, catalog }: LineModalProps & { ca
   if (line && category?.id === line.category.id && !classifications.some((c) => c.id === line.classification.id)) {
     classifications.push({
       id: line.classification.id,
-      name: `${line.classification.name} (ya no está en el catálogo)`,
+      name: missingLabel(line.classification.name),
       allows_negative: false,
     });
   }
