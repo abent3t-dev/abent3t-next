@@ -70,6 +70,17 @@ export interface FpaVersion {
   params_source: string | null;
   /** B2: visto bueno de planeación a los parámetros; null = sin visto bueno. */
   params_approved: { by: FpaPerson; at: string } | null;
+  /** C4: último día para capturar y enviar ('AAAA-MM-DD', hora de México); null = sin fecha. */
+  capture_deadline?: string | null;
+}
+
+/** C4: hasta cuándo captura un área (la fecha de la versión o su prórroga, la más tarde). */
+export interface FpaCaptureWindow {
+  deadline: string | null;
+  extended_until: string | null;
+  until: string | null;
+  /** Ya no captura ni envía: borrador con la fecha vencida (planeación sí edita). */
+  closed: boolean;
 }
 
 /** GET /fpa/catalogo — categorías con sus clasificaciones y departamentos. */
@@ -106,8 +117,10 @@ export interface FpaBudgetSummary {
   line_count: number;
   /** null = alguna línea "No disponible". */
   total_mxn: Money;
-  /** La persona puede agregar y editar líneas ahora (rol, área, estado y versión). */
+  /** La persona puede agregar y editar líneas ahora (rol, área, estado, versión y fecha). */
   can_edit: boolean;
+  /** C4: la fecha de captura del área. */
+  capture?: FpaCaptureWindow;
 }
 
 /** Lo capturado en un mes: un solo dato según la forma de cálculo. */
@@ -269,6 +282,8 @@ export interface FpaCategoryTotal {
 
 /** GET /fpa/presupuestos/:id */
 export interface FpaBudgetDetail extends FpaBudgetSummary {
+  /** C4: la prórroga vigente del área, con quién la dio y cuándo. */
+  capture_extension?: { until: string; at: string; by: FpaPerson | null } | null;
   version: FpaVersion;
   lines: FpaLine[];
   totals: {
@@ -349,7 +364,9 @@ export type FpaVersionAction =
   | 'abierta'
   | 'regresada'
   | 'cerrada'
-  | 'reabierta';
+  | 'reabierta'
+  | 'fecha_limite'
+  | 'prorroga';
 
 export interface FpaParamChange {
   campo: string;
@@ -369,6 +386,12 @@ export interface FpaVersionEvent {
     visto_bueno_retirado?: { por: string; el: string } | null;
     copia_de?: { id: string; code: string };
     presupuestos_creados?: number;
+    /** C4: fecha_limite y prorroga ('AAAA-MM-DD' o null). */
+    antes?: string | null;
+    despues?: string | null;
+    /** C4: prorroga — el presupuesto y el área. */
+    presupuesto?: string;
+    area?: string;
   } | null;
   comment: string | null;
   actor: FpaPerson | null;
@@ -388,6 +411,14 @@ export interface FpaVersionDetail {
     notes: string | null;
     base_version: { id: string; code: string } | null;
     created_at: string;
+    /** C4: último día para capturar y enviar; null = sin fecha. */
+    capture_deadline?: string | null;
+  };
+  /** C4: las áreas que ya no capturan (no enviaron a tiempo) y las prórrogas. */
+  capture?: {
+    deadline: string | null;
+    closed_areas: { budget_id: string; area: string }[];
+    extensions: { budget_id: string; area: string; until: string }[];
   };
   params: FpaVersionParams;
   params_updated: { by: FpaPerson | null; at: string } | null;
@@ -415,6 +446,8 @@ export interface FpaVersionDetail {
     give_back: FpaCheck;
     close: FpaCheck;
     reopen: FpaCheck;
+    /** C4: poner o cambiar la fecha límite de captura. */
+    set_deadline?: FpaCheck;
   };
   /** Del más reciente al más viejo. */
   events: FpaVersionEvent[];
@@ -521,6 +554,8 @@ export const VERSION_ACTION_LABELS: Record<FpaVersionAction, string> = {
   regresada: 'Regresó la versión a preparación',
   cerrada: 'Cerró la versión',
   reabierta: 'Reabrió la versión',
+  fecha_limite: 'Cambió la fecha límite de captura',
+  prorroga: 'Dio una prórroga de captura',
 };
 
 export const TRAVELER_TYPE_LABELS: Record<TravelerType, { one: string; many: string }> = {
@@ -600,6 +635,8 @@ export interface FpaBudgetFlow {
     current_round: number;
     area: { id: string; name: string };
     version: { id: string; code: string; name: string; status: VersionStatus };
+    /** C4: la fecha de captura del área. */
+    capture?: FpaCaptureWindow;
   };
   turn: {
     step: FlowStep | null;

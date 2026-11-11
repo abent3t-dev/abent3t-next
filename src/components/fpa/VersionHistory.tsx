@@ -1,6 +1,6 @@
 'use client';
 
-import { formatDateTime, formatInflation, formatPesos, formatRate } from '@/lib/fpa-format';
+import { formatDateTime, formatDay, formatInflation, formatPesos, formatRate } from '@/lib/fpa-format';
 import { MONTH_LABELS, VERSION_ACTION_LABELS, type FpaParamChange, type FpaVersionEvent } from '@/types/fpa';
 
 /**
@@ -24,7 +24,12 @@ const ACTION_DOT: Record<FpaVersionEvent['action'], string> = {
   regresada: 'bg-amber-600',
   cerrada: 'bg-gray-600',
   reabierta: 'bg-indigo-500',
+  fecha_limite: 'bg-[#222D59]',
+  prorroga: 'bg-amber-500',
 };
+
+/** C4: un día del historial de la fecha o de una prórroga. */
+const dayText = (day: string | null | undefined, none: string) => (day ? formatDay(day) : none);
 
 /** Un valor del historial, legible: 3.700 → 3.7%, 19.500000 → 19.50, 4000.00 → $4,000.00. */
 function formatValue(change: FpaParamChange, value: string | null): string {
@@ -83,6 +88,25 @@ export default function VersionHistory({ events }: { events: FpaVersionEvent[] }
                   </li>
                 ))}
               </ul>
+            )}
+            {e.action === 'fecha_limite' && e.detail && (
+              <p className="mt-1 text-xs text-gray-600">
+                {dayText(e.detail.antes, 'Sin fecha')} →{' '}
+                <span className="font-medium text-gray-800">{dayText(e.detail.despues, 'sin fecha')}</span>
+              </p>
+            )}
+            {e.action === 'prorroga' && e.detail && (
+              <p className="mt-1 text-xs text-gray-600">
+                {e.detail.area ?? 'Un área'}:{' '}
+                {e.detail.despues ? (
+                  <>
+                    captura hasta el <span className="font-medium text-gray-800">{formatDay(e.detail.despues)}</span>
+                    {e.detail.antes && ` (antes, hasta el ${formatDay(e.detail.antes)})`}
+                  </>
+                ) : (
+                  'se quitó la prórroga'
+                )}
+              </p>
             )}
             {e.detail?.visto_bueno_retirado && (
               <p className="mt-1 text-xs text-amber-700">Con este cambio se quitó el visto bueno que tenía.</p>
