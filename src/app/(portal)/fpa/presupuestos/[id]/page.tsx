@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useFpaBudget, useFpaCatalog } from '@/hooks/useFpa';
+import { useFpaBudget, useFpaCatalog, useFpaContext } from '@/hooks/useFpa';
 import BudgetLinesTable, { groupLines, type AmountMode } from '@/components/fpa/BudgetLinesTable';
 import LineModal from '@/components/fpa/LineModal';
 import { BudgetFlowCard, BudgetFlowHistory } from '@/components/fpa/BudgetFlow';
+import { CaptureNotice } from '@/components/fpa/CaptureDeadline';
 import FpaAmount from '@/components/fpa/FpaAmount';
 import { BudgetStatusBadge, VersionStatusBadge } from '@/components/fpa/StatusBadges';
 import { VersionFacts } from '@/components/fpa/VersionPicker';
@@ -20,7 +21,8 @@ import type { FpaLine } from '@/types/fpa';
  * líneas agrupadas por categoría. Con can_edit: "Agregar línea" y clic en una
  * fila para editarla; sin él, la fila abre la línea en solo lectura.
  * B3: arriba, el flujo de aprobación (turno y pasos de quien mira); abajo,
- * su historial por ronda.
+ * su historial por ronda. C4: hasta cuándo se captura, el aviso de que ya
+ * cerró y, para planeación, la prórroga del área.
  */
 
 const errorText = (error: unknown, fallback: string) =>
@@ -58,6 +60,7 @@ export default function FpaPresupuestoPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
   const budgetQ = useFpaBudget(id);
+  const contextQ = useFpaContext();
   const detail = budgetQ.data;
   // El catálogo solo hace falta para capturar
   const catalogQ = useFpaCatalog(!!detail?.can_edit);
@@ -103,7 +106,7 @@ export default function FpaPresupuestoPage() {
               {!canEdit && (
                 <span
                   className="inline-flex px-2.5 py-1 text-xs font-medium rounded-full bg-[#222D59]/10 text-[#222D59]"
-                  title="Se captura mientras el presupuesto está en borrador o devuelto y la versión en captura, y solo quien es responsable de captura del área o Planeación"
+                  title="Se captura mientras el presupuesto está en borrador o devuelto y la versión en captura (un borrador, hasta la fecha límite), y solo quien es responsable de captura del área o Planeación"
                 >
                   Solo consulta
                 </span>
@@ -138,6 +141,9 @@ export default function FpaPresupuestoPage() {
         </dl>
         <VersionFacts version={version} />
       </div>
+
+      {/* Fecha límite de captura y prórroga (C4) */}
+      <CaptureNotice detail={detail} canAdmin={contextQ.data?.can_admin ?? false} />
 
       {/* Flujo de aprobación (B3) */}
       <BudgetFlowCard budgetId={detail.id} />

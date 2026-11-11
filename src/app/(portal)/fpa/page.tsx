@@ -7,7 +7,7 @@ import { useFpaBudgets, useFpaContext, useFpaVersions } from '@/hooks/useFpa';
 import VersionPicker from '@/components/fpa/VersionPicker';
 import { BudgetStatusBadge } from '@/components/fpa/StatusBadges';
 import FpaAmount from '@/components/fpa/FpaAmount';
-import { defaultVersionId, sumMoney } from '@/lib/fpa-format';
+import { defaultVersionId, formatDay, sumMoney } from '@/lib/fpa-format';
 import { DUTY_LABELS, type FpaContext } from '@/types/fpa';
 
 /**
@@ -17,7 +17,8 @@ import { DUTY_LABELS, type FpaContext } from '@/types/fpa';
  * versión: lo decide el API en can_edit); si no, "Ver".
  *
  * La versión elegida viaja en la URL (?version=) para que el regreso desde la
- * captura vuelva a la misma.
+ * captura vuelva a la misma. C4: debajo del estado, "Fuera de tiempo" si el
+ * área no envió antes de la fecha límite, o hasta cuándo tiene prórroga.
  */
 
 function Spinner() {
@@ -153,6 +154,21 @@ function PresupuestosContent() {
                         <BudgetStatusBadge status={budget.status} />
                         {budget.current_round > 0 && (
                           <span className="block mt-0.5 text-xs text-gray-500">Ronda {budget.current_round}</span>
+                        )}
+                        {budget.capture?.closed ? (
+                          <span
+                            className="block mt-0.5 text-xs font-medium text-red-700"
+                            title={budget.capture.until ? `La captura cerró el ${formatDay(budget.capture.until)}` : undefined}
+                          >
+                            Fuera de tiempo
+                          </span>
+                        ) : (
+                          budget.capture?.extended_until &&
+                          budget.status === 'borrador' && (
+                            <span className="block mt-0.5 text-xs text-amber-700">
+                              Prórroga al {formatDay(budget.capture.extended_until)}
+                            </span>
+                          )
                         )}
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-gray-700 tabular-nums">

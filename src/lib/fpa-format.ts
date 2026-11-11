@@ -93,6 +93,18 @@ export function formatDateTime(iso: string): string {
   });
 }
 
+/** C4: "2026-11-20" → "20 de noviembre de 2026" (un día del calendario, sin hora). */
+export function formatDay(day: string): string {
+  const d = new Date(`${day}T12:00:00Z`);
+  if (Number.isNaN(d.getTime())) return day;
+  return d.toLocaleDateString('es-MX', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+/** C4: hoy en México, "AAAA-MM-DD" (para el mínimo de un campo de fecha). */
+export function todayMx(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date());
+}
+
 /** Versión por omisión: la primera en captura; si no hay, la primera. */
 export function defaultVersionId(versions: FpaVersion[]): string | null {
   return (versions.find((v) => v.status === 'captura') ?? versions[0])?.id ?? null;

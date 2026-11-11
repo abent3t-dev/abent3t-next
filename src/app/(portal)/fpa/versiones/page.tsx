@@ -11,6 +11,7 @@ import FpaModal from '@/components/fpa/FpaModal';
 import { VersionStatusBadge } from '@/components/fpa/StatusBadges';
 import VersionParamsForm from '@/components/fpa/VersionParamsForm';
 import VersionHistory from '@/components/fpa/VersionHistory';
+import { CaptureDeadlineCard } from '@/components/fpa/CaptureDeadline';
 import { formatDateTime, formatInflation, formatPesos, formatRate } from '@/lib/fpa-format';
 import {
   MONTH_LABELS,
@@ -32,7 +33,8 @@ import {
  * trazable con qué parámetros se calcula el presupuesto. Planeación edita en
  * preparación, el firmante da el visto bueno y con él se abre a captura;
  * abierta, los parámetros no cambian. El CFO ve todo sin cambiar nada. Qué
- * puede hacer cada quien lo decide el API (actions).
+ * puede hacer cada quien lo decide el API (actions). C4: la fecha límite de
+ * captura, con las áreas que no enviaron a tiempo y las prórrogas.
  */
 
 const errorText = (error: unknown, fallback: string) =>
@@ -562,6 +564,9 @@ function VersionDetailPanel({
           </ul>
         </div>
       )}
+
+      {/* C4: fecha límite de captura (no es un parámetro: cambia también abierta) */}
+      <CaptureDeadlineCard detail={detail} canAdmin={canAdmin} />
 
       {/* Parámetros */}
       <div className="bg-white rounded-lg shadow p-4 space-y-3">

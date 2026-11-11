@@ -6,14 +6,14 @@ import {
   VERSION_STATUS_LABELS,
   type FpaVersion,
 } from '@/types/fpa';
-import { NO_DISPONIBLE, formatDateTime, formatExchangeRates, formatInflation } from '@/lib/fpa-format';
+import { NO_DISPONIBLE, formatDateTime, formatDay, formatExchangeRates, formatInflation, todayMx } from '@/lib/fpa-format';
 import { VersionStatusBadge } from './StatusBadges';
 
 /**
  * FP&A (A3) — chips de versión (B-26, F2-26, B-27…) y, debajo, los datos de
  * la elegida: nombre, ejercicio, tipo, estado, tipos de cambio e inflación.
  * Los parámetros los fija FP&A; para las áreas son de solo lectura. B2: con su
- * fuente y el visto bueno de planeación.
+ * fuente y el visto bueno de planeación. C4: con la fecha límite de captura.
  */
 
 /** Tipos de cambio, inflación, mes de corte, fuente y visto bueno de una versión. */
@@ -64,6 +64,12 @@ export function VersionFacts({ version }: { version: FpaVersion }) {
               pendiente
             </span>
           )}
+        </span>
+      )}
+      {version.capture_deadline && (
+        <span title="Último día para capturar y enviar, hora de México. Las firmas no llevan fecha.">
+          {version.status === 'captura' && todayMx() > version.capture_deadline ? 'Captura cerrada desde el ' : 'Captura hasta el '}
+          <strong className="font-semibold text-[#424846]">{formatDay(version.capture_deadline)}</strong>
         </span>
       )}
     </div>
