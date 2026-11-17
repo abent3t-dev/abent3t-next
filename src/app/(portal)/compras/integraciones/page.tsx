@@ -183,6 +183,7 @@ export default function IntegracionesPage() {
                 <option value="all">Todo</option>
                 <option value="purchase_orders">{MAXIMO_TARGET_LABELS.purchase_orders}</option>
                 <option value="contracts">{MAXIMO_TARGET_LABELS.contracts}</option>
+                <option value="rfqs">{MAXIMO_TARGET_LABELS.rfqs}</option>
               </select>
               <button
                 onClick={() => void triggerSync()}
@@ -220,16 +221,21 @@ export default function IntegracionesPage() {
                 {status.contractsEnabled ? 'Habilitados' : 'Deshabilitados'}
               </span>
             </div>
+            {/* O2: las solicitudes de cotización tienen su propio flag */}
             <div>
-              <p className="text-xs text-gray-500 uppercase">Intervalo</p>
-              <p className="text-sm text-gray-900">cada {status.intervalMinutes} min</p>
+              <p className="text-xs text-gray-500 uppercase">Solicitudes de cotización</p>
+              <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${status.rfqsEnabled ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700'}`}>
+                {status.rfqsEnabled ? 'Habilitadas' : 'Deshabilitadas'}
+              </span>
             </div>
             <div>
-              <p className="text-xs text-gray-500 uppercase">Tamaño de página</p>
-              <p className="text-sm text-gray-900">{status.pageSize} registros</p>
+              <p className="text-xs text-gray-500 uppercase">Intervalo y página</p>
+              <p className="text-sm text-gray-900">
+                cada {status.intervalMinutes} min · {status.pageSize} registros
+              </p>
             </div>
-            {(['purchase_orders', 'contracts'] as const).map((t) => {
-              const lastRun = status.lastRuns[t];
+            {(['purchase_orders', 'contracts', 'rfqs'] as const).map((t) => {
+              const lastRun = status.lastRuns[t] ?? null;
               return (
                 <div key={t} className="md:col-span-2 border border-gray-200 rounded-lg p-3">
                   <div className="flex items-center justify-between mb-1">
@@ -244,7 +250,7 @@ export default function IntegracionesPage() {
                         </span>
                       )}
                       <span className="text-xs text-gray-500">
-                        {status.counts[t]} registros sincronizados
+                        {status.counts[t] ?? 0} registros sincronizados
                       </span>
                     </div>
                   </div>

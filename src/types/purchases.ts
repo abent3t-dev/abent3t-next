@@ -370,7 +370,8 @@ export const APPROVAL_LEVEL_NAMES: Record<number, string> = {
 // no trae (historicos, decision 20.A.1: la UI muestra "—", no oculta filas).
 // ==========================================
 
-export type MaximoSyncTarget = 'purchase_orders' | 'contracts';
+/** O2 (2026-11-17): 'rfqs' = solicitudes de cotización (AB_COTIZACIONES). */
+export type MaximoSyncTarget = 'purchase_orders' | 'contracts' | 'rfqs';
 
 /**
  * G1 (2026-09-28): proveedor EFECTIVO de Maximo — el de SAP si la OC migró
@@ -645,11 +646,14 @@ export interface MaximoSyncRun {
 export interface MaximoSyncStatus {
   enabled: boolean;
   contractsEnabled: boolean;
+  /** O2: MAXIMO_RFQS_ENABLED; ausente con un api anterior a O2. */
+  rfqsEnabled?: boolean;
   intervalMinutes: number;
   pageSize: number;
   running: MaximoSyncTarget[];
-  lastRuns: Record<MaximoSyncTarget, MaximoSyncRun | null>;
-  counts: Record<MaximoSyncTarget, number>;
+  /** O2: `rfqs` falta con un api anterior a O2. */
+  lastRuns: Partial<Record<MaximoSyncTarget, MaximoSyncRun | null>>;
+  counts: Partial<Record<MaximoSyncTarget, number>>;
 }
 
 export interface MaximoSummaryLastRun {
@@ -970,6 +974,7 @@ export const MAXIMO_RUN_STATUS_CLASSES: Record<MaximoSyncRun['status'], string> 
 export const MAXIMO_TARGET_LABELS: Record<MaximoSyncTarget, string> = {
   purchase_orders: 'Órdenes (PO)',
   contracts: 'Contratos',
+  rfqs: 'Solicitudes de cotización (RQ)',
 };
 
 export const MAXIMO_TRIGGER_LABELS: Record<MaximoSyncRun['triggered_by'], string> = {
