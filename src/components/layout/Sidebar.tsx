@@ -43,6 +43,7 @@ function getCurrentModule(pathname: string): UserModule | null {
   if (pathname.startsWith('/compras')) return 'compras';
   if (pathname.startsWith('/contabilidad')) return 'contabilidad';
   if (pathname.startsWith('/fpa')) return 'fpa';
+  if (pathname.startsWith('/almacen')) return 'almacen';
   if (
     pathname.startsWith('/capacitacion') ||
     pathname.startsWith('/dashboard') ||
@@ -63,6 +64,7 @@ const MODULE_SUBTITLE: Record<UserModule, string> = {
   compras: 'Compras',
   contabilidad: 'Contabilidad',
   fpa: 'FP&A',
+  almacen: 'Almacén',
 };
 
 function getModuleSubtitle(pathname: string): string {
@@ -238,6 +240,12 @@ const Icons: Record<string, React.FC<{ className?: string }>> = {
   'presentation-chart': ({ className }) => (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+    </svg>
+  ),
+  // Almacén: caja (inventario)
+  package: ({ className }) => (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
     </svg>
   ),
 };

@@ -24,10 +24,12 @@ export type UserRole =
   // Roles de FP&A
   | 'fpa_area'              // Responsable de área: captura o aprueba en sus áreas
   | 'fpa_planeacion'        // Planeación: ve todo y administra áreas y responsables
-  | 'fpa_cfo';              // CFO: ve todo y firma el paso final
+  | 'fpa_cfo'               // CFO: ve todo y firma el paso final
+  // Rol de Almacén
+  | 'almacen_consulta';     // Consulta del reporte de inventario al corte
 
 /** Módulos del sistema: agrupan los roles por área funcional. */
-export type UserModule = 'core' | 'capacitacion' | 'compras' | 'contabilidad' | 'fpa';
+export type UserModule = 'core' | 'capacitacion' | 'compras' | 'contabilidad' | 'fpa' | 'almacen';
 
 /** Asignación de un rol específico a un módulo (de la tabla user_roles). */
 export interface UserRoleAssignment {
@@ -86,6 +88,7 @@ export const MODULE_ROLES: Record<UserModule, UserRole[]> = {
   ],
   contabilidad: ['contabilidad', 'fiscal', 'director_financiero', 'accionista'],
   fpa: ['fpa_area', 'fpa_planeacion', 'fpa_cfo'],
+  almacen: ['almacen_consulta'],
 };
 
 /** Etiquetas legibles de los módulos. */
@@ -95,10 +98,11 @@ export const MODULE_LABELS: Record<UserModule, string> = {
   compras: 'Compras',
   contabilidad: 'Contabilidad',
   fpa: 'FP&A',
+  almacen: 'Almacén',
 };
 
 /** Lista ordenada de módulos para iterar en UI. */
-export const ALL_MODULES: UserModule[] = ['core', 'capacitacion', 'compras', 'contabilidad', 'fpa'];
+export const ALL_MODULES: UserModule[] = ['core', 'capacitacion', 'compras', 'contabilidad', 'fpa', 'almacen'];
 
 /**
  * Prioridad para elegir el rol "principal" cuando un usuario tiene varios.
@@ -130,6 +134,8 @@ export const ROLE_PRIORITY: UserRole[] = [
   'fpa_planeacion',
   'fpa_cfo',
   'fpa_area',
+  // Almacén al final, por lo mismo (mismo orden que el backend)
+  'almacen_consulta',
 ];
 
 /**
@@ -209,6 +215,13 @@ const FPA_ADMINS: UserRole[] = ['super_admin', 'fpa_planeacion'];
 
 // Ven todas las áreas y las versiones con sus parámetros (B2); cambiarlas es de planeación
 const FPA_SEE_ALL: UserRole[] = ['super_admin', 'fpa_planeacion', 'fpa_cfo'];
+
+// ==========================================
+// GRUPOS DE ROLES - ALMACÉN
+// ==========================================
+
+// Entrada al módulo (solo consulta). super_admin explícito, como en FP&A.
+const ALMACEN_ROLES: UserRole[] = ['super_admin', 'almacen_consulta'];
 
 /** Navegacion principal del sidebar */
 export const SIDEBAR_NAV: NavItem[] = [
@@ -290,6 +303,18 @@ export const SIDEBAR_NAV: NavItem[] = [
       { label: 'Consolidado', href: '/fpa/consolidado', icon: 'bar-chart', roles: FPA_ROLES },
       { label: 'Versiones', href: '/fpa/versiones', icon: 'calendar', roles: FPA_SEE_ALL },
       { label: 'Áreas', href: '/fpa/areas', icon: 'building', roles: FPA_ADMINS },
+    ],
+  },
+  // ==========================================
+  // MODULO DE ALMACÉN (reporte de inventario al corte)
+  // ==========================================
+  {
+    label: 'Almacén',
+    href: '/almacen',
+    icon: 'package',
+    roles: ALMACEN_ROLES,
+    children: [
+      { label: 'Inventario al corte', href: '/almacen', icon: 'package', roles: ALMACEN_ROLES },
     ],
   },
   // ==========================================
@@ -380,6 +405,8 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   fpa_area: 'Responsable de área (FP&A)',
   fpa_planeacion: 'Planeación (FP&A)',
   fpa_cfo: 'CFO (FP&A)',
+  // Rol de Almacén
+  almacen_consulta: 'Consulta (Almacén)',
 };
 
 /** Pagina de inicio por rol */
@@ -409,6 +436,8 @@ export const HOME_ROUTES: Record<UserRole, string> = {
   fpa_area: '/fpa',
   fpa_planeacion: '/fpa/consolidado',
   fpa_cfo: '/fpa/consolidado',
+  // Rol de Almacén
+  almacen_consulta: '/almacen',
 };
 
 /** Roles que pueden gestionar usuarios */

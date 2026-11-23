@@ -63,6 +63,9 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
   { path: '/fpa/versiones', roles: ['super_admin', 'fpa_planeacion', 'fpa_cfo'] },
   { path: '/fpa', roles: ['super_admin', 'fpa_area', 'fpa_planeacion', 'fpa_cfo'] },
 
+  // Almacén (reporte de inventario al corte, solo consulta). super_admin explícito.
+  { path: '/almacen', roles: ['super_admin', 'almacen_consulta'] },
+
   // Reportes
   { path: '/reportes', roles: ['super_admin', 'admin_rh', 'executive'] },
 
