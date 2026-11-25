@@ -13,6 +13,16 @@ export function fechaCorta(f: string | null): string {
   return `${f.slice(8, 10)}-${MESES[Number(f.slice(5, 7)) - 1]}-${f.slice(0, 4)}`;
 }
 
+/** '2026-10' → 'oct-2026'. */
+export function mesCorto(m: string): string {
+  return `${MESES[Number(m.slice(5, 7)) - 1]}-${m.slice(0, 4)}`;
+}
+
+/** '2026-10-23' o '2026-10-23T10:00:00' → '23-oct'. */
+export function diaCorto(f: string): string {
+  return `${f.slice(8, 10)}-${MESES[Number(f.slice(5, 7)) - 1]}`;
+}
+
 /** '2026-10-30T11:13:38' → '30-oct-2026 11:13'. */
 export function fechaHora(f: string | null): string {
   if (!f) return '—';
