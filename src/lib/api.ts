@@ -100,7 +100,15 @@ export async function uploadFile<T>(
  * Helper para descargar un archivo binario (e.g. Excel export). Devuelve
  * un Blob para que el caller decida cómo manejarlo (downloadar, abrir, etc).
  */
-export async function downloadFile(path: string): Promise<Blob> {
+/**
+ * Descarga un archivo del api como Blob. Con `onProgress`, lee la respuesta por
+ * partes y avisa cuánto lleva y el total (si el api manda Content-Length), para
+ * mostrar el avance mientras baja; sin él, igual que siempre.
+ */
+export async function downloadFile(
+  path: string,
+  onProgress?: (recibido: number, total: number | null) => void,
+): Promise<Blob> {
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'include',
   });
@@ -108,5 +116,18 @@ export async function downloadFile(path: string): Promise<Blob> {
     const error = await res.json().catch(() => ({ message: res.statusText }));
     throw new Error(error.message || 'Error al descargar');
   }
-  return res.blob();
+  if (!onProgress || !res.body) return res.blob();
+  const largo = Number(res.headers.get('Content-Length'));
+  const total = Number.isFinite(largo) && largo > 0 ? largo : null;
+  const reader = res.body.getReader();
+  const partes: BlobPart[] = [];
+  let recibido = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    partes.push(value);
+    recibido += value.byteLength;
+    onProgress(recibido, total);
+  }
+  return new Blob(partes, { type: res.headers.get('Content-Type') ?? '' });
 }
